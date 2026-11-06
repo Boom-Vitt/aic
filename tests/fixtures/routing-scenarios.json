@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {"id":"coupled-bug","request":"A single shared date parser now rejects a previously valid date. Reproduce the reported failure, fix the parser without changing its API, and verify the regression.","expected_workflow":"debug","expected_topology":"solo"},
+    {"id":"independent-research","request":"Produce two substantial source-verified investigations: the documented skill discovery interface for a CLI, and a separate benchmark paper's limitations. They use different sources and disjoint notes; each needs independently checkable citations. One lead will synthesize both.","expected_workflow":"research","expected_topology":"parallel"},
+    {"id":"consequential-implementation","request":"Implement an approved authorization boundary across API and storage. Unauthorized cross-account reads would expose financial records, and the change needs independent outcome checking against the agreed security criteria.","expected_workflow":"implementation","expected_topology":"generator-evaluator"},
+    {"id":"bounded-answer","request":"Explain the difference between an Agent Skill and a model provider, citing the relevant specification. No files should change and no agents or services should launch.","expected_workflow":"answer","expected_topology":"solo"}
+  ],
+  "limits":"These scenarios check declared workflow selection in bounded smoke runs, not broad model quality. Offline contract tests do not perform inference; actual host runs are recorded separately."
+}

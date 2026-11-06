@@ -1,0 +1,9 @@
+{
+  "objective": "Review the proposed README change inside the approved project.",
+  "confirmed": ["A recommendation has been written; no implementation or launch is claimed."],
+  "unverified": ["The README acceptance checks have not been executed."],
+  "evidence": ["README.md"],
+  "uncertain_actions": [],
+  "blockers": ["Execution needs approval if it was not already included in the user's request."],
+  "next_action": "Present the recommendation and obtain the required scope approval before changes."
+}

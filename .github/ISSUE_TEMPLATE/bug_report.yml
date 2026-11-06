@@ -1,0 +1,24 @@
+name: Bug report
+description: Report a reproducible user-visible behavior or compatibility problem.
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and observed behavior
+      description: Include the AIC revision, harness/version, OS and exact command. Exclude secrets and private code.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Synthetic reproduction and evidence
+      description: Use a small disposable project. Distinguish documentation, installation, native discovery and actual model/launch behavior.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: This report contains no real credentials, customer data or private prompts.
+          required: true
