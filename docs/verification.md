@@ -10,12 +10,13 @@ Tests use isolated targets beneath the checkout's ignored `.work/` directory. Th
 
 ## Initial delivery receipt — November 6, 2026
 
-Actual full offline runs used the entrypoint above. The one skipped case requires two distinct existing directory names differing only by case, which this filesystem cannot create; the other alias, future-name and hard-link scope cases ran.
+Actual full offline runs used the entrypoint above. Filesystem-specific cases are complementary: macOS skipped the distinct case-only-directory fixture; Linux skipped the case-insensitive-directory-alias fixture. The other scope, future-name and hard-link cases ran in each environment.
 
 | Interpreter | Environment and selection | Observed result |
 | --- | --- | --- |
 | Python 3.14.7 | macOS arm64, isolated checkout `.venv` | 82 ran: 81 passed, 1 skipped; exit 0 |
 | Python 3.11.15 | macOS arm64, explicit `AIC_PYTHON` | 82 ran: 81 passed, 1 skipped; exit 0 |
+| Python 3.11.18 | Ubuntu 24.04.5, [initial PR CI run](https://github.com/Boom-Vitt/aic/actions/runs/42187083490) | 82 ran: 81 passed, 1 skipped; exit 0 |
 
 A targeted path-safety regression run was initially RED because the helper did not yet exist; after implementation all four cases passed. The older system Python is not a supported-runtime claim.
 
