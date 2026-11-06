@@ -1,6 +1,6 @@
 [project]
 name = "aiculture-skills"
-version = "2.0.0"
+version = "2.0.1"
 description = "Portable, evidence-backed Agent Skills for task routing and scoped handoffs"
 requires-python = ">=3.11"
 license = "Apache-2.0"

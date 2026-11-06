@@ -208,6 +208,34 @@ class GatewayTests(unittest.TestCase):
         self.assertFalse(policy['allow_deletions'])
         self.assertEqual(set(policy['required_status_checks']['contexts']), {'offline-contracts', 'aic/macmini', 'aic/independent-review'})
 
+    def test_personal_repository_protection_installs_without_organization_restrictions(self):
+        api = API()
+        branch = f'/repos/{REPO}/branches/main'
+        api.routes['GET', branch] = {'protected': False}
+
+        def personal_repository(query):
+            request = api.writes[-1][2]
+            if 'bypass_pull_request_allowances' in request['required_pull_request_reviews']:
+                return 422, json.dumps({
+                    'message': 'Validation Failed',
+                    'errors': ['Only organization repositories can have users and team restrictions'],
+                })
+            api.routes['GET', branch] = {'protected': True}
+            installed = protection()
+            installed['required_pull_request_reviews'] = request['required_pull_request_reviews']
+            return installed
+
+        api.routes['PUT', branch + '/protection'] = personal_repository
+        installed = GitHub(write_enabled=True, runner=api).protect_main()
+        self.assertTrue(installed['protected'])
+        self.assertTrue(installed['strict'])
+        self.assertTrue(installed['enforce_admins'])
+        self.assertEqual(set(installed['required_contexts']), {
+            'offline-contracts', 'aic/macmini', 'aic/independent-review'})
+        self.assertTrue(installed['required_pr'])
+        self.assertFalse(installed['allow_force_pushes'])
+        self.assertFalse(installed['allow_deletions'])
+
     def test_initial_required_checks_cannot_precede_maintainer_publication(self):
         for state in ('missing', 'partial-tree', 'symlink'):
             api = API()

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 — 2026-11-07
+- Fix initial branch protection on personal GitHub repositories by omitting organization-only bypass structures. The read-back policy still requires strict checks, administrator enforcement and pull requests, and rejects every nonempty bypass allowance.
+- Preserve the ordinary two-role-runs-per-UTC-day limit; a separately recorded owner-approved, three-invocation supervised proof does not increase recurring capacity.
+
 ## 2.0.0 — 2026-11-06
 - Add seven original, task-conditioned workflow templates and a milestone-planning guide with ownership, dependency, context, permission and acceptance contracts.
 - Separate task category, template, topology and runtime/model choice. The host AI reasons about selection; the local helpers do not infer intent, schedule teams or rank vendors.
