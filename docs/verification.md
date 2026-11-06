@@ -34,7 +34,9 @@ Before initial maintainer publication, the corrected complete Mac mini entrypoin
 
 The first actual subscription-backed researcher completed through `openai-codex/gpt-6.1-sol`, but the adapter rejected duplicate receipts whose timing metadata differed. The stable-identity fix then parsed that **same original stream offline**, without another model call. Its unchanged seven findings and six limitations still exceeded the four-item policy, so the result was rejected and the consumed call/evidence retained. Both role prompts now disclose the same hard limits as their validators; no bound was widened and no output was trimmed or repaired.
 
-Successful research/review, protected publication and installed-service lifecycle remain separate gates. Nothing was published or enabled by this rejected attempt. The [maintenance guide](maintenance.md) requires initial manual publication before installing maintainer-only branch checks, then real end-to-end proof before scheduler activation.
+A subsequent corrected researcher invocation passed the unchanged source, rights, originality and output-bound gates and produced one accepted private record. This was an explicitly labeled historical first-party engineering backfill, not a newly published or peer-reviewed paper. The owner approved a one-time ceiling of three total proof invocations, including the rejected attempt; two have run at this stage. Both ledgers/evidence are retained and the normal two-per-day policy is unchanged.
+
+Fresh exact-head review, protected publication and installed-service lifecycle remain separate gates. Nothing was published or enabled by the rejected attempt or private researcher stage. The [maintenance guide](maintenance.md) requires initial manual publication before installing maintainer-only branch checks, then real end-to-end proof before scheduler activation.
 
 
 ## Initial delivery receipt — November 6, 2026
