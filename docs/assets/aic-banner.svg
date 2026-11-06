@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 152" role="img" aria-labelledby="title description">
+  <title id="title">AIC — AI Culture</title>
+  <desc id="description">An original geometric AIC wordmark, drawn for Boom-Vitt, with a quiet linear accent.</desc>
+  <style>:root { --accent: #5378c9; } .ink { fill: none; stroke: var(--accent); stroke-linecap: round; stroke-linejoin: round; }</style>
+  <g class="ink" stroke-width="10">
+    <path d="M44 112 75 38 106 112M56 84h38"/>
+    <path d="M139 38h40m-20 0v74m-20 0h40"/>
+    <path d="M265 49a38 38 0 1 0 0 52"/>
+  </g>
+  <path class="ink" stroke-width="1.5" opacity=".55" d="M326 76h526"/>
+  <path class="ink" stroke-width="3" d="M869 59v34m-17-17h34"/>
+  <circle class="ink" stroke-width="1.5" opacity=".55" cx="869" cy="76" r="29"/>
+</svg>

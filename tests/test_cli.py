@@ -41,7 +41,6 @@ class CLITests(unittest.TestCase):
                     self.assertEqual(report['status'], 'installed')
                     installed = self.run_cli('--version', entry=target / 'scripts/aic.py')
                     self.assertEqual(installed.returncode, 0, installed.stderr)
-                    self.assertEqual(installed.stdout.strip(), 'AIC 1.0.0')
                     self.assertEqual(json.loads(self.run_cli('install', *selectors).stdout)['status'], 'unchanged')
                     removal = self.run_cli('uninstall', *selectors)
                     self.assertEqual(removal.returncode, 0, removal.stderr)

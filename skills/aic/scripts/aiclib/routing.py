@@ -6,6 +6,7 @@ The host skill must require verification or independent review for high-risk wor
 """
 from __future__ import annotations
 
+import json
 import stat
 from copy import deepcopy
 from pathlib import Path
@@ -15,12 +16,15 @@ from .safety import AICError, checked_root, relative_path, safe_path
 
 
 _PLAN_KEYS = frozenset({
-    "schema_version", "task", "workflow", "topology", "risk", "reasons",
+    "schema_version", "task", "workflow", "template", "topology", "risk", "reasons",
     "evidence", "scope", "acceptance", "independent_subtasks", "next_action",
     "approval_required",
 })
-_WORKFLOWS = frozenset({"answer", "research", "implementation", "debug", "review", "design"})
-_TOPOLOGIES = frozenset({"solo", "parallel", "generator-evaluator"})
+_CATALOG = json.loads((Path(__file__).resolve().parents[2] / "assets/workflows.json").read_text(encoding="utf-8"))
+_WORKFLOWS = frozenset(item["id"] for item in _CATALOG["workflows"])
+_TOPOLOGIES = frozenset(_CATALOG["topologies"])
+_TEMPLATES = {item["id"]: frozenset(item["topologies"]) for item in _CATALOG["templates"]}
+_TEMPLATE_IDS = frozenset(_TEMPLATES)
 _RISKS = frozenset({"low", "medium", "high"})
 
 
@@ -125,7 +129,7 @@ def _physical_overlap(first: _PhysicalScope, second: _PhysicalScope) -> bool:
 
 
 def validate_plan(plan: dict, *, project: Path | None = None) -> dict:
-    """Return a detached, unchanged-value copy of a schema-version-1 plan.
+    """Return a detached, unchanged-value copy of a schema-version-2 plan.
 
     An optional existing project enables symlink checks for every selected path
     and existence checks for evidence. Without it, paths are checked lexically;
@@ -142,11 +146,14 @@ def validate_plan(plan: dict, *, project: Path | None = None) -> dict:
     filesystem lock, or protection against subsequent filesystem changes.
     """
     value = _object(plan, _PLAN_KEYS, "Recommendation")
-    if type(value["schema_version"]) is not int or value["schema_version"] != 1:
-        raise AICError("schema_version must be the integer 1.")
+    if type(value["schema_version"]) is not int or value["schema_version"] != 2:
+        raise AICError("schema_version must be the integer 2; select a template explicitly.")
     _text(value["task"], "task")
     _choice(value["workflow"], _WORKFLOWS, "workflow")
+    _choice(value["template"], _TEMPLATE_IDS, "template")
     _choice(value["topology"], _TOPOLOGIES, "topology")
+    if value["topology"] not in _TEMPLATES[value["template"]]:
+        raise AICError("The selected template does not support this topology.")
     _choice(value["risk"], _RISKS, "risk")
     _texts(value["reasons"], "reasons")
     _texts(value["acceptance"], "acceptance")
@@ -173,6 +180,9 @@ def validate_plan(plan: dict, *, project: Path | None = None) -> dict:
         _text(branch["goal"], f"{label}.goal")
         _texts(branch["acceptance"], f"{label}.acceptance")
         branch_paths.append(_paths(branch["allowed_paths"], f"{label}.allowed_paths", root, nonempty=True))
+
+    if value["topology"] != "parallel" and branch_paths:
+        raise AICError("independent_subtasks must be empty unless topology is parallel.")
 
     if value["topology"] == "parallel":
         if len(branch_paths) < 2:

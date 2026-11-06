@@ -14,9 +14,10 @@ from aiclib.safety import AICError
 
 def recommendation():
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "task": "Review the migration and propose an owner-approved implementation.",
         "workflow": "review",
+        "template": "direct",
         "topology": "solo",
         "risk": "high",
         "reasons": ["The host AI selected a review before any implementation."],
@@ -32,6 +33,7 @@ def recommendation():
 def parallel_recommendation():
     plan = recommendation()
     plan["topology"] = "parallel"
+    plan["template"] = "explore-build"
     plan["independent_subtasks"] = [
         {
             "goal": "Review implementation behavior.",
@@ -81,6 +83,7 @@ class RoutingTests(unittest.TestCase):
                 plan = recommendation()
                 plan["workflow"] = workflow
                 plan["topology"] = "generator-evaluator"
+                plan["template"] = "independent-review"
                 self.assertEqual(validate_plan(plan, project=self.project), plan)
 
     def test_parallel_branches_have_independent_acceptance_and_disjoint_paths(self):
@@ -197,7 +200,7 @@ class RoutingTests(unittest.TestCase):
 
     def test_malformed_schema_and_types_are_rejected(self):
         invalid_values = {
-            "schema_version": (True, 1.0, "1", 0, 2),
+            "schema_version": (True, 2.0, "2", 0, 1, 3),
             "task": (None, "", " \n", 1, []),
             "workflow": ("auto", True, [], {}),
             "topology": ("swarm", None, {}),

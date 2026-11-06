@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0 — 2026-11-06
+- Add seven original, task-conditioned workflow templates and a milestone-planning guide with ownership, dependency, context, permission and acceptance contracts.
+- Separate task category, template, topology and runtime/model choice. The host AI reasons about selection; the local helpers do not infer intent, schedule teams or rank vendors.
+- Require recommendation schema 2 with an explicit compatible `template`; add `sequential` topology and reject schema-1 recommendations rather than guessing a migration. Other AIC formats keep their independent versions.
+- Credit primary research and engineering sources with exact versions, evidence limits, checked dates and content-specific license status. Preserve upstream notices; cited papers, figures, prompts and implementation code are not redistributed or relicensed.
+- Expand portable routing scenarios to cover every template and mixed project milestones. Actual checks and consumption limits are recorded in [verification](docs/verification.md).
+- Add opt-in primary-source discovery, owner-assigned research/adoption issues and independent exact-head review for a research-record-only automatic merge lane. Instruction, template, code, CI and security changes remain manual.
+- Bound unattended work to two reserved role runs per UTC day using the existing subscription login, with no tools, provider fallback or new API credentials. Preserve durable evidence and reconcile uncertain external effects without automatic replay.
+- Add an explicitly activated, immutable published-source macOS scheduler with owned installation/removal and private state/logs. Installing the portable skill does not start a service. See [maintenance](docs/maintenance.md) for policy and setup.
+- Replace the README's upstream-facing presentation with owner-focused documentation and an original vector banner; retain legal notices and research credit in their dedicated files.
+
 ## 1.0.0 — 2026-11-06
 
 - Publish the self-contained `aic` Agent Skill with English, evidence-backed task routing, workflow/topology selection, scoped memory and handoff guidance.

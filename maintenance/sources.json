@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "checked_on": "2026-11-06",
+  "arxiv": {
+    "url": "https://export.arxiv.org/api/query?search_query=cat%3Acs.AI+AND+%28all%3Aagent+OR+all%3Aworkflow%29&start=0&max_results=3&sortBy=lastUpdatedDate&sortOrder=descending",
+    "documentation": ["https://info.arxiv.org/help/api/user-manual.html", "https://info.arxiv.org/help/api/tou.html"],
+    "tier": "preprint",
+    "metadata_rights": "CC0; arXiv API terms explicitly separate descriptive metadata from e-print rights.",
+    "content_rights": "Per-paper license only; unknown unless observed. Private evidence; reference-only public citation.",
+    "request_policy": "One collector connection at a time; at least three seconds after the previous arXiv request completes. Controller serializes collector processes."
+  },
+  "crossref": {
+    "url": "https://api.crossref.org/journals/2522-5839/works?query=agent&filter=type:journal-article&sort=published&order=desc&rows=3",
+    "documentation": ["https://www.crossref.org/documentation/retrieve-metadata/rest-api/", "https://www.nature.com/natmachintell/journal-information", "https://www.nature.com/natmachintell/about/content"],
+    "journal": "Nature Machine Intelligence",
+    "issn": "2522-5839",
+    "doi_prefix": "10.1038/s42256-",
+    "tier": "peer-reviewed",
+    "review_boundary": "Crossref journal-article metadata alone is insufficient. Require the publisher's citation_article_type to be Article or Review; editorials, comments and inaccessible publisher metadata are ineligible.",
+    "publisher_redirect_boundary": "Observed 2026-11-06: exact www.nature.com DOI article -> idp.nature.com/authorize -> /transit -> same article with cookies_not_supported. Only this parameter-validated anonymous round-trip is allowed; no cookies/credentials are stored or sent. Transient state/query identifiers never enter Candidate/SourceDocument URLs or revision hashes.",
+    "metadata_rights": "Crossref metadata generally unrestricted; publisher abstracts may remain copyrighted.",
+    "content_rights": "Record deposited license URL, content-version and start unchanged; do not infer permission or follow license URLs. Unknown/restrictive material remains reference-only."
+  },
+  "engineering": {
+    "url": "https://www.anthropic.com/engineering",
+    "documentation": ["https://www.anthropic.com/engineering"],
+    "tier": "engineering",
+    "authorship_boundary": "Prefer explicit citation-author or structured Person credits. Parse only a bounded Written by name/team attribution; biographies and acknowledgment sentences are not authors. Unparseable person credits may use an explicitly supplied Organization author, never inferred people.",
+    "content_rights": "Unknown unless article explicitly supplies rights evidence; repository licenses do not apply.",
+    "bootstrap": "https://www.anthropic.com/engineering/multi-agent-research-system",
+    "bootstrap_observation": "Readable primary article redirects on the same official host to /research/multi-agent-research-system; published 2025-06-13, modified 2026-10-09. Historical backfill, not new publication."
+  }
+}

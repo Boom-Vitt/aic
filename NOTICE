@@ -3,7 +3,8 @@ Copyright 2026 Boom-Vitt and AIC contributors.
 
 This package follows the Agent Skills specification and the skill-directory
 layout and authoring guidance published by Anthropic. AIC-specific instructions,
-helper implementations, examples and tests are newly authored for this project.
+helper implementations, workflow templates, research summaries, examples and
+tests are newly authored for this project.
 
 Apache-2.0 authoring reference:
 Anthropic skills/skill-creator, Copyright 2026 Anthropic, PBC.
@@ -14,6 +15,33 @@ skills or other separately licensed Anthropic implementations are redistributed.
 
 Agent Skills specification reference, Apache-2.0:
 https://github.com/agentskills/agentskills/tree/83021e2be457a9b6679148719c1f6074f0ad975e
+The pinned governance policy distinguishes code/specifications (Apache-2.0)
+from other documentation (CC BY 4.0). No blanket Apache claim is made for the
+upstream repository, and its non-specification documentation is not copied.
+
+Research and engineering references (citation/reference-only):
+Credit to Yubin Kim and coauthors (Google Research, Google DeepMind, MIT);
+the CooperBench authors (Stanford/SAP and affiliated researchers);
+Keenan Samway, Daniel D'souza and coauthors (Cohere Labs/Cohere);
+Jiayi Geng and Graham Neubig (Carnegie Mellon University);
+Paras Dahal and coauthors (Meta Superintelligence Labs);
+Shiyi Cao and coauthors (UC Berkeley);
+Mert Cemri, Melissa Z. Pan, Shuyi Yang and coauthors (UC Berkeley/Intesa Sanpaolo);
+Zhenting Qi and coauthors (FAIR/Meta and Harvard);
+Han Li, HanHaoNing Li, Ziqian Jiang and Yiling Lou;
+the credited Anthropic engineering/security authors and OpenAI's Ryan Lopopolo;
+Yuxin Wang and coauthors (Dartmouth, Microsoft and an independent researcher);
+and the credited OpenAI Cookbook memory/compaction contributors.
+
+Full source titles, author/team credits, exact versions, primary URLs,
+evidence limits, checked dates and license evidence/status are in the skill's
+references/research.md and references/provenance.md
+(source tree: skills/aic/references/).
+No upstream research PDFs, prose excerpts, figures, tables, prompts, datasets
+or implementation code are redistributed. Unknown or restrictive publication
+rights remain reference-only. Paper/web-content rights, implementation-code
+licenses and AIC's Apache-2.0 license are separate; AIC does not relicense
+cited material. Original AIC templates/summaries are not upstream endorsements.
 
 Names of harnesses and model providers identify compatibility targets only.
 No endorsement, certification or universal interoperability is implied.

@@ -17,7 +17,7 @@ from aiclib.safety import AICError, canonical_json
 
 
 def recommendation():
-    return dict(schema_version=1, task='Review the requested project', workflow='review',
+    return dict(schema_version=2, task='Review the requested project', workflow='review', template='direct',
                 topology='solo', risk='low', reasons=['Owner requested review'], evidence=[],
                 scope={'read': ['README.txt'], 'write': []}, acceptance=['Report evidence'],
                 independent_subtasks=[], next_action='recommend', approval_required=True)

@@ -1,17 +1,76 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "workflows": [
-    {"id":"answer","purpose":"Answer a bounded question using authoritative evidence.","default_topology":"solo"},
-    {"id":"research","purpose":"Investigate independent unknowns and synthesize source-backed findings.","default_topology":"solo"},
-    {"id":"implementation","purpose":"Implement an approved behavior with observable acceptance and focused checks.","default_topology":"solo"},
-    {"id":"debug","purpose":"Reproduce an observed failure, establish its cause, fix it and verify the changed path.","default_topology":"solo"},
-    {"id":"review","purpose":"Evaluate existing work against explicit criteria with concrete evidence.","default_topology":"solo"},
-    {"id":"design","purpose":"Compare alternatives against constraints and obtain a decision before consequential execution.","default_topology":"solo"}
+    {"id": "answer", "purpose": "Answer a bounded question using authoritative evidence."},
+    {"id": "research", "purpose": "Investigate unknowns and reconcile source-backed findings."},
+    {"id": "implementation", "purpose": "Implement approved behavior and verify observable acceptance."},
+    {"id": "debug", "purpose": "Reproduce a failure, establish its cause, fix and recheck."},
+    {"id": "review", "purpose": "Evaluate existing work against explicit acceptance with concrete evidence."},
+    {"id": "design", "purpose": "Compare alternatives against constraints before consequential execution."}
   ],
   "topologies": {
-    "solo":"Use one agent for coupled reasoning, shared invariants or small work.",
-    "parallel":"Use only for substantial independently checkable branches with explicit semantic interfaces and one integrator.",
-    "generator-evaluator":"Separate generation and evaluation when consequential risk or demonstrated quality gaps justify the overhead."
+    "solo": "One owner handles coupled reasoning, shared invariants or bounded work.",
+    "sequential": "Dependent delegated units proceed in verified producer-to-consumer order.",
+    "parallel": "Substantial independently checkable branches have exclusive write/output scopes and one integrator.",
+    "generator-evaluator": "Generation and selected-input evaluation are separate responsibilities."
   },
-  "inference":"The host agent chooses from this descriptive catalog; it is not a keyword classifier or a universal performance ranking."
+  "templates": [
+    {
+      "id": "direct",
+      "topologies": ["solo"],
+      "select_when": "Work is bounded or coupled and delegation would mostly repeat context.",
+      "avoid_when": "Independent substantial work or consequential acceptance gaps justify another structure.",
+      "reference": "references/templates.md#direct",
+      "research": ["google-2026", "concurrency-2026", "anthropic-agents-2024"]
+    },
+    {
+      "id": "explore-build",
+      "topologies": ["parallel"],
+      "select_when": "Independent discovery questions are the bottleneck before a capable owner builds.",
+      "avoid_when": "Questions are dependent or the specification is already clear.",
+      "reference": "references/templates.md#explore-build",
+      "research": ["cohere-2026", "openai-harness-2026"]
+    },
+    {
+      "id": "ordered-handoff",
+      "topologies": ["sequential"],
+      "select_when": "Useful delegated units depend on confirmed upstream artifacts or share mutation boundaries.",
+      "avoid_when": "One owner can finish the small coupled task without a meaningful handoff.",
+      "reference": "references/templates.md#ordered-handoff",
+      "research": ["cooperbench-2026", "caid-2026"]
+    },
+    {
+      "id": "isolated-build",
+      "topologies": ["parallel"],
+      "select_when": "Substantial implementation units have agreed interfaces and independent acceptance.",
+      "avoid_when": "Shared invariants or unresolved interfaces require simultaneous overlapping writers.",
+      "reference": "references/templates.md#isolated-build",
+      "research": ["caid-2026", "cooperbench-2026"]
+    },
+    {
+      "id": "independent-review",
+      "topologies": ["generator-evaluator"],
+      "select_when": "Consequential defects or observed self-review gaps justify separate acceptance checking.",
+      "avoid_when": "A bounded task has adequate direct verification and another review adds no useful evidence.",
+      "reference": "references/templates.md#independent-review",
+      "research": ["anthropic-harness-2026", "mast-2025", "containment-2026"]
+    },
+    {
+      "id": "durable-controller",
+      "topologies": ["solo", "sequential", "parallel", "generator-evaluator"],
+      "select_when": "Long-running work needs compact state, artifact dependencies and explicit recovery ownership.",
+      "avoid_when": "A short task does not need a separate control or continuity layer.",
+      "reference": "references/templates.md#durable-controller",
+      "research": ["meta-control-2026", "openai-harness-2026", "containment-2026"]
+    },
+    {
+      "id": "adaptive-optimization",
+      "topologies": ["solo", "sequential", "parallel", "generator-evaluator"],
+      "select_when": "A correct measured baseline has a diagnosed optimization plateau and approved experiment limits.",
+      "avoid_when": "The task lacks an executable correctness gate or reliable objective.",
+      "reference": "references/templates.md#adaptive-optimization",
+      "research": ["eat-2026"]
+    }
+  ],
+  "inference": "The host AI selects task category, template and current-stage topology from evidence; this catalog is not a keyword classifier, scheduler or universal runtime/model ranking."
 }
