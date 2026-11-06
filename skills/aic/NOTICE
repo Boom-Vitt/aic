@@ -1,0 +1,19 @@
+AIC (AI Culture)
+Copyright 2026 Boom-Vitt and AIC contributors.
+
+This package follows the Agent Skills specification and the skill-directory
+layout and authoring guidance published by Anthropic. AIC-specific instructions,
+helper implementations, examples and tests are newly authored for this project.
+
+Apache-2.0 authoring reference:
+Anthropic skills/skill-creator, Copyright 2026 Anthropic, PBC.
+https://github.com/anthropics/skills/tree/ca45fc496a3436251f191354091d557da31c15b5/skills/skill-creator
+Its license is retained in LICENSE and in the installed skill's LICENSE.txt.
+The basic template/SKILL.md is a structural reference; no document-generation
+skills or other separately licensed Anthropic implementations are redistributed.
+
+Agent Skills specification reference, Apache-2.0:
+https://github.com/agentskills/agentskills/tree/83021e2be457a9b6679148719c1f6074f0ad975e
+
+Names of harnesses and model providers identify compatibility targets only.
+No endorsement, certification or universal interoperability is implied.

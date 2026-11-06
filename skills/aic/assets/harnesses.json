@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-11-06",
+  "agents": [
+    {"id":"claude-code","name":"Claude Code","project":".claude/skills","user":".claude/skills","source":"https://code.claude.com/docs/en/skills","status":"documented"},
+    {"id":"codex","name":"OpenAI Codex","project":".agents/skills","user":".agents/skills","source":"https://developers.openai.com/codex/skills","status":"documented"},
+    {"id":"omp","name":"oh-my-pi / omp","project":".omp/skills","user":".omp/agent/skills","source":"https://github.com/can1357/oh-my-pi/blob/75e7801e247d4e3263439d4cc08ccad60dc64bdd/docs/skills.md","status":"documented"},
+    {"id":"pi","name":"Pi","project":".pi/skills","user":".pi/agent/skills","source":"https://pi.dev/docs/latest/skills","status":"documented"},
+    {"id":"hermes","name":"Hermes Agent","project":".hermes/skills","user":".hermes/skills","source":"https://hermes-agent.nousresearch.com/docs/user-guide/features/skills","status":"documented"},
+    {"id":"openclaw","name":"OpenClaw","project":"skills","user":".openclaw/skills","source":"https://docs.openclaw.ai/tools/skills","status":"documented"},
+    {"id":"cursor","name":"Cursor","project":".cursor/skills","user":".cursor/skills","source":"https://cursor.com/docs/skills.md","status":"documented"},
+    {"id":"gemini-cli","name":"Gemini CLI","project":".gemini/skills","user":".gemini/skills","source":"https://geminicli.com/docs/cli/skills.md","status":"documented"},
+    {"id":"opencode","name":"OpenCode","project":".opencode/skills","user":".config/opencode/skills","source":"https://opencode.ai/docs/skills/","status":"documented"},
+    {"id":"copilot-cli","name":"GitHub Copilot CLI","project":".github/skills","user":".copilot/skills","source":"https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills","status":"documented"}
+  ]
+}
