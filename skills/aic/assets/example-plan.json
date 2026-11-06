@@ -1,7 +1,8 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "task": "Create a concise project README after approval.",
   "workflow": "implementation",
+  "template": "direct",
   "topology": "solo",
   "risk": "low",
   "reasons": ["This is one coupled, independently verifiable deliverable."],

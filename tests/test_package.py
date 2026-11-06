@@ -42,7 +42,7 @@ class PackageTests(unittest.TestCase):
     def test_documentation_relative_links_resolve_within_the_distribution(self):
         files = [ROOT / name for name in ('README.md', 'CONTRIBUTING.md', 'SECURITY.md')]
         files += list((ROOT / 'docs').glob('*.md'))
-        files += list((SKILL / 'references').glob('*.md'))
+        files += list((SKILL / 'references').rglob('*.md'))
         for file in files:
             for target in re.findall(r'\[[^\]]*\]\(([^)]+)\)', file.read_text(encoding='utf-8')):
                 if '://' in target or target.startswith('#'):

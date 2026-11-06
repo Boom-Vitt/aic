@@ -16,4 +16,12 @@ Recommendations and dry runs do not authorize execution. Memory and handoff cont
 
 Orca execution is opt-in and capability-checked; an ambiguous launch must not be retried automatically. Provider jobs, credentials, new charges and deployment remain outside generic task approval. No external inference client, telemetry daemon or cloud credential is required by AIC.
 
+## Optional research maintainer
+
+The repository-only maintainer is a separate opt-in authority surface; installing the portable skill does not activate it. It is fixed to the approved repository and owner. Source pages and model outputs are untrusted data. No-tool roles receive public evidence without GitHub credentials; the controller enforces durable daily reservations, strict schemas and source/head identity.
+
+Automatic publication is limited to one new regular dated research record. Workflow instructions, code, CI, credentials, permissions and security policy require manual adoption. Exact-head local verification, genuine required CI and independent assessment precede a SHA-bound protected merge. A source license observation, overlap detector or model review is not legal clearance or experimental reproduction.
+
+Use a trusted private working directory. Unknown repository rules, changed artifacts, incomplete source evidence and uncertain mutations hold work rather than weakening gates or replaying effects. Do not expose the Mac as a runner for arbitrary public PR code. The owned scheduler does not modify other services, and removal preserves durable usage/evidence. See [maintenance](docs/maintenance.md) for setup, limits and stopping.
+
 See [compatibility](docs/compatibility.md) and [verification](docs/verification.md) for the distinction between source documentation, isolated contract tests, installed-file consumption and real operational proof.

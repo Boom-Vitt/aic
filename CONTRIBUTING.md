@@ -13,6 +13,19 @@ Explain the user-visible behavior, boundaries, expected evidence and compatibili
 3. Add behavior tests for discovery-directory placement, idempotency and refusal boundaries. These are installation contracts, not proof the actual host discovered the skill.
 4. Update `docs/compatibility.md` and report any actual live checks separately. Model/provider names alone are not harness adapters.
 
+## Add research or a workflow template
+
+Use original wording and reliable primary sources: prefer the current peer-reviewed journal/conference version; label controlled preprints, first-party engineering cases and capability documentation separately. Record author/team, exact version/date, claim, applicability limits, checked date and the actual source-content license with an evidence URL in `skills/aic/references/research.md`. A repository's implementation license is not automatically the paper/website license. Unknown or restrictive content stays reference-only; do not vendor upstream text, figures, PDFs or code without separately reviewed rights and required notices.
+
+Update template guidance, the machine catalog, strict recommendation contract and consumer examples together. State selection/avoid triggers, ownership/dependencies, effective authority, context/control transfer, observable acceptance and partial/blocked exits. Do not add a keyword router, a universal runtime winner, compulsory swarm, unbounded review loop or model-confidence completion rule. Keep NOTICE copies consistent and preserve upstream attribution. Schema changes need an explicit migration, not a silent compatibility guess.
+
+## Maintain dated research records
+
+The optional repository maintainer may propose original factual records and assigned adoption tasks; it must not adopt its own instructions, code or permissions. Follow [maintenance](docs/maintenance.md), including source-content rights, complete-method evidence, exact-head independent review, real local/CI checks and durable daily usage. Never reset reservations or replay an uncertain paid/external operation to obtain a green result.
+
+Keep dated records data-only and self-contained under `skills/aic/references/research-updates/`. Changes to the collector, model capabilities, GitHub authority, schemas or scheduler are manual security-sensitive changes with runnable boundary checks and independent review. Do not execute an untrusted PR on a private host.
+
+
 ## Implement and verify
 
 Write regressions for plausible consumer failures: traversal, unauthorized effects, modified/unmanaged preservation, evidence freshness, semantic interface overlap and uncertain launch replay. Do not pin prose, incidental implementation or mocked success as live behavior.

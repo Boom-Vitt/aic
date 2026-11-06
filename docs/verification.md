@@ -8,6 +8,35 @@ Run `./scripts/verify.sh` with Python 3.11+. The script prefers the checkout's i
 
 Tests use isolated targets beneath the checkout's ignored `.work/` directory. They exercise manifest-owned install/update/uninstall, all documented adapter path contracts, modified/unmanaged preservation, symlink/traversal refusal, bounded metadata inspection, strict recommendation schemas and parallel scope boundaries, scoped note approval/integrity/staleness, read-only handoff data, canonical launch approval and dry-run immutability. Controlled subprocess fixtures check protocol and uncertainty handling; they are not live Orca/model proof.
 
+## Workflow-template update receipt — November 6, 2026
+
+This receipt covers the version-2 template/schema update, not an unattended-maintenance deployment or a new cross-model benchmark.
+
+- Focused RED/GREEN checks exercised the new template contract: six template tests passed after implementation; eighteen routing tests ran, with seventeen passed and the distinct case-sensitive-directory fixture skipped on macOS.
+- The actual checkout and isolated installed CLI both reported `AIC 2.0.0` and accepted the schema-2 example. Managed fixture installation, source upgrade and unchanged repetition returned `installed`, `upgraded` and `unchanged`.
+- A fresh native worker consumed the isolated installed version-2 skill, references and catalog. Expected fields were withheld for eight synthetic requests spanning all seven templates. All **8/8** workflow/template/topology selections matched; all eight actual recommendations then passed the installed `check-plan --project` CLI. A real CLI probe rejected an out-of-project traversal with exit 2.
+- Its mixed project plan preserved independent discovery → single-owner shared contract → isolated formatter builds → single-owner integration → independent acceptance. Every hypothetical milestone/check remained not-started/not-run; no scenario implementation or agent launch occurred.
+- Independent static review found no actionable patch-introduced defect in the assigned schema, path/approval, handoff, packaging and guide surface. That review ran no executable checks and did not independently repeat the upstream license audit.
+- Actual `orca-plan` preserved the nested schema-2 template and emitted a digest-bound preview. The proposed new-project directory remained absent; no operational Orca registration or agent launch occurred.
+
+The worker's required global skill read resolved to the older 1.0.0 installation before it explicitly consumed the fixture's 2.0.0 instructions. This is installed-file consumption, **not** proof of native discovery of version 2, another Claude Code/Codex CLI run, statistical quality or a universal runtime ranking. No existing global installation/settings were changed. Primary source inspection and rights checks support the ledger's recorded facts; the cited experiments were not independently reproduced.
+
+## Research-maintenance implementation receipt — November 6, 2026
+
+Before initial maintainer publication, the corrected complete Mac mini entrypoint ran **253 tests: 252 passed, one filesystem-specific skip; exit 0**, using isolated Python 3.14.7. Earlier integration fixture errors were corrected without relaxing the private-directory permission gate. No full verification run failed.
+
+- Consumer-visible regressions cover source identity/completeness and transport bounds, reference-only/public-prose limits, strict role/head/source binding, durable usage, changed packet/trace/receipt rejection, no uncertain-effect replay, exact record Git modes/bytes, stash/ref and owner-file preservation, interrupted main integration, rejected cleanup, and mixed-batch manual tasks.
+- Actual throwaway Python processes exercised SIGTERM/SIGINT cleanup of the owned agent group and handler restoration. A separate real-signal fixture interrupts successful capture finalization so shutdown cannot continue into acceptance. These are local process checks, not proof of live launchd or provider behavior.
+- Independent read-only security/correctness reviews found actionable defects, followed by regression fixes and re-review. The scoped follow-ups found no remaining actionable defect in the reviewed fixes. They did not execute the checks or certify deployed service compatibility.
+- Actual bounded daily discovery retrieved complete evidence for [XStack: A Benchmark for ML Repo Migration, arXiv:2611.08472v1](https://arxiv.org/abs/2611.08472v1), published November 5, 2026, and first-party engineering sources. Other abstract-only/inaccessible bodies and a non-reviewed journal entry remained visible errors; the partial result exited 2 and started no model or publication.
+- A live Content-Length transport failure was reproduced through a real socket/HTTP-response fixture and fixed; subsequent arXiv retrieval succeeded. Publisher redirect and byline/author handling also have isolated boundary coverage. Discovery is bounded, not a claim of exhaustive paper coverage or independent scientific reproduction.
+- The actual installed CLI advertises the required isolation controls. Per-process fixtures verify protocol, credential-override exclusion and no-fallback handling; existing global settings and skill installations were not changed.
+
+The first actual subscription-backed researcher completed through `openai-codex/gpt-6.1-sol`, but the adapter rejected duplicate receipts whose timing metadata differed. The stable-identity fix then parsed that **same original stream offline**, without another model call. Its unchanged seven findings and six limitations still exceeded the four-item policy, so the result was rejected and the consumed call/evidence retained. Both role prompts now disclose the same hard limits as their validators; no bound was widened and no output was trimmed or repaired.
+
+Successful research/review, protected publication and installed-service lifecycle remain separate gates. Nothing was published or enabled by this rejected attempt. The [maintenance guide](maintenance.md) requires initial manual publication before installing maintainer-only branch checks, then real end-to-end proof before scheduler activation.
+
+
 ## Initial delivery receipt — November 6, 2026
 
 Actual full offline runs used the entrypoint above. Filesystem-specific cases are complementary: macOS skipped the distinct case-only-directory fixture; Linux skipped the case-insensitive-directory-alias fixture. The other scope, future-name and hard-link cases ran in each environment.
@@ -40,7 +69,7 @@ All ten documented adapter paths were exercised by isolated project/user CLI ins
 2. Give the host the scenario IDs and requests, withholding the `expected_*` fields. Ask for recommendations only, not execution of those requests.
 3. Have it read its installed `SKILL.md`, relevant references and the synthetic source, then return one complete recommendation per case.
 4. Save each actual plan in that disposable project and run `python3 scripts/aic.py check-plan PLAN.json --project PROJECT` from this checkout.
-5. Compare workflow/topology against the fixture's expected fields, require all case IDs exactly once and preserve the recommendation/approval boundary. Record failures as well as successes.
+5. Compare workflow/template/topology against the fixture's expected fields, require all case IDs exactly once and preserve the recommendation/approval boundary. Evaluate the separate project case against its preserved acceptance, dependency and ownership invariants; do not mistake its milestone table for executable scheduling. Record failures as well as successes.
 6. Record the host/version, actual model and trace-based discovery level. Do not turn file consumption into native-discovery proof or a small smoke into a benchmark. Uninstall only the intact owned test copy.
 
 ## Verification boundaries

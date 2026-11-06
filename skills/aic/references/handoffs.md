@@ -9,7 +9,7 @@ Given a validated host-AI recommendation, print the complete planned target and 
 python3 <skill-directory>/scripts/aic.py orca-plan recommendation.json --project /absolute/path/to/new-project --name approved-task
 ```
 
-`orca-plan` is the dry run. It does not create directories or Git state, write an artifact, probe/run Orca, register a project, start a model or change settings. Its JSON includes the project, chosen workflow/scope, optional explicitly chosen model, operations and a canonical digest. No model is forced by default.
+`orca-plan` is the dry run. It does not create directories or Git state, write an artifact, probe/run Orca, register a project, start a model or change settings. Its JSON includes the project, schema-2 recommendation with chosen workflow/template/topology/scope, optional explicitly chosen model, operations and a canonical digest. The outer handoff format keeps its own version. No model is forced by default.
 
 Show the user the target, the file changes, fresh agent launch, selected model if any, and any known usage implications. Do not execute when new charges or another protected boundary is unresolved. A digest is a consent attestation, not a signature or proof that a human approved it.
 
