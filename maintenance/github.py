@@ -209,7 +209,7 @@ class GitHub:
             'required_status_checks': {'strict': True, 'contexts': list(REQUIRED)},
             'enforce_admins': True, 'required_pull_request_reviews': {
                 'dismiss_stale_reviews': True, 'require_code_owner_reviews': False,
-                'required_approving_review_count': 0, 'bypass_pull_request_allowances': {'users': [], 'teams': [], 'apps': []}},
+                'required_approving_review_count': 0},
             'restrictions': None, 'allow_force_pushes': False, 'allow_deletions': False})
         try:
             policy = self.protection()
