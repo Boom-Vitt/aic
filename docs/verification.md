@@ -4,9 +4,34 @@ This document distinguishes offline contracts from actual host behavior. It does
 
 ## Reproducible offline entrypoint
 
-Run `./scripts/verify.sh` with Python 3.11+. The script prefers the checkout's isolated `.venv/bin/python` when present, otherwise `python3`; `AIC_PYTHON` can explicitly select a supported interpreter. No pip packages, provider key, network installer or model call is required.
+Run `./scripts/verify.sh` with Python 3.11+. The script prefers the checkout's isolated `.venv/bin/python` when present, otherwise `python3`; `AIC_PYTHON` can explicitly select a supported interpreter. Core-only checks need no third-party packages. Install the declared optional `.[mcp]` dependencies into that isolated environment before claiming MCP verification; without them the protocol tests explicitly skip. Verification itself performs no network installation or model call and requires no provider key. See [integration development](../CONTRIBUTING.md#integration-development).
 
 Tests use isolated targets beneath the checkout's ignored `.work/` directory. They exercise manifest-owned install/update/uninstall, all documented adapter path contracts, modified/unmanaged preservation, symlink/traversal refusal, bounded metadata inspection, strict recommendation schemas and parallel scope boundaries, scoped note approval/integrity/staleness, read-only handoff data, canonical launch approval and dry-run immutability. Controlled subprocess fixtures check protocol and uncertainty handling; they are not live Orca/model proof.
+
+## Skills-first plugin and MCP receipt (0.0.2) — November 7, 2026
+
+These are functional observations from the standalone AIC checkout on the Mac mini, not a model benchmark, universal host certification or hosted-service deployment. The skill/plugin now use the host conversation as their user entry point; internal helpers are not a user prerequisite. Recommendation/catalog schema remains **3**.
+
+- The complete entrypoint with isolated **Python 3.14.7**, official **MCP SDK 2.3.0** installed, ran **276 tests: 275 passed, one case-sensitive-filesystem fixture skipped; exit 0**, in 11.199 seconds. All **16** new MCP consumer cases ran, including strict noncoercing arguments, opaque JSON, fixed/independent roots, metadata privacy, evidence and parallel-scope checks, denied arbitrary resources, error recovery and real source stdio outside the checkout.
+- The first full run failed with 16 new-fixture import errors: older tests prepend the legacy helper directory to `sys.path`, while the new fixture delayed its source import until setup. Moving that import beside its explicit source-path selection fixed the isolation issue without changing a production guard. The corrected cases passed with the entire suite discovered first, then the complete entrypoint passed. That is **one failed full run**, not a hidden zero-failure claim.
+- Earlier real source startup exposed a separate package-shadowing bug that in-process tests missed: an implicit namespace could resolve the sibling legacy `aic.py` launcher and start its argument parser. The permanent stdio consumer regression failed before the ordinary package anchor was added and passed afterward. SDK client lifetime is kept in the same async test task; no validation/privacy/approval boundary was relaxed.
+- Actual Claude Code native strict validation accepted both plugin and marketplace manifests with no manifest errors/warnings. Native local-scope install/list reported **`aic@aic-marketplace` version `0.0.2`, enabled**, in a task-private HOME/config/project; the client version command reported **2.1.319**. The plugin declares no hooks, settings or automatically started MCP. The native directory checker also reported a nonblocking missing-icon advisory; official directory submission is not claimed. Its plugin validator does not accept a bare skill directory without a plugin manifest, so that attempt is not skill-validation or discovery evidence.
+
+The official SDK client launched three actual stdio subprocess forms from outside the source tree. Each negotiated **2026-07-28**, reported server **AIC 0.0.2**, exercised all four tools, fetched all twelve concrete resources, denied unsafe operations and recovered:
+
+| Actual consumer form | Read-only tools | Packaged resources | Unsafe tool calls refused | Arbitrary resource reads denied | Synthetic project unchanged |
+| --- | --- | --- | --- | --- | --- |
+| Source Python launcher | 4 | 12 | 9 | 2 | Yes |
+| Installed wheel console entry point | 4 | 12 | 9 | 2 | Yes |
+| Exact documented host-started `uvx` argument array | 4 | 12 | 9 | 2 | Yes |
+
+All twelve resource hashes matched across the three forms. Calls covered catalog/guidance, metadata-only inspection, a valid schema-3 recommendation, boolean-limit refusal, root-switch refusal, serialized-plan refusal, traversal, old schema, false approval, execution/agent-launch refusal and successful use afterward. These are real SDK transport observations, **not** a Claude Code/other host's native MCP discovery or model invocation trace.
+
+The actual wheel was built with pinned **Hatchling 1.29.0** and installed into separate task-owned full-SDK and core-only environments. The wheel contains the original skill tree, catalog/examples, guides, LICENSE.txt/NOTICE and distribution license files. With **no MCP SDK installed**, core validation, packaged resources and a lazy adapter import worked; attempting MCP startup failed cleanly with exit 2 and a missing-extra message, not a traceback. No PyPI publication is implied.
+
+The SDK and protocol-types distribution license files were checked as **MIT, Copyright (c) 2024 Anthropic, PBC**; the build backend's installed MIT grant credits **Ofek Lev**. [Pinned provenance](../skills/aic/references/provenance.md) and both NOTICE copies retain dependency and existing research credits. Optional dependencies keep their own notices and are not vendored or relicensed by AIC.
+
+No inference/model scenario, real Orca launch, public MCP listener, global skill/MCP/plugin configuration, scheduler upgrade or release tag was part of these checks. Existing historical host-consumption receipts below remain historical; installing/listing a plugin does not establish native skill invocation or AI quality. Final exact-head publication and independent-review receipts belong to the associated GitHub pull request.
 
 ## Development-version correction — November 7, 2026
 

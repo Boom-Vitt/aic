@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.2 — 2026-11-07 (unreleased)
+- Make the portable Agent Skill the default user experience: ask the existing host agent to use AIC, without a manual AIC CLI or Python prerequisite. Retain deterministic helper and maintainer commands as explicitly optional developer/operator interfaces.
+- Add a native skills-only Claude Code plugin and single-plugin marketplace. Installation adds the same skill, not hooks, permission overrides, models or an automatically started server.
+- Add an optional local stdio MCP adapter using the pinned official Python SDK. Four read-only tools expose the existing catalog/guidance, bounded metadata inspection and strict recommendation validation for one explicitly configured absolute project; no project rebinding, arbitrary file reads, writes, execution or model calls.
+- Package the same portable tree and rights notices in an installable Python wheel, with the MCP SDK as an optional extra. Anchor the Python package so source startup cannot resolve the legacy helper script instead of the MCP adapter.
+- Professionalize the public README around Skill/plugin/MCP choices and a host-agent example. Preserve the owner's original banner/byline and keep research, specification and dependency attribution in dedicated rights records.
+- Keep recommendation/catalog schema 3, all five workflow families and the existing scoped maintenance authority unchanged. Add real protocol-boundary regressions and record actual native installation, source/wheel/host-started stdio and dependency-free-core checks in [verification](docs/verification.md).
+- Source publication does not create a release tag, publish to PyPI or an official plugin directory, update global host installations, activate MCP globally or upgrade the immutable maintainer service.
+
 ## 0.0.1 — 2026-11-07 (unreleased)
 - Use the owner's development-version sequence `0.0.1`, `0.0.2`, `0.0.3`, and onward. Renumber the active package/CLI/skill metadata without changing independently versioned schemas, runtime behavior or historical verification results.
 - Consolidate the active catalog into five original task-adaptive workflow families: `direct`, `explore-build`, `coordinated-delivery`, `independent-review` and `adaptive-controller`. Select and compose by evidence, dependencies, risk and cost, not a universal winner, permanent team or keyword classifier.

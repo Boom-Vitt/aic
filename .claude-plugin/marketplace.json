@@ -1,0 +1,14 @@
+{
+  "name": "aic-marketplace",
+  "owner": {
+    "name": "Boom-Vitt"
+  },
+  "description": "The AIC skills-only Claude Code plugin from Boom-Vitt/aic.",
+  "version": "0.0.2",
+  "plugins": [
+    {
+      "name": "aic",
+      "source": "./"
+    }
+  ]
+}

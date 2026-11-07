@@ -53,3 +53,17 @@ cited material. Original AIC templates/summaries are not upstream endorsements.
 
 Names of harnesses and model providers identify compatibility targets only.
 No endorsement, certification or universal interoperability is implied.
+
+Optional protocol/runtime and build dependencies:
+The local MCP adapter uses the official Model Context Protocol Python SDK
+(mcp and mcp-types 2.3.0), MIT, Copyright (c) 2024 Anthropic, PBC.
+https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.3.0
+https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/v2.3.0/LICENSE
+The build backend is Hatchling 1.29.0, MIT,
+Copyright (c) 2021-present Ofek Lev.
+https://github.com/pypa/hatch
+These packages are external dependencies with their own distributed licenses,
+not vendored into AIC or relicensed under AIC's Apache-2.0 grant.
+The plugin manifests and MCP adapter are original AIC implementations.
+Official host/protocol documentation was consulted for compatibility only;
+its prose and examples are not redistributed as AIC-authored material.

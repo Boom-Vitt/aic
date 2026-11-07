@@ -1,9 +1,9 @@
 # Optional Orca to omp handoff
 
-AIC is not tied to Orca or omp. Keep the current compatible host unless capability, lifecycle or authority requirements justify a requested transfer; no current harness/model has a universal quality ranking. This existing adapter uses a local installed Orca CLI; it is not a hosted service, plugin installer, credential manager or general cross-CLI launcher.
+AIC is not tied to Orca or omp. Keep the current compatible host unless capability, lifecycle or authority requirements justify a requested transfer; no current harness/model has a universal quality ranking. Normal host-guided work and [file-only continuation](memory.md#handoff-schema) need no AIC CLI or cross-runtime launch. The commands below are optional internal agent/operator tooling for an explicitly approved transfer using a local installed Orca CLI, not public first-run setup. This adapter is not a hosted service, plugin installer, credential manager or general cross-CLI launcher. Neither the skills-only Claude Code plugin nor the read-only [MCP adapter](integrations.md) launches it.
 
 ## Preview without effects
-Given a validated host-AI recommendation, print the complete planned target and actions:
+Only when the optional operator handoff itself is requested, use the included Python helper with a validated host-AI recommendation to print the complete planned target and actions:
 
 ```sh
 python3 <skill-directory>/scripts/aic.py orca-plan recommendation.json --project /absolute/path/to/new-project --name approved-task

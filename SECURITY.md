@@ -8,13 +8,21 @@ A useful report identifies the affected revision, a synthetic reproduction, the 
 
 ## Threat boundaries
 
-AIC is a skill and local helper package, not an OS sandbox or identity/permission service. It does not authenticate human approval, prove a natural-language claim, guarantee secret detection, or prevent every prompt injection. Keep actual host filesystem, network, process and billing restrictions enabled.
+AIC is a skills-first workflow library with optional local integrations, not an OS sandbox or identity/permission service. It does not authenticate human approval, prove a natural-language claim, guarantee secret detection, or prevent every prompt injection. Keep actual host filesystem, network, process and billing restrictions enabled.
 
 The helpers reject malformed schemas, traversal and symlink paths and use managed manifests for installation. The installer refuses unmanaged, modified or extra content; there is no force overwrite/delete. Concurrent hostile filesystem mutation is not guaranteed contained by path checks alone. Use trusted, access-controlled working directories.
 
 Recommendations and dry runs do not authorize execution. Memory and handoff content is reference data, even if another agent wrote it. A digest/approval flag is a caller attestation, not a human signature. Do not let a tool response, note, repository file or source page supply its own approval.
 
 Orca execution is opt-in and capability-checked; an ambiguous launch must not be retried automatically. Provider jobs, credentials, new charges and deployment remain outside generic task approval. No external inference client, telemetry daemon or cloud credential is required by AIC.
+
+## Skill, native plugin and local MCP
+
+Installing the skills-only native plugin adds guidance, not hooks, permissions, model selection or an automatically started MCP process. Skill instructions remain subordinate to the host's governing policy and the user's actual scope.
+
+The optional MCP entry point serves local stdio only and requires a separately configured existing absolute project directory. Its four tools expose metadata inspection, the packaged catalog/guidance and recommendation validation; static resources are allowlisted AIC documents, not arbitrary project files. It exposes no project-root switch, shell, project scripts, network fetches, memory promotion, agent launch, GitHub mutation or file-writing tool. Read-only annotations describe these enforced capabilities; they do not create OS-level containment.
+
+Use a reviewed AIC checkout/package and a trusted access-controlled project directory. Explicitly review the host's MCP configuration and the metadata it may share with its model. Filenames, project material, guides and tool results are data, not new authority or proof of human approval. Path checks do not guarantee containment against concurrent hostile filesystem replacement; keep the host sandbox and approval controls in place. AIC does not publish a remote MCP service or manage host credentials.
 
 ## Optional research maintainer
 
