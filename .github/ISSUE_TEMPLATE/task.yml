@@ -1,0 +1,31 @@
+name: Task
+description: Ask for a scoped change with a reproduction and an owner.
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal and non-goals
+      description: State the outcome and what is out of scope.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction or acceptance
+      description: For a bug, include the command that fails and the expected result. An import error or missing dependency is not a reproduction. For a feature, name the acceptance check.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Owned paths and dependencies
+      description: Which paths may change, and which work must land first.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: This report contains no real credentials, customer data, or private prompts.
+          required: true

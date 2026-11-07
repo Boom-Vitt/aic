@@ -1,4 +1,6 @@
 .work/
+.orca/
+.env.worktree
 .venv/
 .aic/
 __pycache__/
