@@ -34,7 +34,7 @@ jobs:
       - name: Install the optional MCP extra and coverage
         # coverage.py 7.17.2 is Apache-2.0 (https://github.com/coveragepy/coveragepy).
         # It produces this job's report only. It is not an AIC runtime dependency and its code is not vendored.
-        run: python -m pip install --only-binary=:all: '.[mcp]' 'coverage==7.17.2'
+        run: "python -m pip install --only-binary=:all: '.[mcp]' 'coverage==7.17.2'"
       - name: Run MCP tests and write a coverage report
         shell: bash
         env:
