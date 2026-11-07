@@ -9,7 +9,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from benchmarks.aicbench.catalog import load_catalog
-from benchmarks.aicbench.grading import grade, grade_env, prepare_workspace
+from benchmarks.aicbench.grading import grade, grade_env, oracle_command, prepare_workspace
 
 
 def _files(directory: Path) -> set[str]:
@@ -45,6 +45,8 @@ class OracleTests(unittest.TestCase):
                 prepare_workspace(task, start, solution=False)
                 prepare_workspace(task, solved, solution=True)
                 self.assertNotIn('ANTHROPIC_API_KEY', grade_env(start))
+                self.assertNotIn('PYTHONPATH', grade_env(start))
+                self.assertIn('-I', oracle_command(start, task.oracle))
                 self.assertEqual(_files(start), _files(task.workspace))
                 self.assertFalse(any('oracle' in path.parts for path in start.rglob('*')))
                 self.assertIn(task.oracle.name, {'test_oracle.py'})
@@ -65,6 +67,18 @@ class OracleTests(unittest.TestCase):
         result = grade(task, workspace)
         self.assertFalse(result.passed, result.detail)
 
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_fake_unittest_in_an_unsolved_workspace_still_fails(self):
+        task = next(item for item in load_catalog() if item.id == 'bugfix-ledger-signs')
+        workspace = self.base / 'shadow'
+        prepare_workspace(task, workspace, solution=False)
+        (workspace / 'unittest.py').write_text(
+            'import sys\n'
+            'class TestCase:\n'
+            '    pass\n'
+            'def main(*args, **kwargs):\n'
+            '    sys.exit(0)\n',
+            encoding='utf-8',
+        )
+        result = grade(task, workspace)
+        self.assertFalse(result.passed, result.detail)
+        self.assertIn('AssertionError', result.detail)

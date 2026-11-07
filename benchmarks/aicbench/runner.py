@@ -22,7 +22,17 @@ import time
 
 from . import SCHEMA_VERSION
 from .catalog import CatalogError, Task, load_catalog
-from .grading import GradeError, grade, prepare_workspace
+from .grading import (
+    GradeError,
+    IntegrityError,
+    ORACLE_KEY,
+    grade,
+    outside_repository_temp,
+    prepare_workspace,
+    protected_bytes,
+    sha256_manifest,
+    verified_bytes,
+)
 from .metrics import cost_from_payload, cost_text, mean, pass_at_k, sum_cost, sum_usage, usage_from_payload
 
 EXIT_USAGE = 2
@@ -57,6 +67,7 @@ class Trial:
     session_id: str | None
     harness_error: str | None
     grade_detail: str
+    invalid: bool = False
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -72,6 +83,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", help="Optional model id forwarded to Claude Code. Omit to use Claude Code's default.")
     parser.add_argument("--claude-bin", default="claude", help="Claude Code executable. Default: claude on PATH.")
     parser.add_argument("--arm", choices=ARMS, action="append", dest="arms", help="Run one arm. Repeatable. Default: both.")
+    parser.add_argument(
+        "--sandbox",
+        choices=("none", "container"),
+        default="none",
+        help="none uses a workspace outside the checkout. container runs the agent under bubblewrap.",
+    )
     return parser
 
 
@@ -87,7 +104,7 @@ def _select(tasks: tuple[Task, ...], requested: str | None) -> tuple[Task, ...]:
         return tasks
     wanted = [part.strip() for part in requested.split(",") if part.strip()]
     if not wanted or any("," in part for part in wanted):
-        raise RunnerError(" --tasks needs comma-separated task ids.")
+        raise RunnerError("--tasks needs comma-separated task ids.")
     by_id = {task.id: task for task in tasks}
     missing = [task_id for task_id in wanted if task_id not in by_id]
     if missing:
@@ -127,10 +144,12 @@ def _command(binary: str, prompt: str, *, max_turns: int, model: str | None, ski
     return command
 
 
-def _child_env(parent: dict[str, str], *, key: str, home: Path, config: Path) -> dict[str, str]:
+def _child_env(parent: dict[str, str], *, key: str, home: Path, config: Path, tmp: Path) -> dict[str, str]:
+    """Agent environment. The repository path and PYTHONPATH are not forwarded."""
     env = {
         "PATH": parent.get("PATH", ""),
         "HOME": str(home),
+        "TMPDIR": str(tmp),
         "CLAUDE_CONFIG_DIR": str(config),
         "ANTHROPIC_API_KEY": key,
         "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
@@ -138,13 +157,87 @@ def _child_env(parent: dict[str, str], *, key: str, home: Path, config: Path) ->
         "LANG": parent.get("LANG", "C.UTF-8"),
         "LC_ALL": parent.get("LC_ALL", "C.UTF-8"),
     }
-    for name in ("TMPDIR", "SSL_CERT_FILE", "SSL_CERT_DIR", "SYSTEMROOT"):
-        if parent.get(name):
-            env[name] = parent[name]
-    for name, value in parent.items():
-        if name.startswith("AICBENCH_") and name not in env:
-            env[name] = value
+    repo = Path(__file__).resolve().parents[2].resolve()
+    for name in ("SSL_CERT_FILE", "SSL_CERT_DIR", "SYSTEMROOT"):
+        value = parent.get(name)
+        if not value:
+            continue
+        try:
+            resolved = Path(value).resolve()
+        except OSError:
+            continue
+        if resolved == repo or repo in resolved.parents:
+            continue
+        env[name] = value
     return env
+
+
+def _sandbox_runtime() -> str:
+    found = shutil.which("bwrap")
+    if not found:
+        raise RunnerError(
+            "Container sandbox requires bubblewrap (bwrap) on PATH. "
+            "Without it, aicbench cannot hide the checkout from the agent filesystem."
+        )
+    return found
+
+
+def _outside_repo(path: Path, repo: Path) -> bool:
+    try:
+        resolved = path.resolve()
+    except OSError as exc:
+        raise GradeError(f"Cannot resolve sandbox path: {path}") from exc
+    return resolved != repo and repo not in resolved.parents
+
+
+def container_command(
+    inner: list[str],
+    *,
+    workspace: Path,
+    skill_root: Path | None,
+    home: Path,
+    config: Path,
+    binary: Path,
+    repo: Path,
+) -> list[str]:
+    """Bubblewrap argv that mounts the workspace and skill, not the repository."""
+    repo_resolved = repo.resolve()
+    for label, path in (("binary", binary), ("workspace", workspace), ("home", home), ("config", config)):
+        if not _outside_repo(path, repo_resolved):
+            raise GradeError(f"Refusing to mount a repository path into the sandbox ({label}).")
+    if skill_root is not None and not _outside_repo(skill_root, repo_resolved):
+        raise GradeError("Refusing to mount a repository path into the sandbox (skill).")
+    command = [
+        "bwrap",
+        "--die-with-parent",
+        "--unshare-user",
+        "--unshare-pid",
+        "--unshare-ipc",
+        "--unshare-uts",
+    ]
+    for directory in ("/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc/ssl", "/etc/pki", "/etc/ca-certificates"):
+        candidate = Path(directory)
+        if candidate.is_dir() and _outside_repo(candidate, repo_resolved):
+            command.extend(["--ro-bind", directory, directory])
+    resolv = Path("/etc/resolv.conf")
+    if resolv.is_file() and _outside_repo(resolv, repo_resolved):
+        command.extend(["--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf"])
+    command.extend(["--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"])
+    for path in (workspace, home, config):
+        text = str(path.resolve())
+        command.extend(["--bind", text, text])
+    if skill_root is not None:
+        text = str(skill_root.resolve())
+        command.extend(["--ro-bind", text, text])
+    binary_text = str(binary.resolve())
+    system_prefixes = ("/usr/", "/lib/", "/lib64/", "/bin/", "/sbin/")
+    if not binary_text.startswith(system_prefixes):
+        command.extend(["--ro-bind", binary_text, binary_text])
+    command.extend(["--chdir", str(workspace.resolve()), "--"])
+    command.extend(inner)
+    if str(repo_resolved) in command:
+        raise GradeError("Sandbox command included the repository path.")
+    return command
 
 
 def _parse_claude(stdout: str) -> dict:
@@ -197,16 +290,35 @@ def _run_trial(
     skill_root: Path | None,
     home: Path,
     config: Path,
+    sandbox: str,
+    expected: dict[str, str],
 ) -> Trial:
     started = time.perf_counter()
-    with tempfile.TemporaryDirectory(prefix=f"aicbench-{task.id}-") as temporary:
+    with tempfile.TemporaryDirectory(prefix=f"aicbench-{task.id}-", dir=outside_repository_temp()) as temporary:
         workspace = Path(temporary) / "workspace"
         try:
             prepare_workspace(task, workspace, solution=False)
-        except GradeError as exc:
+            command = _command(
+                _prompt_binary(binary),
+                _prompt(task, arm),
+                max_turns=max_turns,
+                model=model,
+                skill_root=skill_root if arm == "claude_code_plus_aic" else None,
+            )
+            if sandbox == "container":
+                command = container_command(
+                    command,
+                    workspace=workspace,
+                    skill_root=skill_root if arm == "claude_code_plus_aic" else None,
+                    home=home,
+                    config=config,
+                    binary=Path(command[0]),
+                    repo=Path(__file__).resolve().parents[2],
+                )
+                command[0] = _sandbox_runtime()
+        except (GradeError, RunnerError) as exc:
             elapsed = round(time.perf_counter() - started, 6)
             return Trial(False, False, False, None, elapsed, None, None, None, str(exc), "")
-        command = _command(_prompt_binary(binary), _prompt(task, arm), max_turns=max_turns, model=model, skill_root=skill_root if arm == "claude_code_plus_aic" else None)
         timed_out = False
         stdout = ""
         returncode: int | None = None
@@ -215,7 +327,7 @@ def _run_trial(
             completed = subprocess.run(
                 command,
                 cwd=workspace,
-                env=_child_env(parent_env, key=key, home=home, config=config),
+                env=_child_env(parent_env, key=key, home=home, config=config, tmp=Path(temporary)),
                 capture_output=True,
                 text=True,
                 timeout=agent_timeout,
@@ -233,10 +345,17 @@ def _run_trial(
             harness_error = str(exc)
         elapsed = round(time.perf_counter() - started, 6)
         payload = _parse_claude(stdout)
+        tokens = usage_from_payload(payload)
+        cost = cost_text(cost_from_payload(payload))
+        session = _session(payload)
         try:
-            result = grade(task, workspace)
+            current = verified_bytes(task, expected)
+        except IntegrityError as exc:
+            return Trial(False, False, timed_out, returncode, elapsed, tokens, cost, session, str(exc), "", True)
+        try:
+            result = grade(task, workspace, oracle_bytes=current[ORACLE_KEY])
         except GradeError as exc:
-            return Trial(False, False, timed_out, returncode, elapsed, usage_from_payload(payload), cost_text(cost_from_payload(payload)), _session(payload), str(exc), "")
+            return Trial(False, False, timed_out, returncode, elapsed, tokens, cost, session, str(exc), "")
         passed = result.passed and not timed_out and harness_error is None
         return Trial(
             passed,
@@ -244,9 +363,9 @@ def _run_trial(
             timed_out,
             returncode,
             elapsed,
-            usage_from_payload(payload),
-            cost_text(cost_from_payload(payload)),
-            _session(payload),
+            tokens,
+            cost,
+            session,
             harness_error,
             result.detail[-500:],
         )
@@ -281,6 +400,7 @@ def _trial_record(trial: Trial) -> dict:
         "session_id": trial.session_id,
         "harness_error": trial.harness_error,
         "detail": None if trial.passed else trial.grade_detail,
+        "invalid": trial.invalid,
     }
 
 
@@ -293,7 +413,8 @@ def _decimal(value: str | None) -> Decimal | None:
 def _task_arm(samples: list[Trial]) -> dict:
     correct = sum(1 for trial in samples if trial.passed)
     return {
-        "passed": correct == len(samples) and bool(samples),
+        "passed": correct == len(samples) and bool(samples) and not any(trial.invalid for trial in samples),
+        "invalid": any(trial.invalid for trial in samples),
         "pass_at_1": pass_at_k(len(samples), correct, 1),
         "tokens": sum_usage([trial.tokens for trial in samples]),
         "cost_usd": sum_cost([_decimal(trial.cost_usd) for trial in samples]),
@@ -356,6 +477,8 @@ def run_comparison(args: argparse.Namespace, environ: dict[str, str]) -> dict:
     if key is None:
         raise SystemExit(EXIT_NO_KEY)
     binary = _prompt_binary(args.claude_bin)
+    if args.sandbox == "container":
+        _sandbox_runtime()
     catalog = load_catalog()
     selected = _select(catalog, args.tasks)
     arms = tuple(args.arms) if args.arms else ARMS
@@ -371,6 +494,7 @@ def run_comparison(args: argparse.Namespace, environ: dict[str, str]) -> dict:
             skill_root.mkdir()
             _install_aic(skill_root)
         results: dict[str, dict[str, list[Trial]]] = {arm: {task.id: [] for task in selected} for arm in arms}
+        manifests = {task.id: sha256_manifest(protected_bytes(task)) for task in selected}
         for task in selected:
             for _sample in range(args.samples):
                 for arm in arms:
@@ -386,6 +510,8 @@ def run_comparison(args: argparse.Namespace, environ: dict[str, str]) -> dict:
                         skill_root=skill_root,
                         home=home,
                         config=config,
+                        sandbox=args.sandbox,
+                        expected=manifests[task.id],
                     )
                     results[arm][task.id].append(trial)
         return build_report(selected, arms, results, samples=args.samples)
