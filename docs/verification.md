@@ -180,7 +180,9 @@ All ten documented adapter paths were exercised by isolated project/user CLI ins
 
 ## Orca template checks — 2026-11-07
 
-On this Linux checkout, `./scripts/verify.sh` with Python 3.12 ran **344** tests in **13.076s**, **17 skipped**, exit 0. The skips are the existing optional MCP cases because `.[mcp]` was not installed here. The new template tests passed: invalid and cyclic plans, unowned path overlap, permission denials, a missing gate, a stale review, a command confined to the named worktree, budget and timeout failure records, bootstrap refusal, and a headless apply whose argv did not push, delete, or pass `--bare`. `shellcheck` 0.9.0 passed on the new shell scripts. No Claude Code process, plugin install, model call, or Mac mini doctor was run. Hosted CI installs the MCP extra and shellcheck; that run is separate from this local receipt.
+On this Linux checkout, `./scripts/verify.sh` with Python 3.12.3 ran **350** tests in **13.574s**, **17 skipped**, exit 0. The skips are the existing optional MCP cases because `.[mcp]` was not installed here. The new template tests passed: invalid and cyclic plans, unowned path overlap, permission denials, a missing gate, a stale review, a command confined to the named worktree, budget and timeout failure records, bootstrap refusal, and a headless apply whose argv did not push, delete, or pass `--bare`. `shellcheck` 0.9.0 passed on the new shell scripts. No Claude Code process, plugin install, model call, or Mac mini doctor was run. Hosted CI installs the MCP extra and shellcheck; that run is separate from this local receipt.
+
+`./scripts/benchmark-run.sh run --suite smoke` on the same checkout recorded 2 runs, both exit 0, `invokes_model` false, and `public_benchmark_scores` null. That is the local recorder check. SWE-bench, Terminal-Bench, Aider polyglot, and real-task suites were not executed.
 
 ## Verification boundaries
 

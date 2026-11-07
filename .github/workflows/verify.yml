@@ -32,5 +32,5 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y shellcheck
           fi
-          shellcheck -s sh scripts/orca-headless.sh scripts/bootstrap-orca-project.sh scripts/orca-gate.sh tests/orca_claude_smoke.sh
+          shellcheck -s sh scripts/orca-headless.sh scripts/bootstrap-orca-project.sh scripts/orca-gate.sh scripts/benchmark-run.sh tests/orca_claude_smoke.sh
           shellcheck -s bash scripts/macos-setup-orca.sh

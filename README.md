@@ -83,6 +83,8 @@ This repository stays the AIC library. The added template shows how to run [Boom
 
 Start with one stream. Four agents and six worktrees are ceilings. On a machine with little free disk, stay at one stream. Details and citations are in [RESEARCH.md](RESEARCH.md) and [CLAUDE.md](CLAUDE.md).
 
+Benchmark comparisons are specified in [docs/BENCHMARKS.md](docs/BENCHMARKS.md). No public benchmark score is claimed.
+
 ## For contributors and maintainers
 
 **Development version: `0.0.3`.** Versions follow the owner's `0.0.N` policy; recommendation/catalog schema **3** is independently versioned. AIC is a normal public GitHub repository, not a GitHub Template Repository. Workflow families are approaches to work, not repository scaffolds.

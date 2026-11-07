@@ -47,6 +47,8 @@ For plugin changes, run the actual Claude Code native validator and install/list
 
 The repository template under `templates/orca-claude/`, `.claude/`, and `scripts/orca-headless.sh` is project harness guidance for Boom Big Nose Workflow v0.4.0. It does not add a workflow family, a plugin hook, or a model client. Keep the native plugin skills-only. Shell changes need a consumer-visible test and `shellcheck` in CI. Do not put secrets, `--bare`, or permission bypasses into the harness. Cite new research in `RESEARCH.md` with primary URLs and the limits in the skill research ledger; do not vendor paper text.
 
+Do not publish a benchmark score without a receipt from `scripts/benchmark-run.sh`. Public suites stay blocked until a pinned checkout, its license, and a real run exist. The smoke suite is a recorder check, not a result.
+
 ## Implement and verify
 
 Write regressions for plausible consumer failures: traversal, unauthorized effects, modified/unmanaged preservation, evidence freshness, semantic interface overlap and uncertain launch replay. Do not pin prose, incidental implementation or mocked success as live behavior.
