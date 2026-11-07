@@ -58,7 +58,7 @@ class CollectorTests(unittest.TestCase):
         self.routes = {}
         self.clock = 100.0
         self.addCleanup(patch.stopall)
-        self.real_request_once = collector._request_once
+        self.real_request_in_process = collector._request_in_process
         patch.object(collector, "_request_once", side_effect=self.request).start()
         patch.object(collector.time, "monotonic", side_effect=lambda: self.clock).start()
         patch.object(collector.time, "sleep", side_effect=self.sleep).start()
@@ -236,6 +236,24 @@ class CollectorTests(unittest.TestCase):
         collector.collect(NOW)
         starts = [at for url, at in self.requests if "arxiv.org/" in url]
         self.assertTrue(all(b - a >= 3 for a, b in zip(starts, starts[1:])))
+
+    def test_arxiv_spacing_rejects_deadline_without_starting_transport(self):
+        collector._arxiv_last_finished = self.clock
+        with self.assertRaises(collector.CollectionError):
+            collector._request("https://export.arxiv.org/api/query", deadline=self.clock + 1)
+        self.assertEqual(self.requests, [])
+        self.assertEqual(collector._arxiv_last_finished, self.clock)
+
+    def test_arxiv_lock_wait_expires_without_starting_transport(self):
+        held = threading.Lock()
+        held.acquire()
+        try:
+            with patch.object(collector, "_arxiv_lock", held):
+                with self.assertRaises(collector.CollectionError):
+                    collector._request("https://export.arxiv.org/api/query", deadline=self.clock + 0.01)
+        finally:
+            held.release()
+        self.assertEqual(self.requests, [])
 
     def test_concurrent_arxiv_fetches_never_overlap(self):
         first_entered = threading.Event()
@@ -463,11 +481,11 @@ class CollectorTests(unittest.TestCase):
                 connection.sock = client
                 with patch.object(collector, "_PinnedHTTPS", return_value=connection):
                     if length == len(payload):
-                        status, _, body = self.real_request_once(BOOTSTRAP, deadline=120)
+                        status, _, body = self.real_request_in_process(BOOTSTRAP, deadline=120)
                         self.assertEqual((status, body), (200, payload))
                     else:
                         with self.assertRaisesRegex(collector.CollectionError, "partial source response"):
-                            self.real_request_once(BOOTSTRAP, deadline=120)
+                            self.real_request_in_process(BOOTSTRAP, deadline=120)
 
 
     def test_invalid_content_type_compressed_and_partial_http_are_rejected(self):

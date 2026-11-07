@@ -106,13 +106,16 @@ def build_server(project: Path) -> MCPServer:
             ) from None
 
     def aic_validate_recommendation(plan: Any) -> dict[str, Any]:
-        """Validate opaque schema-3 JSON against the bound project; never authorize execution."""
+        """Validate bounded opaque schema-3 JSON against the bound project; never authorize execution."""
         try:
             return validate_plan(plan, project=bound_project)
         except AICError:
             raise ToolError(
                 "Recommendation rejected: schema-3 fields, literal approval_required=true, "
-                "next_action=recommend, and safe evidence/scope/branch boundaries are required."
+                "next_action=recommend, and safe evidence/scope/branch boundaries are required. "
+                "Limits: 64 KiB canonical UTF-8 JSON, 8 container levels, 4096 nodes, "
+                "16 branches, 256 total path entries, 16384 overlap comparisons, "
+                "and 32 components / 1024 UTF-8 bytes per relative path."
             ) from None
 
     tools = []

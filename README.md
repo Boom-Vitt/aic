@@ -66,7 +66,7 @@ AIC's original instructions, helpers and workflow patterns are available under [
 
 ## For contributors and maintainers
 
-**Development version: `0.0.2`.** Versions follow the owner's `0.0.N` policy; recommendation/catalog schema **3** is independently versioned. AIC is a normal public GitHub repository, not a GitHub Template Repository. Workflow families are approaches to work, not repository scaffolds.
+**Development version: `0.0.3`.** Versions follow the owner's `0.0.N` policy; recommendation/catalog schema **3** is independently versioned. AIC is a normal public GitHub repository, not a GitHub Template Repository. Workflow families are approaches to work, not repository scaffolds.
 
 - [Contributing and development checks](CONTRIBUTING.md) — versioning, focused changes, research attribution and verification commands.
 - [Integration and helper setup](skills/aic/references/integrations.md) — channel-specific configuration and optional developer interfaces.

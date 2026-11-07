@@ -97,12 +97,12 @@ class GatewayTests(unittest.TestCase):
 
     def test_exact_issue_marker_and_complete_pagination(self):
         api = API()
-        api.routes['GET', f'/repos/{REPO}/issues'] = lambda q: ([{'number': i, 'body': 'not exact ' + MARKER + ' suffix'} for i in range(100)] if q['page'] == ['1'] else [{'number': 500, 'body': 'record\n' + MARKER, 'html_url': 'url'}])
+        api.routes['GET', f'/repos/{REPO}/issues'] = lambda q: ([{'number': i, 'body': 'not exact ' + MARKER + ' suffix', 'user': {'login': 'Boom-Vitt'}} for i in range(100)] if q['page'] == ['1'] else [{'number': 500, 'body': 'record\n' + MARKER, 'html_url': 'url', 'user': {'login': 'Boom-Vitt'}}])
         self.assertEqual(GitHub(runner=api).find_issue(MARKER)['number'], 500)
 
     def test_ambiguous_or_partial_issue_lookup_refused(self):
         api = API(); path = f'/repos/{REPO}/issues'
-        api.routes['GET', path] = [{'number': i, 'body': MARKER} for i in (1, 2)]
+        api.routes['GET', path] = [{'number': i, 'body': MARKER, 'user': {'login': 'Boom-Vitt'}} for i in (1, 2)]
         with self.assertRaises(GitHubError): GitHub(runner=api).find_issue(MARKER)
         api.routes['GET', path] = lambda q: [{'number': i, 'body': ''} for i in range(100)]
         with self.assertRaises(GitHubError): GitHub(runner=api).find_issue(MARKER)

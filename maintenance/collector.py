@@ -11,6 +11,7 @@ import hashlib
 import http.client
 import ipaddress
 import json
+import multiprocessing
 import re
 import socket
 import ssl
@@ -30,6 +31,7 @@ MAX_CANDIDATES = 3
 REQUEST_SECONDS = 15
 FETCH_SECONDS = 60
 MAX_REDIRECTS = 4
+MAX_WORKER_METADATA_BYTES = 64 * 1024
 _HOSTS = frozenset({"export.arxiv.org", "arxiv.org", "api.crossref.org", "www.anthropic.com", "www.nature.com", "idp.nature.com"})
 _ATOM = "{http://www.w3.org/2005/Atom}"
 _ARXIV_ID = re.compile(r"(?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[A-Z]{2})?/\d{7})v[1-9]\d*\Z")
@@ -139,9 +141,12 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
         raise CollectionError("source connection unavailable: " + "; ".join(failures))
 
 
-def _request_once(url: str, *, deadline: float) -> tuple[int, dict[str, str], bytes]:
+def _request_in_process(url: str, *, deadline: float, connection_factory=None) -> tuple[int, dict[str, str], bytes]:
+    """Perform HTTP framing inside the killable transport worker."""
     parts = urlsplit(_url(url))
-    connection = _PinnedHTTPS(parts.hostname, timeout=min(REQUEST_SECONDS, max(0.1, deadline - time.monotonic())), context=ssl.create_default_context())
+    if connection_factory is None:
+        connection_factory = _PinnedHTTPS
+    connection = connection_factory(parts.hostname, timeout=min(REQUEST_SECONDS, max(0.1, deadline - time.monotonic())), context=ssl.create_default_context())
     try:
         path = parts.path or "/"
         if parts.query:
@@ -179,14 +184,134 @@ def _request_once(url: str, *, deadline: float) -> tuple[int, dict[str, str], by
         connection.close()
 
 
+def _request_worker(channel, url, deadline, connection_factory):
+    """Send bounded JSON metadata and raw bytes, never pickled response data."""
+    try:
+        try:
+            status, headers, body = _request_in_process(
+                url, deadline=deadline, connection_factory=connection_factory
+            )
+            metadata = json.dumps(
+                {"status": status, "headers": headers, "length": len(body)},
+                ensure_ascii=True, separators=(",", ":"),
+            ).encode("ascii")
+            if len(metadata) > MAX_WORKER_METADATA_BYTES:
+                raise CollectionError("source response headers exceed bound")
+        except CollectionError as exc:
+            metadata = json.dumps({"error": str(exc)[:4096]}, ensure_ascii=True).encode("ascii")
+            body = b""
+        except Exception as exc:
+            metadata = json.dumps(
+                {"error": "source transport unavailable: " + _transport_category(exc)},
+                ensure_ascii=True,
+            ).encode("ascii")
+            body = b""
+        channel.sendall(len(metadata).to_bytes(4, "big"))
+        channel.sendall(metadata)
+        channel.sendall(body)
+    except OSError:
+        # The parent closes its private channel when cancelling the request.
+        pass
+    finally:
+        channel.close()
+
+
+def _receive_worker_bytes(channel, count, deadline):
+    chunks = []
+    while count:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise CollectionError("source response deadline exceeded")
+        channel.settimeout(remaining)
+        chunk = channel.recv(min(count, 65536))
+        if not chunk:
+            raise CollectionError("source transport worker ended without a complete response")
+        chunks.append(chunk)
+        count -= len(chunk)
+    return b"".join(chunks)
+
+
+def _request_once(url: str, *, deadline: float) -> tuple[int, dict[str, str], bytes]:
+    """Bound DNS through response completion with a safely spawned worker.
+
+    The parent owns the absolute deadline, cancellation and reaping. The trusted
+    internal connection factory is passed explicitly so spawn does not depend on
+    inherited state; no factory or executable object comes from response IPC.
+    """
+    _url(url)
+    if time.monotonic() >= deadline:
+        raise CollectionError("source response deadline exceeded")
+    parent, child = socket.socketpair()
+    process = multiprocessing.get_context("spawn").Process(
+        target=_request_worker, args=(child, url, deadline, _PinnedHTTPS),
+        name="aic-source-transport",
+    )
+    try:
+        process.start()
+        child.close()
+        length = int.from_bytes(_receive_worker_bytes(parent, 4, deadline), "big")
+        if not 0 < length <= MAX_WORKER_METADATA_BYTES:
+            raise CollectionError("invalid source transport metadata length")
+        try:
+            metadata = json.loads(_receive_worker_bytes(parent, length, deadline))
+        except (ValueError, UnicodeError, RecursionError) as exc:
+            raise CollectionError("invalid source transport metadata") from exc
+        if not isinstance(metadata, dict):
+            raise CollectionError("invalid source transport metadata")
+        if set(metadata) == {"error"} and isinstance(metadata["error"], str):
+            failure = metadata["error"]
+            result = None
+        elif (
+            set(metadata) == {"status", "headers", "length"}
+            and type(metadata["status"]) is int
+            and 100 <= metadata["status"] <= 999
+            and isinstance(metadata["headers"], dict)
+            and all(isinstance(key, str) and isinstance(value, str) for key, value in metadata["headers"].items())
+            and type(metadata["length"]) is int
+            and 0 <= metadata["length"] <= MAX_RESPONSE_BYTES
+        ):
+            failure = None
+            body = _receive_worker_bytes(parent, metadata["length"], deadline)
+            result = metadata["status"], metadata["headers"], body
+        else:
+            raise CollectionError("invalid source transport metadata")
+        process.join(max(0, deadline - time.monotonic()))
+        if process.is_alive() or time.monotonic() >= deadline:
+            raise CollectionError("source response deadline exceeded")
+        if process.exitcode != 0:
+            raise CollectionError("source transport worker exited unsuccessfully")
+        if failure is not None:
+            raise CollectionError(failure)
+        return result
+    except TimeoutError as exc:
+        raise CollectionError("source response deadline exceeded") from exc
+    except (OSError, RuntimeError, TypeError) as exc:
+        raise CollectionError("source transport worker unavailable: " + _transport_category(exc)) from exc
+    finally:
+        parent.close()
+        child.close()
+        if process.pid is not None:
+            if process.is_alive():
+                # Unlike a thread timeout, kill also cancels resolver and TLS
+                # work. Reap before returning or releasing the arXiv lock.
+                process.kill()
+            process.join()
+        process.close()
+
+
 def _request(url: str, *, deadline: float) -> tuple[int, dict[str, str], bytes]:
     global _arxiv_last_finished
     if urlsplit(url).hostname not in ("export.arxiv.org", "arxiv.org"):
         return _request_once(url, deadline=deadline)
-    with _arxiv_lock:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0 or not _arxiv_lock.acquire(timeout=remaining):
+        raise CollectionError("arXiv connection wait exceeded source deadline")
+    try:
         if _arxiv_last_finished is not None:
             delay = 3 - (time.monotonic() - _arxiv_last_finished)
             if delay > 0:
+                if delay >= deadline - time.monotonic():
+                    raise CollectionError("arXiv rate-limit wait exceeded source deadline")
                 time.sleep(delay)
         if time.monotonic() >= deadline:
             raise CollectionError("arXiv rate-limit wait exceeded source deadline")
@@ -194,6 +319,8 @@ def _request(url: str, *, deadline: float) -> tuple[int, dict[str, str], bytes]:
             return _request_once(url, deadline=deadline)
         finally:
             _arxiv_last_finished = time.monotonic()
+    finally:
+        _arxiv_lock.release()
 
 
 def _query(url: str) -> dict[str, str]:

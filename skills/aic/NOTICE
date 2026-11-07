@@ -67,3 +67,14 @@ not vendored into AIC or relicensed under AIC's Apache-2.0 grant.
 The plugin manifests and MCP adapter are original AIC implementations.
 Official host/protocol documentation was consulted for compatibility only;
 its prose and examples are not redistributed as AIC-authored material.
+
+Repository-only security tooling (external, not bundled runtime dependencies):
+Gitleaks 8.30.1, MIT, Copyright (c) 2019 Zachary Rice.
+https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1
+https://github.com/gitleaks/gitleaks/blob/v8.30.1/LICENSE
+pip-audit 2.10.1, Apache-2.0, Python Packaging Authority contributors.
+https://github.com/pypa/pip-audit
+https://pypi.org/project/pip-audit/2.10.1/
+CI downloads/installs these tools separately with pinned versions and verifies
+the Gitleaks archive checksum. Their code is not copied into the portable skill;
+their upstream license terms remain authoritative.

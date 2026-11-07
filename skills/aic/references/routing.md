@@ -42,6 +42,19 @@ All fields below are required and no extra fields are accepted. Prose must expla
 - The host also states whether control returns to the lead or responsibility transfers, which context/history and data recipients are permitted, and what actually enforces tool/filesystem/network restrictions. A forked conversation is not clean-input evaluation and a worktree is not a security sandbox.
 - `next_action` is always `recommend`, and `approval_required` must be the boolean `true`. Execution is a separate approved phase, never a side effect of validation.
 
+### Validation resource limits
+
+The core validator used by `check-plan`, MCP and Orca rejects an oversized recommendation before project filesystem access or cross-branch overlap work. It never truncates an accepted recommendation: the result retains every supplied value in a detached copy. Validation does not authorize execution.
+
+- Canonical JSON must fit **64 KiB** (65,536 UTF-8 bytes), using compact separators, unescaped Unicode and finite JSON numbers. Object key order does not affect this byte budget. Unsupported Python values, non-string object keys, recursive containers and invalid UTF-8 strings are controlled validation errors.
+- JSON may contain at most **8 nested container levels**, counting the root object as level 1, and **4,096 nodes**, counting each object, array, scalar and object key occurrence. Container lengths are checked before enumerating their children, and scalar conversion is bounded before encoding; the validator does not serialize an unbounded input tree.
+- There may be at most **16 independent subtasks** and **256 total path entries**, aggregated across evidence, both scope lists and every branch's `allowed_paths`. Repeated entries count separately.
+- Each relative path may contain at most **32 normalized components** and **1,024 UTF-8 bytes** in its supplied spelling. Existing traversal, sensitive-path, symlink and evidence-existence checks still apply.
+- The worst-case cross-branch budget is **16,384 overlap predicate comparisons**: sum the product of the path counts for every unordered pair of branches. Project-bound validation counts that sum twice, for lexical and physical isolation; unbound validation counts only the lexical pass. Short-circuiting an actual collision does not increase the permitted input budget.
+
+If a recommendation exceeds a limit, reduce the current milestone or divide it into separately reviewed stages rather than relying on client timeouts. Core callers receive `AICError`; MCP returns a sanitized tool error without exposing the bound project root or private exception details. Passing the budget does not weaken the real inode/ancestor, hard-link or case-alias checks described above.
+
+
 Record roles, dependency readiness, accepted artifact versions, selected/inherited context, allowed effects, integration ownership, evidence and bounded stop/reselection in the task's existing approved artifact or conversation. These are procedural obligations, not extra schema fields. Sequential work needs an accepted producer output before downstream mutation; parallel work needs at least two independently checkable ready branches, non-overlapping output scopes and one integration owner. Separate paths alone prove neither readiness nor semantic independence.
 
 For `adaptive-controller`, say whether the task needs durable delivery or explicitly approved measured optimization. Continuity uses compact artifact/evidence state and original acceptance, not a mandatory performance benchmark. Optimization also needs a correct baseline/oracle, representative comparable workloads, measurement protocol and authorized resource limits. No recommendation launches a model, GPU, tmux server or service.
