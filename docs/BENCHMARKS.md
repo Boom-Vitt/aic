@@ -36,6 +36,10 @@ The smoke receipt sets `public_benchmark_scores` to null, `invokes_model` to fal
 
 `plan` on a public suite exits 3 and writes no score. `run` on a public suite exits 3.
 
+## Held-out routing pack
+
+`tests/fixtures/routing-scenarios.json` is an evaluation fixture. Skill text must never be derived from its held-out cases. Do not read that pack when editing `skills/aic`. A skill written from those requests or labels measures the fixture instead of the skill.
+
 ## What a scale run still needs
 
 - A local checkout of the suite at one revision, after the license check above.
