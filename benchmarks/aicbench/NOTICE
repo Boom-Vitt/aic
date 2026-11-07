@@ -1,0 +1,24 @@
+aicbench
+Copyright 2026 Boom-Vitt and AIC contributors.
+
+The tasks, hidden oracles, reference solutions, and runner in this directory
+are original AIC works under the repository Apache-2.0 license. No benchmark
+instances, prompts, tests, or implementation code were copied from SWE-bench,
+HumanEval, or any other upstream suite.
+
+pass@1 uses the unbiased estimator described by Mark Chen and coauthors in
+"Evaluating Large Language Models Trained on Code", arXiv:2107.03374
+(https://arxiv.org/abs/2107.03374). That paper's tasks and code are not
+included. The citation is not an endorsement.
+
+The comparison runner starts the Claude Code executable. Claude Code is a
+product name, not an AIC component. The pipeline smoke stub in stub/agent.py
+is an offline harness check. It is not a model, and running it is not a
+published score. The Claude Code command-line contract was checked
+against Anthropic's headless documentation on 2026-11-07:
+https://code.claude.com/docs/en/headless
+That documentation was not copied. AIC does not relicense Claude Code.
+
+Reported cost is the `total_cost_usd` value printed by Claude Code. This
+benchmark does not apply a token price table and does not invent a cost when
+that field is absent.

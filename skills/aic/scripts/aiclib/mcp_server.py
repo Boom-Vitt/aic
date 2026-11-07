@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
@@ -38,6 +40,7 @@ _SECTION_NAMES = tuple(_GUIDANCE)
 _SECTION_MAX_LENGTH = max(len(name) for name in _SECTION_NAMES)
 _FILES_MIN = 1
 _DEPTH_MIN = 0
+_MAX_RESOURCE_BYTES = 1_048_576
 _INSPECTION_REJECTION = (
     "Inspection rejected: use integer limits "
     f"(files {_FILES_MIN}..{_MAX_FILES}, depth {_DEPTH_MIN}..{_MAX_DEPTH}) "
@@ -104,11 +107,62 @@ def _seal_object_schemas(schema: object) -> None:
             _seal_object_schemas(item)
 
 
+def _open_directory(path: Path) -> int:
+    """Open an absolute directory without following a symlink at any component."""
+    descriptor = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for name in path.parts[1:]:
+            child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _read_nofollow(root: Path, relative: str) -> str:
+    """Read one allowlisted regular file; a symlink at any component fails closed."""
+    directory = _open_directory(root)
+    file_descriptor = None
+    try:
+        parts = relative.split("/")
+        for name in parts[:-1]:
+            child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            os.close(directory)
+            directory = child
+        file_descriptor = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+        info = os.fstat(file_descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > _MAX_RESOURCE_BYTES:
+            raise AICError("The packaged resource cannot be read safely.")
+        with os.fdopen(file_descriptor, "rb") as handle:
+            file_descriptor = None
+            payload = handle.read(_MAX_RESOURCE_BYTES + 1)
+        if len(payload) > _MAX_RESOURCE_BYTES:
+            raise AICError("The packaged resource cannot be read safely.")
+        return payload.decode("utf-8")
+    finally:
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+        os.close(directory)
+
+
 def _portable_text(relative: str) -> str:
-    """Read only a caller-selected entry from our concrete packaged allowlist."""
+    """Read only a caller-selected entry from our concrete packaged allowlist.
+
+    ``safe_path`` rejects a symlink that is already present. The bytes are read
+    afterwards with ``O_NOFOLLOW``, so a symlink swapped in after that check is
+    not followed.
+    """
     if relative not in _RESOURCE_PATHS:
         raise AICError("The requested portable resource is not allowlisted.")
-    return safe_path(_SKILL_ROOT, relative, must_exist=True).read_text(encoding="utf-8")
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY") or os.open not in os.supports_dir_fd:
+        raise AICError("The packaged resource cannot be read safely.")
+    safe_path(_SKILL_ROOT, relative, must_exist=True)
+    try:
+        return _read_nofollow(_SKILL_ROOT, relative)
+    except (OSError, UnicodeError) as exc:
+        raise AICError("The packaged resource cannot be read safely.") from exc
 
 
 def build_server(project: Path) -> MCPServer:

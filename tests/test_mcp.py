@@ -303,6 +303,56 @@ class McpBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.is_error)
 
     @mcp_session
+    async def test_guidance_returns_packaged_text_without_project_contents(self):
+        result = await self.client.call_tool("aic_get_guidance", {"section": "start"})
+        self.assertFalse(result.is_error)
+        self.assertEqual(result.structured_content["uri"], "aic://skill/SKILL.md")
+        self.assertIn("AIC: AI Culture", result.structured_content["text"])
+        self.assertNotIn("private body must not be returned", result.structured_content["text"])
+        self.assertNotIn("PRIVATE_MARKER_NOT_FOR_CONTEXT", result.structured_content["text"])
+
+    @mcp_session
+    async def test_packaged_resource_symlink_is_not_followed(self):
+        skill = self.base / "linked-skill"
+        (skill / "references").mkdir(parents=True)
+        (skill / "SKILL.md").write_text("portable guidance", encoding="utf-8")
+        secret = self.base / "linked-secret.txt"
+        secret.write_text("LINKED_RESOURCE_SECRET", encoding="utf-8")
+        (skill / "references" / "safety.md").symlink_to(secret)
+        with patch.object(self.module, "_SKILL_ROOT", skill):
+            result = await self.client.call_tool("aic_get_guidance", {"section": "safety"})
+        self.assertTrue(result.is_error)
+        self.assertNotIn("LINKED_RESOURCE_SECRET", str(result.content))
+        recovered = await self.client.call_tool("aic_get_guidance", {"section": "start"})
+        self.assertFalse(recovered.is_error)
+        self.assertIn("AIC: AI Culture", recovered.structured_content["text"])
+
+    @mcp_session
+    async def test_packaged_read_does_not_follow_a_symlink_swapped_in_after_the_check(self):
+        skill = self.base / "swap-skill"
+        skill.mkdir()
+        (skill / "SKILL.md").write_text("portable guidance", encoding="utf-8")
+        secret = self.base / "swapped-secret.txt"
+        secret.write_text("SYMLINK_SWAP_SECRET", encoding="utf-8")
+        original = self.module.safe_path
+
+        def swap(root, relative, **kwargs):
+            path = original(root, relative, **kwargs)
+            if path.name == "SKILL.md":
+                path.unlink()
+                path.symlink_to(secret)
+            return path
+
+        with patch.object(self.module, "_SKILL_ROOT", skill), patch.object(self.module, "safe_path", swap):
+            result = await self.client.call_tool("aic_get_guidance", {"section": "start"})
+        self.assertTrue(result.is_error)
+        self.assertNotIn("SYMLINK_SWAP_SECRET", str(result.content))
+        self.assertTrue((skill / "SKILL.md").is_symlink())
+        recovered = await self.client.call_tool("aic_get_guidance", {"section": "start"})
+        self.assertFalse(recovered.is_error)
+        self.assertIn("AIC: AI Culture", recovered.structured_content["text"])
+
+    @mcp_session
     async def test_unlisted_guidance_cannot_open_arbitrary_files(self):
         for section in ("../.env", str(self.project / ".env"), "file:///etc/passwd", "unknown-guide"):
             with self.subTest(section=section):

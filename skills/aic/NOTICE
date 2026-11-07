@@ -49,7 +49,13 @@ and the credited OpenAI Cookbook memory/compaction contributors.
 Orca template notes also credit John Yang and coauthors (SWE-agent),
 Chunqiu Steven Xia and coauthors (Agentless), Dong Chen and coauthors (CodeR),
 and Daman Arora and coauthors (MASAI), plus Claude Code product documentation.
-Those sources stay reference-only.
+The editing procedure also cites those SWE-agent and Agentless papers and
+the AutoCodeRover paper by Yuntong Zhang, Haifeng Ruan, Zhiyu Fan
+and Abhik Roychoudhury. The SWE-agent
+and Agentless implementation repositories named in the ledger are MIT. The
+AutoCodeRover repository named there is source-available and is not a grant
+to copy that code. No paper text or implementation source from those projects
+is included. Those sources stay reference-only.
 Additional capability references: DeepSeek-AI/DeepSeek Harness contributors,
 and the tmux project and its contributing authors. Their runtime code,
 documentation and software are not included. The optional tmux profile is
