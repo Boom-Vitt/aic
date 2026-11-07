@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.0.3 — 2026-11-08 (unreleased)
+- Headless git reads reject command substitutions, here-strings, process substitutions, `git -c` / `--config-env`, gate scripts owned by the accepted plan, and slashless `git add` pathspecs that resolve outside the worktree.
 - Add a benchmark harness skeleton that records a local smoke command and refuses to score SWE-bench, Terminal-Bench, Aider polyglot, or real-task suites. No public score is included.
 - Add an Orca v0.4.0 plus Claude Code project template: plan checks, a dry-run headless loop, a non-clobbering project bootstrap, a Mac mini setup script, safe project permissions, and CI lint/tests. The native plugin stays skills-only. The setup script does not handle secrets or call a model.
 - Filter public issue/comment markers by approved-author provenance before uniqueness and reconciliation; retain owner ambiguity, assignment checks and uncertain-effect non-replay.
