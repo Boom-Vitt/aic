@@ -88,6 +88,36 @@ class CLITests(unittest.TestCase):
         self.assertEqual(denied.returncode, 2)
         self.assertFalse(project.exists())
 
+    def test_hello_world_is_the_install_check(self):
+        result = self.run_cli('hello-world')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, '')
+        payload = json.loads(result.stdout)
+        version = self.run_cli('--version')
+        self.assertEqual(version.returncode, 0, version.stderr)
+        self.assertEqual(payload['hello'], 'world')
+        self.assertEqual(payload['distribution'], 'aiculture-skills')
+        self.assertEqual(payload['version'], version.stdout.removeprefix('AIC ').strip())
+        self.assertEqual(payload['channels'], ['skill', 'claude-code-plugin', 'local-mcp'])
+        self.assertEqual(list(self.base.iterdir()), [])
+
+    def test_hello_world_rejects_extra_arguments(self):
+        result = self.run_cli('hello-world', '--project', self.base)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('AIC:', result.stderr)
+        self.assertNotIn('Traceback', result.stderr)
+        self.assertEqual(list(self.base.iterdir()), [])
+
+    def test_help_lists_hello_world_and_agents_still_runs(self):
+        help_result = self.run_cli('--help')
+        self.assertEqual(help_result.returncode, 0, help_result.stderr)
+        self.assertIn('hello-world', help_result.stdout)
+        agents = self.run_cli('agents')
+        self.assertEqual(agents.returncode, 0, agents.stderr)
+        listed = json.loads(agents.stdout)
+        self.assertEqual(listed['schema_version'], 1)
+        self.assertIn('claude-code', [item['id'] for item in listed['agents']])
+
 
 if __name__ == '__main__':
     unittest.main()
