@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.2 — 2026-11-07
+- Read only service-level launchd lifecycle fields. Nested resource-coalition states and PIDs no longer block owned removal or get mistaken for the controller; missing or ambiguous controller evidence still fails closed.
+- Make the lifecycle fixture reflect the actual Mac mini response and retain explicit wrong-PID, unknown-running-state and ownership-preservation coverage.
+- Isolate role startup from ambient home/project plugins while binding the existing CLI authentication directory without copying credentials. Hash the private runtime binding in version-2 receipts; preserve older evidence without automatic reuse.
+
 ## 2.0.1 — 2026-11-07
 - Fix initial branch protection on personal GitHub repositories by omitting organization-only bypass structures. The read-back policy still requires strict checks, administrator enforcement and pull requests, and rejects every nonempty bypass allowance.
 - Preserve the ordinary two-role-runs-per-UTC-day limit; a separately recorded owner-approved, three-invocation supervised proof does not increase recurring capacity.

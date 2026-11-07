@@ -75,6 +75,8 @@ class Protocol:
                              '\targuments = {', *('\t\t' + a for a in config['ProgramArguments']), '\t}',
                              '\tworking directory = ' + config['WorkingDirectory'],
                              '\tstate = ' + ('running' if self.pid is not None else 'not running'),
+                             '\tresource coalition = {', '\t\tstate = active', '\t}',
+                             '\tjetsam coalition = {', '\t\tstate = active', '\t}',
                              *([f'\tpid = {self.pid}'] if self.pid is not None else []), '}']
                     out = '\n'.join(lines).encode()
             elif args[0] == 'bootstrap':
@@ -348,12 +350,32 @@ class MaintainerServiceTests(unittest.TestCase):
             result = self.protocol(argv, **kwargs)
             if 'print' in argv:
                 result.stdout = result.stdout.replace(b'state = not running', b'state = running')
+                result.stdout = result.stdout.replace(
+                    b'\t\tstate = active', b'\t\tstate = active\n\t\tpid = 123456', 1)
             return result
         before = self.snapshot()
-        with self.assertRaises(service.ServiceError):
+        with mock.patch.object(service.os, 'kill', side_effect=ProcessLookupError), \
+                self.assertRaises(service.ServiceError):
             service.uninstall(self.repository, home=self.home, approve=True, runner=missing_pid)
         self.assertEqual(self.snapshot(), before)
         self.assertFalse(any('bootout' in call for call in self.protocol.calls))
+
+    def test_nested_resource_pid_is_not_the_controller(self):
+        self.install(activate=True)
+        self.protocol.pid = 987654
+
+        def nested_pid(argv, **kwargs):
+            result = self.protocol(argv, **kwargs)
+            if 'print' in argv:
+                result.stdout = result.stdout.replace(
+                    b'\t\tstate = active', b'\t\tstate = active\n\t\tpid = 123456', 1)
+            return result
+
+        with mock.patch.object(service.os, 'kill', side_effect=ProcessLookupError) as probe:
+            service.uninstall(self.repository, home=self.home, approve=True, runner=nested_pid)
+        probe.assert_called_once_with(987654, 0)
+        self.assertFalse(self.plist.exists())
+        self.assertFalse((self.root / 'service.json').exists())
 
     def test_modified_pending_shutdown_evidence_never_stops_or_removes_service(self):
         self.install(activate=True)

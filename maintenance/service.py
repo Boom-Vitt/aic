@@ -273,8 +273,9 @@ def _controller_pid(output):
     if output is None:
         return None
     text = output.decode('utf-8')
-    states = re.findall(r'^\s*state = (.+)$', text, re.MULTILINE)
-    pids = re.findall(r'^\s*pid = (.+)$', text, re.MULTILINE)
+    # Only service-level fields; nested resource coalitions have their own state/PID.
+    states = re.findall(r'^\tstate = (.+)$', text, re.MULTILINE)
+    pids = re.findall(r'^\tpid = (.+)$', text, re.MULTILINE)
     if len(pids) == 1 and re.fullmatch(r'[1-9][0-9]*', pids[0]) and int(pids[0]) <= 2**31 - 1:
         return int(pids[0])
     if not pids and states == ['not running']:
