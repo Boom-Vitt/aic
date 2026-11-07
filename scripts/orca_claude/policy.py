@@ -18,14 +18,27 @@ DENY_COMMAND = re.compile(
     r'|--dangerously-skip-permissions|\s--bare\b|\s-delete\b|\.env\b)',
     re.IGNORECASE,
 )
-ALLOW_PREFIXES = (
-    'git status', 'git diff', 'git log', 'git show', 'git rev-parse', 'git worktree list',
-    'git merge-base', 'git merge-tree', 'git add', 'git commit', 'git checkout', 'git switch',
-    'git branch', 'pytest', 'python', 'python3', 'node', 'npm test', 'npm run lint',
-    'npm run typecheck', 'npm run test', 'pnpm test', 'pnpm run lint', 'pnpm run typecheck',
-    'pnpm run test', 'yarn test', 'yarn lint', './scripts/verify.sh', './gate.sh',
-    './.orca/gate.sh', './scripts/orca-gate.sh', 'mkdir', 'ls', 'cat', 'rg', 'sed',
-)
+EXACT_HEADLESS = {
+    './scripts/verify.sh',
+    './gate.sh',
+    './.orca/gate.sh',
+    './scripts/orca-gate.sh',
+}
+GIT_FLAGS = {
+    'status': {'-sb', '--short', '--porcelain', '--branch', '-b'},
+    'diff': {'--stat', '--name-only', '--name-status', '--cached', '--staged', '--exit-code'},
+    'log': {'--oneline', '--stat', '--decorate', '--max-count', '-n'},
+    'show': {'--stat', '--name-only', '--name-status', '--no-patch', '--oneline'},
+    'rev-parse': {'--abbrev-ref', '--show-toplevel', '--is-inside-work-tree', '--git-common-dir'},
+    'merge-base': set(),
+    'merge-tree': set(),
+    'add': {'-u', '--update', '-A', '--all'},
+    'commit': {'-m', '--message'},
+}
+INTERPRETERS = {
+    'python', 'python3', 'node', 'deno', 'bun', 'perl', 'ruby', 'pytest', 'py.test',
+}
+WRAPPERS = {'command', 'env', 'exec', 'xargs', 'nice', 'nohup', 'builtin'}
 TEST_MARKERS = (
     'pytest', 'npm test', 'pnpm test', 'yarn test', 'go test', 'cargo test',
     './scripts/verify.sh', './gate.sh', './.orca/gate.sh', 'unittest',
@@ -58,8 +71,8 @@ def _segments(command: str) -> list[str]:
     return [part.strip() for part in re.split(r'(?:&&|\|\||;|\n|\|)', command) if part.strip()]
 
 
-def _allowed_segment(segment: str) -> bool:
-    return any(segment == prefix or segment.startswith(prefix + ' ') or segment.startswith(prefix + '\t') for prefix in ALLOW_PREFIXES)
+def _program(token: str) -> str:
+    return Path(token).name
 
 
 def path_is_sensitive(value: str) -> bool:
@@ -135,15 +148,36 @@ def _git_push_or_branch_delete(tokens: list[str]) -> bool:
     return False
 
 
-def _interpreter_escape(tokens: list[str]) -> bool:
-    if not tokens or Path(tokens[0]).name not in {'python', 'python3', 'node'}:
-        return False
-    for token in tokens[1:]:
-        if token in {'-c', '-e', '--eval'}:
-            return True
-        if token.startswith('-') and not token.startswith('--') and ('c' in token[1:] or 'e' in token[1:]):
-            return True
-    return False
+def _unwrap_wrappers(tokens: list[str]) -> list[str]:
+    current = list(tokens)
+    for _ in range(6):
+        if not current:
+            return current
+        name = _program(current[0])
+        if name not in WRAPPERS:
+            return current
+        index = 1
+        if name == 'env':
+            while index < len(current):
+                token = current[index]
+                if token == '--':
+                    index += 1
+                    break
+                if token.startswith('-'):
+                    index += 2 if token in {'-u', '-C', '-S'} else 1
+                    continue
+                if '=' in token:
+                    index += 1
+                    continue
+                break
+        elif name == 'xargs':
+            while index < len(current) and current[index].startswith('-'):
+                index += 2 if current[index] in {'-I', '-a', '-n', '-P', '-L', '-s', '-E', '-J'} else 1
+        else:
+            while index < len(current) and current[index].startswith('-'):
+                index += 1
+        current = current[index:]
+    return current
 
 
 def _shell_c(tokens: list[str]) -> str | None:
@@ -160,47 +194,106 @@ def _shell_c(tokens: list[str]) -> str | None:
     return None
 
 
-def _sed_script_dangerous(script: str) -> bool:
-    if re.search(r'(?:^|[;\n{}])\s*e(?:\s|$)', script):
-        return True
-    if re.search(r'(?:^|[;\n{}])\s*w\s*\S', script):
-        return True
-    cursor = 0
-    while True:
-        found = re.search(r's([^\n\\])', script[cursor:])
-        if not found:
-            return False
-        delimiter = re.escape(found.group(1))
-        rest = script[cursor + found.end():]
-        parts = re.match(rf'(.*?)(?<!\\){delimiter}(.*?)(?<!\\){delimiter}([^;\n]*)', rest)
-        if parts and re.search(r'[ew]', parts.group(3)):
-            return True
-        cursor += found.end()
-
-
-def _sed_dangerous(tokens: list[str]) -> bool:
-    if not tokens or Path(tokens[0]).name != 'sed':
-        return False
-    scripts: list[str] = []
+def _git_parts(tokens: list[str]) -> tuple[str, list[str]] | None:
+    if not tokens or _program(tokens[0]) != 'git':
+        return None
     index = 1
     while index < len(tokens):
         token = tokens[index]
-        if token in {'-e', '--expression'} and index + 1 < len(tokens):
-            scripts.append(tokens[index + 1])
+        if token in {'-C', '-c', '--git-dir', '--work-tree', '--namespace', '--super-prefix', '--config-env', '--exec-path'}:
             index += 2
             continue
-        if token.startswith('--expression='):
-            scripts.append(token.split('=', 1)[1])
+        if token.startswith(('--git-dir=', '--work-tree=', '--namespace=', '--super-prefix=', '--config-env=', '--exec-path=')):
             index += 1
             continue
-        if token in {'-f', '--file'} or token.startswith('--file='):
+        if token.startswith('-c') and token != '-c':
+            index += 1
+            continue
+        if token.startswith('-') and token not in {'-C', '-c'}:
+            index += 1
+            continue
+        return token, tokens[index + 1:]
+    return None
+
+
+def _path_is_outside_or_sensitive(raw: str, worktree: Path | None, cwd: Path | None) -> bool:
+    text = raw[2:] if raw.startswith('./') else raw
+    if path_is_sensitive(text) or path_is_sensitive(raw):
+        return True
+    if raw.startswith('~') or text.startswith('~'):
+        return True
+    if ':' in raw and '://' not in raw:
+        _revision, path = raw.split(':', 1)
+        if not path:
             return True
+        return _path_is_outside_or_sensitive(path, worktree, cwd)
+    if worktree is None:
+        return raw.startswith('/') or raw.startswith('~') or text.startswith('..')
+    base = cwd if cwd is not None else worktree
+    candidate = Path(raw)
+    if not candidate.is_absolute():
+        candidate = base / candidate
+    try:
+        resolved = candidate.resolve()
+        resolved.relative_to(worktree.resolve())
+    except (OSError, ValueError):
+        return True
+    return path_is_sensitive(str(resolved))
+
+
+def _looks_like_path(token: str) -> bool:
+    return token.startswith(('/', '~', '.')) or '/' in token or (':' in token and '://' not in token)
+
+
+def _safe_git(tokens: list[str], worktree: Path | None, cwd: Path | None) -> bool:
+    if '--no-index' in tokens:
+        return False
+    parts = _git_parts(tokens)
+    if parts is None:
+        return False
+    subcommand, rest = parts
+    if subcommand == 'worktree':
+        return rest in (['list'], ['list', '--porcelain'])
+    flags = GIT_FLAGS.get(subcommand)
+    if flags is None:
+        return False
+    index = 0
+    while index < len(rest):
+        token = rest[index]
+        if token == '--':
+            return all(not _path_is_outside_or_sensitive(path, worktree, cwd) for path in rest[index + 1:])
         if token.startswith('-'):
+            if token not in flags and not (subcommand == 'log' and token.startswith('-n') and token[2:].isdigit()):
+                return False
+            if token in {'-n', '--max-count', '-m', '--message'}:
+                if index + 1 >= len(rest):
+                    return False
+                index += 2
+                continue
             index += 1
             continue
-        scripts.append(token)
+        if _looks_like_path(token) or (':' in token and '://' not in token):
+            if _path_is_outside_or_sensitive(token, worktree, cwd):
+                return False
         index += 1
-    return any(_sed_script_dangerous(script) for script in scripts)
+    return True
+
+
+def _headless_segment_allowed(segment: str, worktree: Path | None, cwd: Path | None) -> bool:
+    tokens = _tokens(segment)
+    if not tokens:
+        return False
+    unwrapped = _unwrap_wrappers(tokens)
+    if not unwrapped:
+        return False
+    if len(unwrapped) == 1 and unwrapped[0] in EXACT_HEADLESS:
+        return True
+    names = {_program(unwrapped[0]), _program(tokens[0])}
+    if names & INTERPRETERS or 'sed' in names:
+        return False
+    if _program(unwrapped[0]) == 'git':
+        return _safe_git(unwrapped, worktree, cwd)
+    return False
 
 
 def command_is_blocked(command: str, *, headless: bool, depth: int = 0) -> bool:
@@ -211,10 +304,9 @@ def command_is_blocked(command: str, *, headless: bool, depth: int = 0) -> bool:
     for segment in _segments(command):
         tokens = _tokens(segment)
         if tokens is None:
-            return headless
-        if _git_push_or_branch_delete(tokens):
             return True
-        if headless and (_interpreter_escape(tokens) or _sed_dangerous(tokens)):
+        unwrapped = _unwrap_wrappers(tokens)
+        if _git_push_or_branch_delete(tokens) or _git_push_or_branch_delete(unwrapped):
             return True
         inner = _shell_c(tokens)
         if inner and command_is_blocked(inner, headless=headless, depth=depth + 1):
@@ -223,7 +315,8 @@ def command_is_blocked(command: str, *, headless: bool, depth: int = 0) -> bool:
 
 
 def decide_tool(tool_name: str, tool_input: object, *, headless: bool, active_stream: str | None,
-                active_worktree: str | None, resolved_toplevel: str | None, plan: dict | None) -> tuple[int, str]:
+                active_worktree: str | None, resolved_toplevel: str | None, plan: dict | None,
+                cwd: str | None = None) -> tuple[int, str]:
     """Return ``(0, reason)`` to allow or ``(2, reason)`` to block."""
     if not isinstance(tool_name, str) or not tool_name:
         return 2, 'missing tool name.'
@@ -237,8 +330,11 @@ def decide_tool(tool_name: str, tool_input: object, *, headless: bool, active_st
         if active_worktree and any(marker in command for marker in TEST_MARKERS):
             if not resolved_toplevel or Path(resolved_toplevel).resolve() != Path(active_worktree).resolve():
                 return 2, 'test command is not running in the active worktree.'
-        if headless and not all(_allowed_segment(segment) for segment in _segments(command)):
-            return 2, 'command is not on the headless allowlist.'
+        if headless:
+            root = Path(resolved_toplevel) if resolved_toplevel else (Path(active_worktree) if active_worktree else None)
+            base = Path(cwd) if cwd else root
+            if not all(_headless_segment_allowed(segment, root, base) for segment in _segments(command)):
+                return 2, 'command is not on the headless allowlist.'
         return 0, 'bash allowed.'
     paths = _tool_paths(payload)
     if any(path_is_sensitive(item) for item in paths):

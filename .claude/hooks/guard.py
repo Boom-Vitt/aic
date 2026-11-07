@@ -72,8 +72,9 @@ def main() -> int:
             headless=headless,
             active_stream=os.environ.get('ORCA_ACTIVE_STREAM') or None,
             active_worktree=active,
-            resolved_toplevel=_toplevel(cwd) if active else None,
+            resolved_toplevel=_toplevel(cwd) if cwd else None,
             plan=_plan(cwd, headless),
+            cwd=cwd or None,
         )
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         print(f'guard failed closed: {exc}', file=sys.stderr)

@@ -132,7 +132,7 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
         self.assertEqual(code, 2)
         code, _ = decide_tool('Bash', {'command': 'pytest -q'}, headless=True,
                               active_stream=None, active_worktree=None, resolved_toplevel=None, plan=None)
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 2)
         code, _ = decide_tool('NewTool', {}, headless=True,
                               active_stream=None, active_worktree=None, resolved_toplevel=None, plan=None)
         self.assertEqual(code, 2)
@@ -164,9 +164,41 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
             code, _message = decide_tool('Bash', {'command': command}, headless=True, active_stream=None,
                                          active_worktree=None, resolved_toplevel=None, plan=None)
             self.assertEqual(code, 2, command)
-        allowed, _message = decide_tool('Bash', {'command': "sed -e 's/a/b/'"}, headless=True, active_stream=None,
+        allowed, _message = decide_tool('Bash', {'command': 'git diff --stat'}, headless=True, active_stream=None,
                                         active_worktree=None, resolved_toplevel=None, plan=None)
         self.assertEqual(allowed, 0)
+        exact, _message = decide_tool('Bash', {'command': './gate.sh'}, headless=True, active_stream=None,
+                                      active_worktree=None, resolved_toplevel=None, plan=None)
+        self.assertEqual(exact, 0)
+
+    def test_headless_denies_reviewer_bypasses(self):
+        secret = self.root / 'id_rsa'
+        secret.write_text('secret\n', encoding='utf-8')
+        repo = self.root / 'repo'
+        repo.mkdir()
+        options = dict(active_stream=None, active_worktree=None, resolved_toplevel=str(repo), plan=None, cwd=str(repo))
+        denied = (
+            f'git diff --no-index /dev/null {secret}',
+            "sed -e '1e echo hi'",
+            "sed -e '1e /usr/bin/git -C /tmp push'",
+            'python3 evil.py',
+            'python3 -m pip',
+            'node -p process.version',
+            'node --require ./preload.js app.js',
+            'git show HEAD:.env',
+            'git log -p -- README.md',
+            f'git diff -- {secret}',
+        )
+        for command in denied:
+            code, _message = decide_tool('Bash', {'command': command}, headless=True, **options)
+            self.assertEqual(code, 2, command)
+        code, _message = decide_tool('Bash', {'command': 'command git -C x push'}, headless=False,
+                                     active_stream=None, active_worktree=None, resolved_toplevel=None, plan=None)
+        self.assertEqual(code, 2)
+        for wrapper in ('env git push', 'exec git push', 'xargs git branch -D feature'):
+            code, _message = decide_tool('Bash', {'command': wrapper}, headless=False,
+                                         active_stream=None, active_worktree=None, resolved_toplevel=None, plan=None)
+            self.assertEqual(code, 2, wrapper)
 
     def test_hook_blocks_git_push_with_exit_2(self):
         result = subprocess.run(
@@ -362,6 +394,10 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
             self.assertEqual(text, (ROOT / 'templates' / 'orca-claude' / relative).read_text(encoding='utf-8'))
             self.assertNotIn('Bash(python3 *)', text)
             self.assertNotIn('Bash(pytest *)', text)
+            if relative.endswith('settings.headless.json'):
+                self.assertNotIn('Bash(git diff *)', text)
+                self.assertNotIn('Bash(git log *)', text)
+                self.assertNotIn('Bash(git show *)', text)
         def tree(root):
             return {path.relative_to(root).as_posix(): path.read_bytes()
                     for path in root.rglob('*') if path.is_file() and '__pycache__' not in path.parts}
