@@ -14,12 +14,51 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills"))
 SDK_AVAILABLE = importlib.util.find_spec("mcp") is not None
+_SECTIONS = (
+    "start", "workflows", "templates", "project-plans", "routing",
+    "memory", "safety", "supervision", "research", "integrations",
+)
+_INSPECTION_ERROR = (
+    "Error executing tool aic_inspect_project: "
+    "Inspection rejected: use integer limits (files 1..10000, depth 0..32) "
+    "and an unchanged safe bound project directory."
+)
+_GUIDANCE_ERROR = (
+    "Error executing tool aic_get_guidance: "
+    "Unknown guidance section; use a declared section name."
+)
 
 if SDK_AVAILABLE:
     from mcp import Client, StdioServerParameters
 
     from mcp.shared.exceptions import MCPError
     from aic.scripts.aiclib import mcp_server
+
+
+def _error_text(result) -> str:
+    return "\n".join(block.text for block in result.content if getattr(block, "text", None) is not None)
+
+
+def _assert_closed_and_bounded(test, schema, path):
+    """Every object is closed, and every number or string carries its published limit."""
+    if isinstance(schema, dict):
+        if schema.get("type") == "object":
+            test.assertIs(schema.get("additionalProperties"), False, path)
+        kind = schema.get("type")
+        if kind in ("integer", "number"):
+            test.assertIn("minimum", schema, path)
+            test.assertIn("maximum", schema, path)
+            test.assertLessEqual(schema["minimum"], schema["maximum"], path)
+        if kind == "string":
+            test.assertIsInstance(schema.get("maxLength"), int, path)
+            test.assertGreater(schema["maxLength"], 0, path)
+        for key, value in schema.items():
+            if key == "additionalProperties" and not isinstance(value, dict):
+                continue
+            _assert_closed_and_bounded(test, value, f"{path}.{key}")
+    elif isinstance(schema, list):
+        for index, item in enumerate(schema):
+            _assert_closed_and_bounded(test, item, f"{path}[{index}]")
 
 
 def mcp_session(test):
@@ -173,13 +212,68 @@ class McpBoundaryTests(unittest.IsolatedAsyncioTestCase):
 
     @mcp_session
     async def test_inspection_does_not_coerce_limits_or_ignore_bounds(self):
-        for arguments in ({"max_files": True}, {"max_depth": False}, {"max_files": 1.5}, {"max_depth": "2"}, {"max_files": 0}, {"max_files": 10001}, {"max_depth": -1}, {"max_depth": 33}):
+        for arguments in ({"max_files": True}, {"max_depth": False}, {"max_files": 1.5}, {"max_depth": "2"}):
             with self.subTest(arguments=arguments):
                 result = await self.client.call_tool("aic_inspect_project", arguments)
                 self.assertTrue(result.is_error)
+                self.assertNotEqual(_error_text(result), _INSPECTION_ERROR)
+        for arguments in ({"max_files": 0}, {"max_files": 10001}, {"max_depth": -1}, {"max_depth": 33}):
+            with self.subTest(arguments=arguments):
+                result = await self.client.call_tool("aic_inspect_project", arguments)
+                self.assertEqual(_error_text(result), _INSPECTION_ERROR)
+                for leaked in ("10001", "-1", "33"):
+                    self.assertNotIn(leaked, _error_text(result))
         recovered = await self.client.call_tool("aic_inspect_project", {"max_files": 1, "max_depth": 0})
         self.assertFalse(recovered.is_error)
         self.assertEqual(recovered.structured_content["project"], str(self.project))
+
+    async def _assert_published_bounds(self, client):
+        listed = await client.list_tools()
+        schemas = {tool.name: tool.input_schema for tool in listed.tools}
+        for name, schema in schemas.items():
+            with self.subTest(schema=name):
+                _assert_closed_and_bounded(self, schema, name)
+        files = schemas["aic_inspect_project"]["properties"]["max_files"]
+        depth = schemas["aic_inspect_project"]["properties"]["max_depth"]
+        self.assertEqual((files["minimum"], files["maximum"]), (1, 10000))
+        self.assertEqual((depth["minimum"], depth["maximum"]), (0, 32))
+        section = schemas["aic_get_guidance"]["properties"]["section"]
+        self.assertEqual(section["enum"], list(_SECTIONS))
+        self.assertEqual(section["maxLength"], max(len(name) for name in _SECTIONS))
+        plan = schemas["aic_validate_recommendation"]["properties"]["plan"]
+        self.assertNotIn("additionalProperties", plan)
+        ceiling = await client.call_tool("aic_inspect_project", {"max_files": files["maximum"], "max_depth": depth["maximum"]})
+        self.assertFalse(ceiling.is_error)
+        self.assertEqual(ceiling.structured_content["project"], str(self.project))
+        for arguments in (
+            {"max_files": files["minimum"] - 1},
+            {"max_files": files["maximum"] + 1},
+            {"max_depth": depth["minimum"] - 1},
+            {"max_depth": depth["maximum"] + 1},
+        ):
+            with self.subTest(arguments=arguments):
+                result = await client.call_tool("aic_inspect_project", arguments)
+                text = _error_text(result)
+                self.assertEqual(text, _INSPECTION_ERROR)
+                for supplied in arguments.values():
+                    if str(supplied) not in _INSPECTION_ERROR:
+                        self.assertNotIn(str(supplied), text)
+        for name in _SECTIONS:
+            with self.subTest(section=name):
+                result = await client.call_tool("aic_get_guidance", {"section": name})
+                self.assertFalse(result.is_error)
+                self.assertTrue(result.structured_content["text"])
+        marker = "PRIVATE_SECTION_MARKER"
+        for section_name in ("unknown", "x" * section["maxLength"], marker + ("x" * section["maxLength"])):
+            with self.subTest(section=section_name):
+                result = await client.call_tool("aic_get_guidance", {"section": section_name})
+                self.assertEqual(_error_text(result), _GUIDANCE_ERROR)
+                self.assertNotIn(marker, _error_text(result))
+                self.assertNotIn(section_name, _error_text(result))
+
+    @mcp_session
+    async def test_published_bounds_match_server_rejection(self):
+        await self._assert_published_bounds(self.client)
 
     @mcp_session
     async def test_recommendation_cannot_remove_approval_or_become_execution(self):
@@ -209,12 +303,63 @@ class McpBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.is_error)
 
     @mcp_session
+    async def test_guidance_returns_packaged_text_without_project_contents(self):
+        result = await self.client.call_tool("aic_get_guidance", {"section": "start"})
+        self.assertFalse(result.is_error)
+        self.assertEqual(result.structured_content["uri"], "aic://skill/SKILL.md")
+        self.assertIn("AIC: AI Culture", result.structured_content["text"])
+        self.assertNotIn("private body must not be returned", result.structured_content["text"])
+        self.assertNotIn("PRIVATE_MARKER_NOT_FOR_CONTEXT", result.structured_content["text"])
+
+    @mcp_session
+    async def test_packaged_resource_symlink_is_not_followed(self):
+        skill = self.base / "linked-skill"
+        (skill / "references").mkdir(parents=True)
+        (skill / "SKILL.md").write_text("portable guidance", encoding="utf-8")
+        secret = self.base / "linked-secret.txt"
+        secret.write_text("LINKED_RESOURCE_SECRET", encoding="utf-8")
+        (skill / "references" / "safety.md").symlink_to(secret)
+        with patch.object(self.module, "_SKILL_ROOT", skill):
+            result = await self.client.call_tool("aic_get_guidance", {"section": "safety"})
+        self.assertTrue(result.is_error)
+        self.assertNotIn("LINKED_RESOURCE_SECRET", str(result.content))
+        recovered = await self.client.call_tool("aic_get_guidance", {"section": "start"})
+        self.assertFalse(recovered.is_error)
+        self.assertIn("AIC: AI Culture", recovered.structured_content["text"])
+
+    @mcp_session
+    async def test_packaged_read_does_not_follow_a_symlink_swapped_in_after_the_check(self):
+        skill = self.base / "swap-skill"
+        skill.mkdir()
+        (skill / "SKILL.md").write_text("portable guidance", encoding="utf-8")
+        secret = self.base / "swapped-secret.txt"
+        secret.write_text("SYMLINK_SWAP_SECRET", encoding="utf-8")
+        original = self.module.safe_path
+
+        def swap(root, relative, **kwargs):
+            path = original(root, relative, **kwargs)
+            if path.name == "SKILL.md":
+                path.unlink()
+                path.symlink_to(secret)
+            return path
+
+        with patch.object(self.module, "_SKILL_ROOT", skill), patch.object(self.module, "safe_path", swap):
+            result = await self.client.call_tool("aic_get_guidance", {"section": "start"})
+        self.assertTrue(result.is_error)
+        self.assertNotIn("SYMLINK_SWAP_SECRET", str(result.content))
+        self.assertTrue((skill / "SKILL.md").is_symlink())
+        recovered = await self.client.call_tool("aic_get_guidance", {"section": "start"})
+        self.assertFalse(recovered.is_error)
+        self.assertIn("AIC: AI Culture", recovered.structured_content["text"])
+
+    @mcp_session
     async def test_unlisted_guidance_cannot_open_arbitrary_files(self):
         for section in ("../.env", str(self.project / ".env"), "file:///etc/passwd", "unknown-guide"):
             with self.subTest(section=section):
                 result = await self.client.call_tool("aic_get_guidance", {"section": section})
-                self.assertTrue(result.is_error)
-                self.assertNotIn("PRIVATE_MARKER_NOT_FOR_CONTEXT", str(result.content))
+                self.assertEqual(_error_text(result), _GUIDANCE_ERROR)
+                self.assertNotIn("PRIVATE_MARKER_NOT_FOR_CONTEXT", _error_text(result))
+                self.assertNotIn(section, _error_text(result))
         recovered = await self.client.call_tool("aic_validate_recommendation", {"plan": self.plan})
         self.assertFalse(recovered.is_error)
 
@@ -252,6 +397,7 @@ class McpBoundaryTests(unittest.IsolatedAsyncioTestCase):
             recovered = await client.call_tool("aic_validate_recommendation", {"plan": self.plan})
             self.assertFalse(recovered.is_error)
             self.assertIs(recovered.structured_content["approval_required"], True)
+            await self._assert_published_bounds(client)
 
     async def test_startup_needs_an_explicit_existing_absolute_project(self):
         from aic.scripts.aiclib.safety import AICError

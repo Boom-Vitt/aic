@@ -5,7 +5,7 @@
   "seed_sent_to_provider": false,
   "max_tokens": 1024,
   "max_tokens_limit": 4096,
-  "temperature": null,
+  "temperature_sent": true,
   "pricing": {
     "checked": "2026-11-07",
     "url": "https://platform.claude.com/docs/en/about-claude/pricing",
@@ -14,12 +14,12 @@
     "output_usd_per_million": 10,
     "note": "Base input and output rates. Cache writes, cache reads, and batch discounts are not applied."
   },
-  "arms": ["plain-claude-code", "aic"],
-  "aic_context": [
-    "skills/aic/SKILL.md",
-    "skills/aic/references/routing.md"
-  ],
-  "routing_cases": "tests/fixtures/routing-scenarios.json",
+  "temperature": 0,
+  "routing_packs": {
+    "dev": "tests/fixtures/routing-scenarios.json",
+    "heldout-v2": "benchmarks/routing/heldout-v2.json"
+  },
+  "default_routing_pack": "dev",
   "sandbox": "container",
   "probe_timeout_sec": 30,
   "anthropic_version": "2023-06-01",

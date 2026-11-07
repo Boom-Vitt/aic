@@ -36,6 +36,14 @@ The smoke receipt sets `public_benchmark_scores` to null, `invokes_model` to fal
 
 `plan` on a public suite exits 3 and writes no score. `run` on a public suite exits 3.
 
+## Routing packs
+
+`tests/fixtures/routing-scenarios.json` is the dev pack. Tune prompts and the skill on that pack only.
+
+`benchmarks/routing/heldout-v2.json` is the release pack. Score it once per release. Do not tune on it. This checkout does not contain that file until the heldout-v2 change is present. `./scripts/run-benchmarks.sh --routing-pack heldout-v2` exits 2 before any model call when the file is missing, and it names that path.
+
+A run records the selected pack name and the SHA-256 digest of the pack file in `provenance.json`.
+
 ## What a scale run still needs
 
 - A local checkout of the suite at one revision, after the license check above.
@@ -54,8 +62,8 @@ Comparable open-source workflow repositories can be extra arms later, under the 
 
 The command runs two pinned pieces, using `benchmarks/pinned.json`:
 
-1. `benchmarks.routing.compare` reads the held-out requests in `tests/fixtures/routing-scenarios.json`. Expected labels stay out of the prompt. The plain arm receives only the shared output schema. The AIC arm also receives `skills/aic/SKILL.md` and `skills/aic/references/routing.md`. Both arms use the pinned model id and the same output-token cap. The project case in that fixture is not part of this comparison.
-2. `python3 -m aicbench --sandbox container --official` runs `benchmarks/official/probe.py` inside bubblewrap. The plain arm does not see the skill directory. The AIC arm sees it read-only at `/opt/aic`. The probe records whether that mount is visible. It does not call a model. The sandbox process starts with a cleared environment, so the API key is not inside it.
+1. `python3 -m benchmarks.routing.compare --pack <pack file>` compares the no-skill arm with the AIC arm. `--routing-pack dev` is the default and selects the dev pack. `--routing-pack heldout-v2` selects the release pack. Expected labels stay out of the prompt. Both arms use the pinned model id, temperature 0, and the same output-token cap. The recorded seed is not sent to the Messages API.
+2. `python3 -m benchmarks.aicbench --sandbox container --official` runs the container sandbox. Only that sandbox can mark an aicbench report official. The command does not invent a token price for it. The aicbench report records Claude Code's own cost field when a run finishes.
 
 `--dry-run` prints the budget cost ceiling and exits. It does not call a model, does not start bubblewrap, and does not create `results/`.
 
@@ -65,7 +73,7 @@ A real run writes `results/<UTC date>-<full git SHA>/`:
 
 | File | What it records |
 | --- | --- |
-| `provenance.json` | Git SHA, whether the worktree was dirty, model id, date, and the pinned settings |
+| `provenance.json` | Git SHA, whether the worktree was dirty, model id, date, pinned settings, routing pack name, pack path, and the pack's SHA-256 digest |
 | `estimate.json` | The ceiling printed before any model call |
 | `receipts/` | Routing, the bubblewrap probe, and any optional suite that ran |
 | `raw/` | Model text and harness stdout/stderr |
@@ -77,11 +85,12 @@ Terminal-Bench and SWE-bench Lite stay out unless you pass a flag.
 ```sh
 ./scripts/run-benchmarks.sh --dry-run
 ./scripts/run-benchmarks.sh
+./scripts/run-benchmarks.sh --routing-pack heldout-v2
 ./scripts/run-benchmarks.sh --terminal-bench --terminal-bench-checkout /absolute/pinned/terminal-bench
 ./scripts/run-benchmarks.sh --swe-bench-lite --swe-bench-lite-checkout /absolute/pinned/SWE-bench --swe-bench-lite-predictions /absolute/predictions.jsonl
 ```
 
 `--terminal-bench` runs one task of `terminal-bench-core==0.1.1` through the checkout's `terminal_bench` CLI at revision `d28711d0da2675d0bb1d56de45ae5df6082438a3`. `--swe-bench-lite` runs the pinned SWE-bench harness at revision `02e7a74ffd0b707aab73d203fe87bdc7c76afc8e` on a JSONL predictions file of at most 5 rows. Both CLIs have no token budget, so the estimate lists them as unpriced instead of inventing a dollar amount. Their receipts keep `public_benchmark_scores` null and `aic_treatment` false: this command does not claim the skill was loaded inside those harnesses. A missing checkout, the wrong revision, or a missing predictions file exits 3 before any routing call.
 
-GitHub Actions starts this only from a manual `workflow_dispatch` on `.github/workflows/benchmarks.yml`. Pull requests and pushes do not start it. The workflow installs the `bubblewrap` package, passes `secrets.ANTHROPIC_API_KEY` only into the run step, checks out with `persist-credentials: false`, and uploads `results/` as an artifact. Action revisions are pinned SHAs. The workflow token has `contents: read` plus `actions: write` so the artifact upload can store the bundle without permission to change repository contents.
+GitHub Actions starts this only from a manual `workflow_dispatch` on `.github/workflows/benchmarks.yml`. Pull requests and pushes do not start it. The workflow installs the `bubblewrap` package, passes `secrets.ANTHROPIC_API_KEY` only into the run step, checks out with `persist-credentials: false`, and uploads `results/` as an artifact. Action revisions are pinned SHAs. The workflow token has `contents: read`, which is enough for upload-artifact v7. The dispatch input `routing_pack` defaults to `dev`.
 

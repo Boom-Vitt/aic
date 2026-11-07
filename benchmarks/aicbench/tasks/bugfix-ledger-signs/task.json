@@ -1,0 +1,8 @@
+{
+  "id": "bugfix-ledger-signs",
+  "title": "Correct signed ledger amounts and totals",
+  "category": "bugfix",
+  "timeout_seconds": 30,
+  "remove": [],
+  "license": "Apache-2.0"
+}

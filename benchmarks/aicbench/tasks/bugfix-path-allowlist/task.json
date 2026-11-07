@@ -1,0 +1,8 @@
+{
+  "id": "bugfix-path-allowlist",
+  "title": "Keep joined paths inside an allowlisted root",
+  "category": "bugfix",
+  "timeout_seconds": 30,
+  "remove": [],
+  "license": "Apache-2.0"
+}

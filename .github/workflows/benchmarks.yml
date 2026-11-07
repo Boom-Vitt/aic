@@ -10,9 +10,15 @@ on:
         description: Include the pinned SWE-bench Lite subset
         type: boolean
         default: false
+      routing_pack:
+        description: dev is the tuning pack. heldout-v2 is scored once per release.
+        type: choice
+        options:
+          - dev
+          - heldout-v2
+        default: dev
 permissions:
   contents: read
-  actions: write
 concurrency:
   group: benchmarks
   cancel-in-progress: false
@@ -38,9 +44,17 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BENCH_TERMINAL: ${{ inputs.terminal_bench }}
           BENCH_SWE: ${{ inputs.swe_bench_lite }}
+          BENCH_PACK: ${{ inputs.routing_pack }}
         run: |
           set -eu
-          set -- ./scripts/run-benchmarks.sh
+          case "$BENCH_PACK" in
+            dev|heldout-v2) ;;
+            *)
+              printf '%s\n' 'routing pack must be dev or heldout-v2.' >&2
+              exit 2
+              ;;
+          esac
+          set -- ./scripts/run-benchmarks.sh --routing-pack "$BENCH_PACK"
           if [ "$BENCH_TERMINAL" = "true" ]; then
             set -- "$@" --terminal-bench
           fi

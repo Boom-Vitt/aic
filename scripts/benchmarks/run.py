@@ -1,13 +1,17 @@
 """One command for the pinned AIC-versus-baseline comparison.
 
 Dry-run prints the token-budget ceiling and does not call a model. A missing
-API key exits 3 before that estimate. Optional suites are unpriced because
-their pinned CLIs have no token budget.
+API key exits 3 before that estimate. The dev pack is the default. heldout-v2
+is the release pack. Optional suites are unpriced because their pinned CLIs
+have no token budget. aicbench's own report records Claude Code's cost.
 """
 from __future__ import annotations
 
 import argparse
+from contextlib import redirect_stdout
 from datetime import date, datetime, timezone
+import hashlib
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -15,11 +19,26 @@ import re
 import subprocess
 import sys
 
-from aicbench.official import run_official
-from aicbench.protocol import BenchError, load_json
-from benchmarks.client import AnthropicClient, require_key
-from benchmarks.errors import RunError
-from benchmarks.routing.compare import ARMS, compare, context_text, load_cases, prompts
+_ROOT = Path(__file__).resolve().parents[2]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from benchmarks.aicbench.runner import main as aicbench_main
+from benchmarks.routing.baseline import load_catalog
+from benchmarks.routing.compare import _items, aic_system, main as compare_main, message_body, shared_system, skill_documents
+from benchmarks.routing.score import ScoreError, load_pack
+
+
+class RunError(Exception):
+    def __init__(self, message: str, code: int = 1):
+        super().__init__(message)
+        self.code = code
+
+
+def require_key() -> None:
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not key or any(character.isspace() or ord(character) < 32 for character in key):
+        raise RunError("ANTHROPIC_API_KEY is required.", 3)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,8 +58,14 @@ def load_settings(root: Path) -> dict:
         raise RunError("pinned settings schema_version must be 1.", 2)
     if not isinstance(settings.get("model"), str) or not settings["model"]:
         raise RunError("pinned model id is required.", 2)
-    if settings.get("arms") != list(ARMS):
-        raise RunError("pinned arms must be plain-claude-code then aic.", 2)
+    packs = settings.get("routing_packs")
+    if not isinstance(packs, dict) or set(packs) != {"dev", "heldout-v2"}:
+        raise RunError("pinned routing packs must be dev and heldout-v2.", 2)
+    if settings.get("default_routing_pack") != "dev":
+        raise RunError("the default routing pack must be dev.", 2)
+    for name, relative in packs.items():
+        if not isinstance(relative, str) or not relative or relative.startswith("/") or ".." in relative.split("/"):
+            raise RunError(f"routing pack path is not relative: {name}", 2)
     limit = _integer(settings.get("max_tokens_limit"), "max_tokens_limit", 1, 4096)
     _integer(settings.get("max_tokens"), "max_tokens", 1, limit)
     pricing = settings.get("pricing")
@@ -64,10 +89,21 @@ def load_settings(root: Path) -> dict:
     _integer(swe.get("wall_clock_sec"), "swe-bench lite wall clock", 1, 7200)
     if terminal.get("token_budget") is not None or swe.get("token_budget") is not None:
         raise RunError("optional suites stay unpriced until their CLI grows a token budget.", 2)
-    if not isinstance(settings.get("aic_context"), list) or not settings["aic_context"]:
-        raise RunError("AIC context files are required.", 2)
+    _integer(settings.get("temperature"), "temperature", 0, 0)
     _integer(settings.get("probe_timeout_sec"), "probe timeout", 1, 120)
     return settings
+
+
+def load_json(path: Path) -> dict:
+    if path.is_symlink():
+        raise RunError(f"refusing a symlinked file: {path}", 3)
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise RunError(f"unreadable JSON: {path}", 1) from exc
+    if not isinstance(value, dict):
+        raise RunError(f"JSON object required: {path}", 1)
+    return value
 
 
 def _usd(input_tokens: int, output_tokens: int, input_rate: int, output_rate: int) -> str:
@@ -75,15 +111,46 @@ def _usd(input_tokens: int, output_tokens: int, input_rate: int, output_rate: in
     return f"{millionths // 1_000_000}.{millionths % 1_000_000:06d}"
 
 
-def estimate_for(settings: dict, cases: list[dict], aic_text: str, *, terminal: bool, swe: bool) -> dict:
+def resolve_pack(root: Path, settings: dict, name: str) -> Path:
+    relative = settings["routing_packs"].get(name)
+    if not isinstance(relative, str):
+        raise RunError("routing pack must be dev or heldout-v2.", 2)
+    path = root / relative
+    if path.is_symlink() or not path.is_file():
+        raise RunError(
+            f"routing pack {name} is not in this checkout: {relative}. "
+            "The release pack is benchmarks/routing/heldout-v2.json. "
+            "No model call was started.",
+            2,
+        )
+    return path
+
+
+def pack_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def estimate_for(settings: dict, pack, *, terminal: bool, swe: bool) -> dict:
     pricing = settings["pricing"]
     input_rate = pricing["input_usd_per_million"]
     output_rate = pricing["output_usd_per_million"]
+    root = ROOT
+    labels = load_catalog(root)
+    documents = skill_documents(root)
+    systems = (shared_system(labels), aic_system(labels, documents))
+    items = _items(pack)
     input_tokens = 0
-    for case in cases:
-        for system, user in prompts(case, aic_text).values():
-            input_tokens += len(system.encode("utf-8")) + len(user.encode("utf-8"))
-    calls = len(cases) * len(ARMS)
+    for system in systems:
+        for item in items:
+            body = message_body(
+                system=system,
+                user=item.user,
+                model=settings["model"],
+                temperature=float(settings["temperature"]),
+                max_tokens=settings["max_tokens"],
+            )
+            input_tokens += len(json.dumps(body, ensure_ascii=False).encode("utf-8"))
+    calls = len(items) * 2
     output_tokens = calls * settings["max_tokens"]
     components = [
         {
@@ -96,15 +163,12 @@ def estimate_for(settings: dict, cases: list[dict], aic_text: str, *, terminal: 
         },
         {
             "name": "aicbench",
-            "priced": True,
-            "calls": 0,
-            "input_token_ceiling": 0,
-            "output_token_budget": 0,
-            "budget_cost_ceiling_usd": "0.000000",
-            "command": "python3 -m aicbench --sandbox container --official",
+            "priced": False,
+            "token_budget": None,
+            "command": "python3 -m benchmarks.aicbench --sandbox container --official",
         },
     ]
-    unpriced = []
+    unpriced = ["aicbench"]
     if terminal:
         unpriced.append("terminal-bench")
         components.append({"name": "terminal-bench", "priced": False, "token_budget": None})
@@ -124,8 +188,9 @@ def estimate_for(settings: dict, cases: list[dict], aic_text: str, *, terminal: 
         "unpriced": unpriced,
         "public_benchmark_scores": None,
         "note": (
-            "Input uses one token per UTF-8 byte of the system and user text. "
+            "Input uses one token per UTF-8 byte of the JSON body benchmarks.routing.compare would send. "
             "Output uses the pinned max_tokens cap on every routing call. "
+            "aicbench is unpriced here because its report uses Claude Code's own cost field. "
             "This is a ceiling, not an invoice."
         ),
     }
@@ -258,6 +323,7 @@ def _swe_argv(settings: dict, predictions: Path, instance_ids: list[str], run_id
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="run-benchmarks")
+    parser.add_argument("--routing-pack", choices=("dev", "heldout-v2"), default="dev")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--terminal-bench", action="store_true")
     parser.add_argument("--terminal-bench-checkout", type=Path)
@@ -284,6 +350,8 @@ def execute(
     today: date | None = None,
     results_root: Path | None = None,
     revision_reader=None,
+    compare_runner=None,
+    aicbench_runner=None,
 ) -> int:
     require_key()
     if args.terminal_bench_checkout and not args.terminal_bench:
@@ -291,11 +359,12 @@ def execute(
     if (args.swe_bench_lite_checkout or args.swe_bench_lite_predictions) and not args.swe_bench_lite:
         raise RunError("SWE-bench Lite paths require --swe-bench-lite.", 2)
     settings = load_settings(root)
-    cases = load_cases(root / settings["routing_cases"])
-    aic_text = context_text(root, settings["aic_context"])
-    estimate = estimate_for(
-        settings, cases, aic_text, terminal=args.terminal_bench, swe=args.swe_bench_lite,
-    )
+    pack_path = resolve_pack(root, settings, args.routing_pack)
+    digest = pack_sha256(pack_path)
+    pack = load_pack(pack_path)
+    estimate = estimate_for(settings, pack, terminal=args.terminal_bench, swe=args.swe_bench_lite)
+    estimate["routing_pack"] = args.routing_pack
+    estimate["routing_pack_sha256"] = digest
     print(json.dumps(estimate, indent=2, sort_keys=True), flush=True)
     if args.dry_run:
         return 0
@@ -310,10 +379,13 @@ def execute(
         "model": settings["model"],
         "seed": settings["seed"],
         "seed_sent_to_provider": settings["seed_sent_to_provider"],
+        "routing_pack": args.routing_pack,
+        "routing_pack_path": settings["routing_packs"][args.routing_pack],
+        "routing_pack_sha256": digest,
         "settings": settings,
         "commands": [
-            "python3 -m benchmarks.routing.compare",
-            "python3 -m aicbench --sandbox container --official",
+            "python3 -m benchmarks.routing.compare --pack " + settings["routing_packs"][args.routing_pack],
+            "python3 -m benchmarks.aicbench --sandbox container --official",
         ],
         "completed": False,
         "public_benchmark_scores": None,
@@ -347,24 +419,37 @@ def execute(
             "reason": str(exc),
         })
         raise
-    model_client = client or AnthropicClient(
-        url=settings["anthropic_url"], version=settings["anthropic_version"],
-    )
-    routing = compare(
-        client=model_client,
-        model=settings["model"],
-        max_tokens=settings["max_tokens"],
-        cases=cases,
-        aic_text=aic_text,
-        raw_dir=bundle / "raw" / "routing",
-        redact=secret,
-    )
-    routing.pop("rows")
-    _write_json(bundle / "receipts" / "routing.json", routing)
-    official = run_official(root, sandbox_runner=sandbox_runner, timeout=settings["probe_timeout_sec"])
-    _write_json(bundle / "receipts" / "aicbench.json", official)
-    if not official["ok"]:
-        return 1
+    (bundle / "raw").mkdir()
+    compare_argv = [
+        "--model", settings["model"],
+        "--output", str(bundle / "raw" / "routing"),
+        "--pack", str(pack_path),
+        "--max-tokens", str(settings["max_tokens"]),
+        "--seed", str(settings["seed"]),
+        "--temperature", str(settings["temperature"]),
+        "--timeout", "60",
+    ]
+    if secret and secret in compare_argv:
+        raise RunError("refusing to put the API key on a command line.", 1)
+    compare_call = compare_runner or compare_main
+    captured = StringIO()
+    with redirect_stdout(captured):
+        compare_code = compare_call(compare_argv, client=client, environ=os.environ)
+    (bundle / "raw" / "routing-stdout.txt").write_text(_clip(captured.getvalue(), secret), encoding="utf-8")
+    if compare_code != 0:
+        return compare_code
+    aicbench_call = aicbench_runner or aicbench_main
+    aicbench_argv = [
+        "--sandbox", "container",
+        "--official",
+        "--model", settings["model"],
+        "--output", str(bundle / "receipts" / "aicbench.json"),
+    ]
+    if secret and secret in aicbench_argv:
+        raise RunError("refusing to put the API key on a command line.", 1)
+    aicbench_code = aicbench_call(aicbench_argv, environ=os.environ)
+    if aicbench_code != 0:
+        return aicbench_code
     runner = harness_runner or _harness
     run_id = f"aic-{day}-{sha[:12]}"
     if args.terminal_bench:
@@ -430,19 +515,22 @@ def main(
     today: date | None = None,
     results_root: Path | None = None,
     revision_reader=None,
+    compare_runner=None,
+    aicbench_runner=None,
 ) -> int:
     args = _parser().parse_args(argv)
     try:
         return execute(
             args,
             client=client,
-            sandbox_runner=sandbox_runner,
             harness_runner=harness_runner,
             today=today,
             results_root=results_root,
             revision_reader=revision_reader,
+            compare_runner=compare_runner,
+            aicbench_runner=aicbench_runner,
         )
-    except (RunError, BenchError) as exc:
+    except (RunError, ScoreError) as exc:
         print(str(exc), file=sys.stderr)
         return exc.code
 

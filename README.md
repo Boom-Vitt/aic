@@ -22,17 +22,100 @@ Your host supplies the reasoning and tools. AIC supplies portable guidance, five
 | **Claude Code plugin** | You use Claude Code and want native plugin installation of the same skill. The plugin is skills-only; MCP is configured separately. |
 | **Local read-only MCP** | Your host supports MCP and needs AIC's catalog, guidance, bounded project metadata and recommendation validation through tools/resources. |
 
-In a **Claude Code conversation**, open the native install flow with:
+These are three ways to access the same guidance and catalog. Host discovery and capabilities vary; see [compatibility and evidence levels](docs/compatibility.md). Host paths, updates, and removal stay in the **[integration guide](skills/aic/references/integrations.md)**.
+
+## Quickstart
+
+The standalone skill and the Claude Code plugin do not need a Python package or an extra model key. The Python package is the optional helper CLI and the local MCP server.
+
+### Standalone skill
+
+Give the host the complete [`skills/aic/`](skills/aic/) directory, or place that directory in one documented skill root under the name `aic`. Keep `SKILL.md`, `references/`, `assets/`, `scripts/`, `LICENSE.txt`, and `NOTICE` together.
+
+### Claude Code plugin
+
+The plugin install leaves MCP unconfigured. Commands below were checked against the official [install guide](https://code.claude.com/docs/en/plugins/install) on November 7, 2026.
+
+In a Claude Code session, version 2.1.275 or later, run:
 
 ```text
 /plugin install aic --marketplace Boom-Vitt/aic
 ```
 
-This is a host plugin command, not a terminal command. Review AIC's details and choose the intended installation scope.
+Run that in the session prompt. If this marketplace is not registered yet, Claude Code shows the source it resolved and asks you to confirm it, then opens AIC's details for you to pick a scope.
 
-Start with the **[integration guide](skills/aic/references/integrations.md)** for installation, host setup, updates and removal. Standalone Skill and plugin use require no Python, pip packages or extra model keys. The optional MCP adapter requires Python 3.11+ and runs locally over stdio, bound to one explicitly configured project—not a public hosted endpoint.
+From a shell, Claude Code 2.1.292 or later:
 
-These are three ways to access the same guidance and catalog, not three competing workflow engines. Host discovery and capabilities vary; see [compatibility and evidence levels](docs/compatibility.md).
+```bash
+claude plugin install aic --marketplace Boom-Vitt/aic
+```
+
+The shell form adds the marketplace without the session confirmation and records that marketplace in user settings. Its default scope is `user`. `--scope` accepts `user`, `project`, or `local`.
+
+For a reviewed checkout, register the directory, then install by the marketplace's own name, `aic-marketplace`:
+
+```text
+/plugin marketplace add /absolute/path/to/reviewed/aic
+/plugin install aic@aic-marketplace
+```
+
+A relative marketplace path starts with `./` or `../`. A bare `owner/repo` means a GitHub repository. `--marketplace` takes the source (`Boom-Vitt/aic` or a filesystem path). `name@marketplace` takes the registered name (`aic-marketplace`).
+
+After installation, the namespaced skill is `/aic:aic`. An installed listing is a record of installation. It is not a record that a model read the skill.
+
+### Python package (pip, pipx, uv)
+
+The distribution name is `aiculture-skills`. It is not published on PyPI. The PyPI project named `aic` (0.2) is a different package; installing that name does not install this repository.
+
+Requires Python 3.11 or newer. The `mcp` extra installs the pinned SDK `mcp==2.3.0` and is what `aic-mcp` needs. `aic hello-world` runs without that extra. It prints a JSON install check, then exits. It does not read a project, copy the skill, or start a server.
+
+From a checkout, in a new virtual environment:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install ".[mcp]"
+.venv/bin/aic --help
+.venv/bin/aic hello-world
+```
+
+From the built wheel (version 0.0.3 writes `dist/aiculture_skills-0.0.3-py3-none-any.whl`; the build backend is Hatchling 1.33.0):
+
+```bash
+python3 -m pip install "build==1.3.0"
+python3 -m build --wheel --outdir dist
+python3 -m venv /tmp/aic-venv
+/tmp/aic-venv/bin/python -m pip install "dist/aiculture_skills-0.0.3-py3-none-any.whl[mcp]"
+/tmp/aic-venv/bin/aic --help
+/tmp/aic-venv/bin/aic hello-world
+```
+
+pipx 1.8.0, using that same wheel:
+
+```bash
+pipx install "dist/aiculture_skills-0.0.3-py3-none-any.whl[mcp]"
+aic --help
+aic hello-world
+```
+
+uv 0.9.26, using that same wheel:
+
+```bash
+uv tool install "dist/aiculture_skills-0.0.3-py3-none-any.whl[mcp]"
+aic --help
+aic hello-world
+```
+
+If `aic` is not on `PATH` after pipx or `uv tool install`, run the binary in the directory that command prints.
+
+Start the MCP server from a reviewed checkout with this stdio command (uv 0.9.26). Pass the executable and arguments through the host's MCP config; the [integration guide](skills/aic/references/integrations.md) has the `mcpServers` object and the tool names.
+
+```text
+uvx --from /absolute/path/to/reviewed/aic --with mcp==2.3.0 aic-mcp --project /absolute/approved/project
+```
+
+`--project` is an existing absolute directory whose path contains no symlink. On macOS, `/tmp` points at `/private/tmp`, so pass the resolved directory. The server speaks MCP on stdio. `tools/list` is the call the install smoke makes. There is no hosted endpoint. Without the `mcp` extra, `aic-mcp` exits 2 and names that extra.
+
+The [install smoke](.github/workflows/install-smoke.yml) runs on pull requests. On `ubuntu-latest` and `macos-latest` it builds this wheel, installs that single wheel with the `mcp` extra into a fresh venv and a fresh pipx home, runs `aic --help` and `aic hello-world`, and performs one stdio `tools/list` call.
 
 ## Ask your host agent
 

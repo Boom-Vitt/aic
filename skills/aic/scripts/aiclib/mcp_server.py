@@ -7,12 +7,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from . import __version__
-from .inspection import inspect_project
+from .inspection import _MAX_DEPTH, _MAX_FILES, inspect_project
 from .routing import validate_plan
 from .safety import AICError, checked_root, safe_path
 
@@ -34,6 +36,19 @@ _GUIDANCE = {
     "integrations": "references/integrations.md",
 }
 _RESOURCE_PATHS = (*_GUIDANCE.values(), "assets/workflows.json", "assets/example-plan.json")
+_SECTION_NAMES = tuple(_GUIDANCE)
+_SECTION_MAX_LENGTH = max(len(name) for name in _SECTION_NAMES)
+_FILES_MIN = 1
+_DEPTH_MIN = 0
+_MAX_RESOURCE_BYTES = 1_048_576
+_INSPECTION_REJECTION = (
+    "Inspection rejected: use integer limits "
+    f"(files {_FILES_MIN}..{_MAX_FILES}, depth {_DEPTH_MIN}..{_MAX_DEPTH}) "
+    "and an unchanged safe bound project directory."
+)
+_GUIDANCE_REJECTION = "Unknown guidance section; use a declared section name."
+_RANGE_ERRORS = frozenset({"greater_than_equal", "less_than_equal"})
+_SECTION_ERRORS = frozenset({"string_too_long", "too_long", "value_error"})
 _INSTRUCTIONS = (
     "AIC supplies read-only workflow guidance, schema-3 recommendation validation, "
     "and bounded project filenames/sizes only, never project contents. Your host "
@@ -43,11 +58,111 @@ _INSTRUCTIONS = (
 )
 
 
+def _bounded_int(value: object, low: int, high: int) -> bool:
+    """True only for a real int inside the inclusive published bounds. Booleans are not ints."""
+    return type(value) is int and low <= value <= high
+
+
+def _known_section(value: str) -> str:
+    """Reject undeclared guidance names. The fixed error does not echo the supplied text."""
+    if value not in _GUIDANCE:
+        raise ValueError(_GUIDANCE_REJECTION)
+    return value
+
+
+def _bounds_message(exc: Any) -> str | None:
+    """Return the fixed tool error when every failure is a published bound, else None.
+
+    Type mismatches and unexpected fields keep the SDK validation text. Bound failures
+    stay on the same fixed sentences the tool body uses, so the client never receives
+    the rejected number or section text.
+    """
+    errors = exc.errors()
+    if not errors:
+        return None
+    kinds: set[str] = set()
+    fields: set[object] = set()
+    for error in errors:
+        kinds.add(error["type"])
+        location = error.get("loc") or ()
+        if not location:
+            return None
+        fields.add(location[0])
+    if fields and fields <= {"max_files", "max_depth"} and kinds <= _RANGE_ERRORS:
+        return _INSPECTION_REJECTION
+    if fields == {"section"} and kinds <= _SECTION_ERRORS:
+        return _GUIDANCE_REJECTION
+    return None
+
+
+def _seal_object_schemas(schema: object) -> None:
+    """Set additionalProperties false on every object schema in a tool input schema."""
+    if isinstance(schema, dict):
+        if schema.get("type") == "object":
+            schema["additionalProperties"] = False
+        for value in tuple(schema.values()):
+            _seal_object_schemas(value)
+    elif isinstance(schema, list):
+        for item in schema:
+            _seal_object_schemas(item)
+
+
+def _open_directory(path: Path) -> int:
+    """Open an absolute directory without following a symlink at any component."""
+    descriptor = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for name in path.parts[1:]:
+            child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _read_nofollow(root: Path, relative: str) -> str:
+    """Read one allowlisted regular file; a symlink at any component fails closed."""
+    directory = _open_directory(root)
+    file_descriptor = None
+    try:
+        parts = relative.split("/")
+        for name in parts[:-1]:
+            child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            os.close(directory)
+            directory = child
+        file_descriptor = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+        info = os.fstat(file_descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > _MAX_RESOURCE_BYTES:
+            raise AICError("The packaged resource cannot be read safely.")
+        with os.fdopen(file_descriptor, "rb") as handle:
+            file_descriptor = None
+            payload = handle.read(_MAX_RESOURCE_BYTES + 1)
+        if len(payload) > _MAX_RESOURCE_BYTES:
+            raise AICError("The packaged resource cannot be read safely.")
+        return payload.decode("utf-8")
+    finally:
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+        os.close(directory)
+
+
 def _portable_text(relative: str) -> str:
-    """Read only a caller-selected entry from our concrete packaged allowlist."""
+    """Read only a caller-selected entry from our concrete packaged allowlist.
+
+    ``safe_path`` rejects a symlink that is already present. The bytes are read
+    afterwards with ``O_NOFOLLOW``, so a symlink swapped in after that check is
+    not followed.
+    """
     if relative not in _RESOURCE_PATHS:
         raise AICError("The requested portable resource is not allowlisted.")
-    return safe_path(_SKILL_ROOT, relative, must_exist=True).read_text(encoding="utf-8")
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY") or os.open not in os.supports_dir_fd:
+        raise AICError("The packaged resource cannot be read safely.")
+    safe_path(_SKILL_ROOT, relative, must_exist=True)
+    try:
+        return _read_nofollow(_SKILL_ROOT, relative)
+    except (OSError, UnicodeError) as exc:
+        raise AICError("The packaged resource cannot be read safely.") from exc
 
 
 def build_server(project: Path) -> MCPServer:
@@ -61,7 +176,24 @@ def build_server(project: Path) -> MCPServer:
     from mcp.server.mcpserver.tools import Tool
     from mcp.server.mcpserver.utilities.func_metadata import FuncMetadata
     from mcp.types import ToolAnnotations
-    from pydantic import ConfigDict, create_model
+    from pydantic import ConfigDict, Field, ValidationError, create_model
+    from pydantic.functional_validators import AfterValidator
+
+    class _FixedBoundsError(ValidationError):
+        # The SDK reports argument failures as ``Error executing tool <name>: <str(exc)>``.
+        # A normal ValidationError string names the model and the offending value's
+        # constraint. Bound failures instead keep the fixed tool sentence.
+        def __new__(cls, message: str, source: ValidationError) -> _FixedBoundsError:
+            self = ValidationError.__new__(cls, "AIC", [], input_type="python", hide_input=True)
+            self._fixed = message
+            self._source = source
+            return self
+
+        def __str__(self) -> str:
+            return self._fixed
+
+        def errors(self, *args: Any, **kwargs: Any) -> list[Any]:
+            return self._source.errors(*args, **kwargs)
 
     class ExactArguments(FuncMetadata):
         # SDK 2.3.0 normally reparses JSON-looking strings before validation.
@@ -70,6 +202,15 @@ def build_server(project: Path) -> MCPServer:
         # dispatch and error handling, disabling only that convenience coercion.
         def pre_parse_json(self, data: dict[str, Any]) -> dict[str, Any]:
             return data
+
+        def validate_arguments(self, arguments_to_validate: dict[str, Any]) -> dict[str, Any]:
+            try:
+                return super().validate_arguments(arguments_to_validate)
+            except ValidationError as exc:
+                message = _bounds_message(exc)
+                if message is None:
+                    raise
+                raise _FixedBoundsError(message, exc) from None
 
     def aic_get_workflow_catalog() -> dict[str, Any]:
         """Fetch the packaged schema-3 catalog; the host selects, AIC does not infer."""
@@ -84,9 +225,9 @@ def build_server(project: Path) -> MCPServer:
         Sections: start, workflows, templates, project-plans, routing, memory,
         safety, supervision, research, integrations.
         """
-        relative = _GUIDANCE.get(section)
-        if relative is None:
-            raise ToolError("Unknown guidance section; use a declared section name.")
+        if type(section) is not str or len(section) > _SECTION_MAX_LENGTH or section not in _GUIDANCE:
+            raise ToolError(_GUIDANCE_REJECTION)
+        relative = _GUIDANCE[section]
         try:
             text = _portable_text(relative)
         except AICError:
@@ -95,15 +236,14 @@ def build_server(project: Path) -> MCPServer:
 
     def aic_inspect_project(max_files: int = 200, max_depth: int = 4) -> dict[str, Any]:
         """Inspect bound-project names/sizes only; limits: files 1..10000, depth 0..32."""
+        if not _bounded_int(max_files, _FILES_MIN, _MAX_FILES) or not _bounded_int(max_depth, _DEPTH_MIN, _MAX_DEPTH):
+            raise ToolError(_INSPECTION_REJECTION)
         try:
             return inspect_project(bound_project, max_files=max_files, max_depth=max_depth)
         except AICError:
             # Core path errors can name physical filesystem prefixes. Do not
             # disclose those through the transport, even when a path is invalid.
-            raise ToolError(
-                "Inspection rejected: use integer limits (files 1..10000, depth 0..32) "
-                "and an unchanged safe bound project directory."
-            ) from None
+            raise ToolError(_INSPECTION_REJECTION) from None
 
     def aic_validate_recommendation(plan: Any) -> dict[str, Any]:
         """Validate bounded opaque schema-3 JSON against the bound project; never authorize execution."""
@@ -117,6 +257,16 @@ def build_server(project: Path) -> MCPServer:
                 "16 branches, 256 total path entries, 16384 overlap comparisons, "
                 "and 32 components / 1024 UTF-8 bytes per relative path."
             ) from None
+
+    # Annotations stay live objects. The module's postponed-annotation future would
+    # otherwise evaluate Field in the module globals, where the optional SDK is absent.
+    aic_get_guidance.__annotations__["section"] = Annotated[
+        str,
+        Field(max_length=_SECTION_MAX_LENGTH, json_schema_extra={"enum": list(_SECTION_NAMES)}),
+        AfterValidator(_known_section),
+    ]
+    aic_inspect_project.__annotations__["max_files"] = Annotated[int, Field(ge=_FILES_MIN, le=_MAX_FILES)]
+    aic_inspect_project.__annotations__["max_depth"] = Annotated[int, Field(ge=_DEPTH_MIN, le=_MAX_DEPTH)]
 
     tools = []
     for function in (
@@ -143,7 +293,9 @@ def build_server(project: Path) -> MCPServer:
             output_model=metadata.output_model,
             wrap_output=metadata.wrap_output,
         )
-        tool.parameters = arguments.model_json_schema(by_alias=True)
+        schema = arguments.model_json_schema(by_alias=True)
+        _seal_object_schemas(schema)
+        tool.parameters = schema
         tools.append(tool)
 
     server = MCPServer(
