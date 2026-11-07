@@ -1,0 +1,74 @@
+name: Install smoke
+on:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: install-smoke-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  smoke:
+    name: ${{ matrix.os }} / ${{ matrix.installer }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        installer: [venv, pipx]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11"
+      - name: Build one wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check "build==1.3.0"
+          python -m build --wheel --outdir "$RUNNER_TEMP/aic-wheel"
+          wheels=("$RUNNER_TEMP"/aic-wheel/aiculture_skills-*.whl)
+          test "${#wheels[@]}" -eq 1
+          test -f "${wheels[0]}"
+          echo "WHEEL=${wheels[0]}" >> "$GITHUB_ENV"
+      - name: Install the wheel and exercise hello-world plus tools/list
+        shell: bash
+        env:
+          INSTALLER: ${{ matrix.installer }}
+        run: |
+          set -euo pipefail
+          if [ "$INSTALLER" = "venv" ]; then
+            python -m venv "$RUNNER_TEMP/aic-install"
+            AIC_PYTHON="$RUNNER_TEMP/aic-install/bin/python"
+            AIC_BIN="$RUNNER_TEMP/aic-install/bin"
+            "$AIC_PYTHON" -m pip install --disable-pip-version-check "${WHEEL}[mcp]"
+          elif [ "$INSTALLER" = "pipx" ]; then
+            python -m pip install --disable-pip-version-check "pipx==1.8.0"
+            export PIPX_HOME="$RUNNER_TEMP/pipx-home"
+            export PIPX_BIN_DIR="$RUNNER_TEMP/pipx-bin"
+            python -m pipx install "${WHEEL}[mcp]"
+            AIC_BIN="$PIPX_BIN_DIR"
+            AIC_PYTHON="$PIPX_HOME/venvs/aiculture-skills/bin/python"
+          else
+            echo "Unknown installer: $INSTALLER" >&2
+            exit 1
+          fi
+          test -x "$AIC_PYTHON"
+          test -x "$AIC_BIN/aic"
+          test -x "$AIC_BIN/aic-mcp"
+
+          "$AIC_BIN/aic" --help > "$RUNNER_TEMP/aic-help.txt"
+          grep -F -q "hello-world" "$RUNNER_TEMP/aic-help.txt"
+          "$AIC_BIN/aic" hello-world > "$RUNNER_TEMP/aic-hello.json"
+
+          project=$("$AIC_PYTHON" -c 'import tempfile, pathlib; print(pathlib.Path(tempfile.mkdtemp()).resolve())')
+          test -d "$project"
+          case "$project" in
+            /*) ;;
+            *) echo "MCP project path is not absolute: $project" >&2; exit 1 ;;
+          esac
+
+          AIC_BIN="$AIC_BIN" AIC_PROJECT="$project" AIC_HELLO="$RUNNER_TEMP/aic-hello.json" \
+            "$AIC_PYTHON" "$GITHUB_WORKSPACE/scripts/install_smoke_check.py"
