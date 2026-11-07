@@ -46,6 +46,10 @@ Han Li, HanHaoNing Li, Ziqian Jiang and Yiling Lou;
 the credited Anthropic engineering/security authors and OpenAI's Ryan Lopopolo;
 Yuxin Wang and coauthors (Dartmouth, Microsoft and an independent researcher);
 and the credited OpenAI Cookbook memory/compaction contributors.
+Orca template notes also credit John Yang and coauthors (SWE-agent),
+Chunqiu Steven Xia and coauthors (Agentless), Dong Chen and coauthors (CodeR),
+and Daman Arora and coauthors (MASAI), plus Claude Code product documentation.
+Those sources stay reference-only.
 Additional capability references: DeepSeek-AI/DeepSeek Harness contributors,
 and the tmux project and its contributing authors. Their runtime code,
 documentation and software are not included. The optional tmux profile is
