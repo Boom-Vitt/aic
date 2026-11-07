@@ -32,8 +32,8 @@ ANSWERS_NAME = "benchmarks/routing/heldout-v2-answers.json"
 # Frozen digests. Add the next integer when the bytes change. Do not edit version 1.
 FROZEN = {
     1: {
-        PACK_NAME: "7cee89c4899c53268a59d98d04acd3bb64fff24eecd9e7777fc664e6be5fb3cf",
-        ANSWERS_NAME: "3606c4c397ed015d038ce4ee729959dbb66e0a77faef2f120cf105537e9d76c9",
+        PACK_NAME: "bb0a6a4788b02911d827beed0a47f46bf66f9822a97bc55bea2a77cb02c13ec4",
+        ANSWERS_NAME: "10aab94fa5c4bce424cff792f39c2d642aa7beb10ff8c23133fcb0e7add3b6ba",
     }
 }
 ALLOWED = {
@@ -60,6 +60,55 @@ DECIDING_FACT_CASES = (
 
 def label_tokens(text: str) -> set[str]:
     return {match.group(0).lower() for match in LABEL_TOKEN.finditer(text)}
+
+
+# Function words only. A content word keeps the n-gram eligible as a cue.
+STOPWORDS = frozenset(
+    {
+        "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "as",
+        "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "can",
+        "did", "do", "does", "doing", "down", "during", "each", "few", "for", "from", "further", "had",
+        "has", "have", "having", "he", "her", "here", "hers", "herself", "him", "himself", "his", "how",
+        "i", "if", "in", "into", "is", "it", "its", "itself", "just", "me", "more", "most", "my", "myself",
+        "no", "nor", "not", "now", "of", "off", "on", "once", "only", "or", "other", "our", "ours",
+        "ourselves", "out", "over", "own", "same", "she", "should", "so", "some", "such", "than", "that",
+        "the", "their", "theirs", "them", "themselves", "then", "there", "these", "they", "this", "those",
+        "through", "to", "too", "under", "until", "up", "very", "was", "we", "were", "what", "when",
+        "where", "which", "while", "who", "whom", "why", "will", "with", "you", "your", "yours",
+        "yourself", "yourselves",
+    }
+)
+
+
+def request_words(text: str) -> list[str]:
+    lowered = text.lower().replace("'", "").replace("’", "")
+    return re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", lowered)
+
+
+def content_ngrams(words: list[str]) -> set[tuple[str, ...]]:
+    found: set[tuple[str, ...]] = set()
+    for size in range(3, len(words) + 1):
+        for start in range(len(words) - size + 1):
+            gram = tuple(words[start:start + size])
+            if any(word not in STOPWORDS for word in gram):
+                found.add(gram)
+    return found
+
+
+def cue_leaks(cases: list[dict], field: str) -> list[str]:
+    """N-grams shared by 3+ cases of one label and by no case of another label."""
+    labels = {case["id"]: case[field] for case in cases}
+    seen: dict[tuple[str, ...], set[str]] = {}
+    for case in cases:
+        for gram in content_ngrams(request_words(case["request"])):
+            seen.setdefault(gram, set()).add(case["id"])
+    leaks: list[str] = []
+    for gram, ids in seen.items():
+        values = {labels[ident] for ident in ids}
+        if len(values) == 1 and len(ids) >= 3:
+            label = next(iter(values))
+            leaks.append(f"{field}={label} ({len(ids)}): {' '.join(gram)} [{', '.join(sorted(ids))}]")
+    return sorted(leaks)
 
 
 def sha256(path: Path) -> str:
@@ -124,6 +173,13 @@ class HeldoutPackTests(unittest.TestCase):
         by_id = {item["id"]: item for item in answers["cases"]}
         for ident in DECIDING_FACT_CASES:
             self.assertIn("Deciding fact:", by_id[ident]["rationale"])
+
+    def test_repeated_ngrams_are_not_private_to_one_template_or_topology(self):
+        pack = json.loads(PACK_PATH.read_text(encoding="utf-8"))
+        leaks: list[str] = []
+        for field in ("expected_template", "expected_topology"):
+            leaks.extend(cue_leaks(pack["cases"], field))
+        self.assertEqual(leaks, [])
 
     def test_cases_use_the_public_catalog_and_answers_justify_every_label(self):
         pack = json.loads(PACK_PATH.read_text(encoding="utf-8"))

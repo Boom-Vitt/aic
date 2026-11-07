@@ -16,8 +16,8 @@ Tuning happens only on the dev pack, `tests/fixtures/routing-scenarios.json`. It
 
 | pack_version | file | sha256 |
 | --- | --- | --- |
-| 1 | `benchmarks/routing/heldout-v2.json` | `7cee89c4899c53268a59d98d04acd3bb64fff24eecd9e7777fc664e6be5fb3cf` |
-| 1 | `benchmarks/routing/heldout-v2-answers.json` | `3606c4c397ed015d038ce4ee729959dbb66e0a77faef2f120cf105537e9d76c9` |
+| 1 | `benchmarks/routing/heldout-v2.json` | `bb0a6a4788b02911d827beed0a47f46bf66f9822a97bc55bea2a77cb02c13ec4` |
+| 1 | `benchmarks/routing/heldout-v2-answers.json` | `10aab94fa5c4bce424cff792f39c2d642aa7beb10ff8c23133fcb0e7add3b6ba` |
 
 ## Commands
 

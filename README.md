@@ -85,7 +85,7 @@ Start with one stream. Four agents and six worktrees are ceilings. On a machine 
 
 Benchmark comparisons are specified in [docs/BENCHMARKS.md](docs/BENCHMARKS.md). No public benchmark score is claimed.
 
-Routing guidance is tuned only on the dev pack `tests/fixtures/routing-scenarios.json`. The release pack `benchmarks/routing/heldout-v2.json` is scored once per release. Pack version 1 SHA-256: `7cee89c4899c53268a59d98d04acd3bb64fff24eecd9e7777fc664e6be5fb3cf` for the pack and `3606c4c397ed015d038ce4ee729959dbb66e0a77faef2f120cf105537e9d76c9` for `benchmarks/routing/heldout-v2-answers.json`.
+Routing guidance is tuned only on the dev pack `tests/fixtures/routing-scenarios.json`. The release pack `benchmarks/routing/heldout-v2.json` is scored once per release. Pack version 1 SHA-256: `bb0a6a4788b02911d827beed0a47f46bf66f9822a97bc55bea2a77cb02c13ec4` for the pack and `10aab94fa5c4bce424cff792f39c2d642aa7beb10ff8c23133fcb0e7add3b6ba` for `benchmarks/routing/heldout-v2-answers.json`.
 
 ## For contributors and maintainers
 

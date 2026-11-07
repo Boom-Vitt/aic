@@ -4,7 +4,7 @@
   "cases": [
     {
       "id": "h2-answer-flag",
-      "request": "Explain the difference between the museum caption tool's --dry-run flag and its --apply flag. The man-page paragraph for both flags is pasted below this sentence and is the only source. The explanation is one short paragraph for one operator. Do not change the tool, open a second investigation, or launch anyone. Pasted paragraph: --dry-run prints the caption ids that would change and writes nothing; --apply writes those captions only after the same id list is shown.",
+      "request": "Explain the difference between the museum caption tool's --dry-run flag and its --apply flag. The man-page paragraph for both flags is pasted below this sentence and is the only source. The explanation is one short paragraph for one operator. Do not change the tool, start another investigation, or launch anyone. Pasted paragraph: --dry-run prints the caption ids that would change and writes nothing; --apply writes those captions only after the same id list is shown.",
       "expected_workflow": "answer",
       "expected_template": "direct",
       "expected_topology": "solo"
@@ -18,7 +18,7 @@
     },
     {
       "id": "h2-answer-two-sources",
-      "request": "A patron needs a written reply that uses two substantial, independent public sources: the town's posted meeting-notice statute, and the library's posted privacy notice. Each source has its own citation checklist and its own notes file. Neither investigation uses the other's notes. One editor writes the final reply after both citation files exist. Recommend the shape only. Do not publish the reply or contact the patron.",
+      "request": "A patron needs a written reply drawn from the town's posted meeting-notice statute and from the library's posted privacy notice. Those documents do not depend on each other. Give each document a separate checklist and a separate notes file. An editor composes the reply only once both files exist. Recommend that shape only. Do not publish the reply or contact the patron.",
       "expected_workflow": "answer",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
@@ -46,21 +46,21 @@
     },
     {
       "id": "h2-answer-faq-resume",
-      "request": "Resume an approved multi-session FAQ after a context reset. The durable ledger already lists the accepted paragraphs, the open question, and the stop date. One owner must finish the single remaining paragraph, which depends on the accepted ledger and cannot be split. There is no speed target and no benchmark. Do not add writers or republish completed paragraphs.",
+      "request": "The FAQ was cut off when the chat was cleared. A notebook already holds the paragraphs that were accepted, the question still open, and the date work must stop. The same editor finishes that one remaining paragraph, which cannot be divided and depends on the notebook. Nothing about speed is in scope. Do not bring in more writers, and do not republish paragraphs that are already done.",
       "expected_workflow": "answer",
       "expected_template": "adaptive-controller",
       "expected_topology": "solo"
     },
     {
       "id": "h2-answer-faq-branches",
-      "request": "Continue an approved multi-session town-hall FAQ after a context reset. The only memory that may be trusted is the durable ledger of accepted decisions and blocked questions. That ledger currently lists two questions as ready: meeting notice and records retention. Their files do not overlap, and each has its own citation check. One editor accepts whatever the ledger lists. Do not freeze those two questions into a standing pair: if the ledger shows a different ready set at the next resume, follow the ledger. This is continuity of the FAQ, not a speed trial. Do not rerun finished questions.",
+      "request": "Yesterday's town-hall FAQ stopped mid-list, and the editor may trust only the notebook of closed items when picking the work back up. Right now that notebook marks meeting notice and records retention as both unblocked, in separate files, each carrying a citation check. The editor takes the unblocked items the notebook names. Tomorrow the notebook might drop one of those questions or add another, and tomorrow's page wins over today's pair. Questions already closed stay closed. Speed is not the goal.",
       "expected_workflow": "answer",
       "expected_template": "adaptive-controller",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-research-short-read",
-      "request": "Check two sentences that are already pasted here. Sentence A: the caption tool reads skills from the project skills directory. Sentence B: the paper's limitation is that the trial used one model snapshot. One owner can verify both sentences against the attached one-page excerpt. Separate note files would take longer to set up than the check. Produce a short cited note. Do not recruit investigators.",
+      "request": "Check two sentences that are already pasted here. Sentence A: the caption tool reads skills from the project skills directory. Sentence B: the paper's limitation is that the trial used one model snapshot. Verifying both sentences fits in a single short read of the attached one-page excerpt. Separate note files would take longer to set up than the check. Produce a short cited note. Do not recruit investigators.",
       "expected_workflow": "research",
       "expected_template": "direct",
       "expected_topology": "solo"
@@ -74,21 +74,21 @@
     },
     {
       "id": "h2-research-two-rfcs",
-      "request": "Read two substantial public documents for the package-tracking webhook: the carrier's posted retry rules, and the posted signature scheme for webhook bodies. Each document needs its own citation log and its own notes file. Neither log depends on the other. One lead will write the combined cited note after both logs are checked. Recommend the shape only. Do not build the webhook.",
+      "request": "The package-tracking webhook needs a cited note covering the carrier's posted retry rules and another covering how webhook bodies are signed. The two documents are unrelated. Record citations for the retry rules in one log, and signature observations in another log. A lead merges them only after both logs have been checked. Recommend that arrangement only. Do not build the webhook.",
       "expected_workflow": "research",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-research-ordered-memos",
-      "request": "Produce two cited notes from the carrier's posted webhook documents. The signature note may use only terms from the glossary in the retry-rules note, and that glossary does not exist yet. One owner keeps the handoff. Do not start the signature note until that glossary is accepted.",
+      "request": "Write cited notes from the carrier's posted webhook documents. The signature note is limited to terms defined by the retry-rules glossary, which nobody has accepted yet. Hold the signature note until that glossary exists. A single person watches the dependency.",
       "expected_workflow": "research",
       "expected_template": "coordinated-delivery",
       "expected_topology": "sequential"
     },
     {
       "id": "h2-research-ready-memos",
-      "request": "Two cited memos for the cafeteria menu board are ready to write. The shared citation template, the question list, and the output paths are already accepted. One memo covers allergen labels and the other covers posted calorie rules. The paths are disjoint, neither memo waits on the other's prose, and each has its own citation check. One lead integrates the two files. Do not change the menu software.",
+      "request": "Allergen-label and calorie-rule memos can be written now. A citation template, the questions, and the output paths were accepted earlier. The files sit apart, and neither memo needs the other's sentences. Each memo is checked by its citation list. A lead combines the finished files. Leave the menu software as it is.",
       "expected_workflow": "research",
       "expected_template": "coordinated-delivery",
       "expected_topology": "parallel"
@@ -102,21 +102,21 @@
     },
     {
       "id": "h2-research-resume",
-      "request": "Resume an approved multi-session literature check of public captioning rules from its compact source ledger. One owner must resolve the single remaining disputed citation and record what is still uncertain for the next session. Nothing is being optimized, and no benchmark is needed or authorized. Do not open a second workstream or treat earlier notes as sufficient by themselves.",
+      "request": "A literature pass on public captioning rules was left unfinished. Its source list is short enough to carry forward. The remaining job is one disputed citation, plus a note of what is still uncertain. Earlier notes are not authority by themselves. Do not add another investigator, and do not optimize anything.",
       "expected_workflow": "research",
       "expected_template": "adaptive-controller",
       "expected_topology": "solo"
     },
     {
       "id": "h2-research-label-sources",
-      "request": "Read two substantial public sources for the cafeteria menu board before any combined note: the posted allergen-label statute, and the posted calorie-rounding rule. Each source has its own citation log and its own check. Neither log uses the other. One lead writes the combined note only after both logs exist. Do not change the menu software.",
+      "request": "Before anyone writes a combined note about lunch-menu labels, gather the posted allergen statute and the posted calorie-rounding rule. They come from different publications. Keep a citation log for the statute and a different log for the rounding rule, and check each log on its own. A lead may write the combined note afterward. Leave the menu software untouched.",
       "expected_workflow": "research",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-impl-tiny-labels",
-      "request": "Change the warehouse screen's two button captions from 'OK' to 'Confirm' in slot_view.py and from 'Cancel' to 'Back' in scan_view.py. The interface is already fixed, the files are different, and each caption is one word. One owner can edit and check both in a few minutes. Do not assign a second implementer.",
+      "request": "Change the warehouse screen's two button captions from 'OK' to 'Confirm' in slot_view.py and from 'Cancel' to 'Back' in scan_view.py. The interface is already fixed, the files are different, and each caption is one word. The same person can edit and check both in a few minutes. Do not assign a second implementer.",
       "expected_workflow": "implementation",
       "expected_template": "direct",
       "expected_topology": "solo"
@@ -130,7 +130,7 @@
     },
     {
       "id": "h2-impl-discover-first",
-      "request": "Before any code change to the attendance export, investigate two substantial independent unknowns: which public CSV columns the district already documents, and which public timezone rules the export must follow. The sources and the note paths are disjoint, and each note has its own check. One lead reconciles both notes and only then may propose a build. Recommend the investigation shape. Do not write the export.",
+      "request": "The attendance export cannot be edited until two facts are known: the CSV columns the district already publishes, and the timezone rules that export must follow. Capture each fact in its own scratch file. A lead reads both scratch files and only afterward may propose the edit. Do not write the export in this recommendation.",
       "expected_workflow": "implementation",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
@@ -144,7 +144,7 @@
     },
     {
       "id": "h2-impl-disjoint-modules",
-      "request": "Two modules of the cafeteria menu board are approved to build. The shared menu-item interface is already accepted. allergens.py and calories.py have disjoint write paths and separate acceptance checks, and neither module reads the other's uncommitted work. One integration owner merges the accepted results. Recommend the concurrent build. Do not launch it from this recommendation.",
+      "request": "Building allergens.py and calories.py is approved. Their menu-item interface was accepted already. Write scopes are separate, acceptance checks are separate, and neither file reads the other's uncommitted edits. An integrator merges the accepted results. Recommend doing the builds at the same time. This recommendation does not start the work.",
       "expected_workflow": "implementation",
       "expected_template": "coordinated-delivery",
       "expected_topology": "parallel"
@@ -158,126 +158,126 @@
     },
     {
       "id": "h2-impl-resume-one-unit",
-      "request": "Continue an approved multi-session change to the library hold email. The durable record lists the accepted template, the open unit, and a send that must not be repeated. One owner has the only ready unit, and it is coupled to that record. The goal is to finish the email correctly, not to make it faster. No benchmark is authorized. Do not resend mail or add workers.",
+      "request": "Library hold mail was left half-changed across sittings. A record names the template already accepted, the single unfinished unit, and a send that must not be repeated. That unit is tied to the record, so it stays with one person. Correctness matters here; making the mail faster does not. Do not resend anything, and do not add helpers.",
       "expected_workflow": "implementation",
       "expected_template": "adaptive-controller",
       "expected_topology": "solo"
     },
     {
       "id": "h2-impl-ordered-resume",
-      "request": "Resume an approved multi-week change to the package-tracking webhook after an interruption. The checkpoint file is the only record of what has been accepted. It currently shows the signature parser accepted and the retry caller blocked on that accepted contract. One owner must continue from the checkpoint and stop at the agreed date. Do not freeze that parser-then-caller order as a standing plan: if the checkpoint shows a different blocked unit at the next resume, follow the checkpoint. This is continuity of the change, not a speed trial.",
+      "request": "The webhook migration spans several weeks and was paused on Thursday. A checkpoint file says the signature parser passed acceptance, while the retry caller still cannot start until that contract is what sits on disk. Whoever picks the migration back up should read that file first and continue the blocked caller, ending on the Thursday deadline already written down. If a later pause leaves a different unit blocked, that later file wins over the parser-then-caller sequence described here. This is not a speed trial.",
       "expected_workflow": "implementation",
       "expected_template": "adaptive-controller",
       "expected_topology": "sequential"
     },
     {
       "id": "h2-debug-holiday-notes",
-      "request": "The attendance export fails only when the date is a district holiday. Two read-only investigations do not share notes: one collects the posted holiday calendar, and the other records which timezone parse_day uses. Each note has a check that does not need the other note. No fix is selected yet. One owner compares the notes before recommending a change. Do not edit the export in this recommendation.",
+      "request": "The attendance export fails only when the date is a district holiday. Two read-only investigations do not share notes: one collects the posted holiday calendar, and the other records which timezone parse_day uses. Each write-up can be falsified without seeing the other write-up. No fix is selected yet. One owner compares the write-ups before recommending a change. Do not edit the export in this recommendation.",
       "expected_workflow": "debug",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-debug-one-parser",
-      "request": "Two warehouse commands fail: slot lookup and barcode reprint. Both failures are raised in the same parse_slot function, which the owner has open. A second person would reread that function. Reproduce both commands, fix the shared parser, and show both commands accepting the previously failing codes. Do not split the diagnosis.",
+      "request": "Two warehouse commands fail: slot lookup and barcode reprint. Both failures are raised in the same parse_slot function, which is already on screen. A second person would reread that function. Reproduce both commands, fix the shared parser, and show both commands accepting the previously failing codes. Do not split the diagnosis.",
       "expected_workflow": "debug",
       "expected_template": "direct",
       "expected_topology": "solo"
     },
     {
       "id": "h2-debug-two-hypotheses",
-      "request": "The map-tile cache sometimes serves a stale tile. Two substantial read-only investigations are independent: one reads request timestamps into its own note, and the other reads the cache key derivation into a different note. Each note has a result that can be checked without the other. No patch is ready. One lead compares the notes before choosing a fix. Do not restart the tile service.",
+      "request": "The map-tile cache sometimes serves a stale tile. Two read-only tracks stay apart: one records request timestamps, and the other records how the cache key is derived. Either track can be judged without the other. No patch is ready. A lead compares them before choosing a fix. Do not restart the tile service.",
       "expected_workflow": "debug",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-debug-trace-then-repro",
-      "request": "Diagnose the invoice footer's wrong total as two specialist units. The trace unit must finish and be accepted before the reproduction unit may build a fixture from that trace. The fixture is not ready now. One owner keeps the handoff. Do not change tax rates or send an invoice.",
+      "request": "The invoice footer's wrong total needs a trace specialist and, later, a reproduction specialist. Reproduction may build its fixture only from a trace that has already been accepted, so the fixture cannot start yet. Track that dependency with one person. Leave tax rates unchanged, and do not send an invoice.",
       "expected_workflow": "debug",
       "expected_template": "coordinated-delivery",
       "expected_topology": "sequential"
     },
     {
       "id": "h2-debug-two-fixtures",
-      "request": "Two diagnostic fixtures for the menu board are ready to add. The shared failure report format is already accepted. The allergen fixture and the calorie fixture write disjoint files, neither needs the other's result, and each fixture has its own expected output. One owner integrates the two reports. Recommend the concurrent fixtures. Do not change production menu data.",
+      "request": "Add an allergen fixture and a calorie fixture to the menu display. The failure-report format they share was accepted earlier. They write different files, neither waits on the other's result, and each has an expected output of its own. Someone integrates the two reports. Recommend adding the fixtures together. Production menu data stays unchanged.",
       "expected_workflow": "debug",
       "expected_template": "coordinated-delivery",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-debug-patch-eval",
-      "request": "A patch claims to stop the scanner from charging a deposit twice. Double charges are customer-visible. A separate evaluator must run the original failing sale, not the author's summary, and accept the patch only if that sale charges once. The author does not sign off on their own patch. Do not deploy the scanner.",
+      "request": "A patch claims to stop the scanner from charging a deposit twice. Double charges are customer-visible. A separate evaluator must run the original failing sale, not a summary written by the person who patched it, and accept the patch only if that sale charges once. The patch writer does not sign off on the patch. Do not deploy the scanner.",
       "expected_workflow": "debug",
       "expected_template": "independent-review",
       "expected_topology": "generator-evaluator"
     },
     {
       "id": "h2-debug-incident-resume",
-      "request": "Continue a multi-session diagnosis of the stale map tile after a context reset. A durable incident file must survive the reset and is the only record of which evidence is accepted. It currently shows the trace accepted and reproduction of the cache-key failure still blocked on that trace. One owner keeps the file and stops at the agreed time. Do not freeze that trace-then-reproduction order as a standing plan: if the file shows a different blocked step at the next resume, follow the file. This is continuity of the diagnosis, not a benchmark. Do not flush the production cache.",
+      "request": "The stale map tile is still under diagnosis, and the shift log has to outlast a cleared chat. That log says the trace is accepted and reproducing the cache-key failure is still waiting on the trace. The person on duty keeps the log and stops when the clock hits the time already set. Should a later shift find the log pointing at a different waiting step, they follow the log instead of repeating trace-then-reproduction. Do not flush the production cache, and do not turn the diagnosis into a timing contest.",
       "expected_workflow": "debug",
       "expected_template": "adaptive-controller",
       "expected_topology": "sequential"
     },
     {
       "id": "h2-debug-writeup-eval-stage",
-      "request": "Resume the approved multi-session scanner incident. The durable ledger holds accepted traces and the open question. The current stage is a public incident paragraph that a separate evaluator must check against the ledger before the owner accepts it. Do not repeat finished traces, do not change the original failure criteria, and do not run a performance trial.",
+      "request": "The scanner incident continues across cleared chats. Accepted traces and the still-open question sit in an incident notebook. What needs doing now is a public paragraph about the incident, and someone other than the writer must compare that paragraph with the notebook before it is accepted. Leave finished traces alone, leave the original failure criteria alone, and skip any timing trial.",
       "expected_workflow": "debug",
       "expected_template": "adaptive-controller",
       "expected_topology": "generator-evaluator"
     },
     {
       "id": "h2-review-caption-eval",
-      "request": "Check the six-line pluralization change before it is published on every museum caption. A wrong plural would be visible to visitors. A separate reader receives the wording list and the diff, not the author's note that it looks fine, and lists mismatches. Do not edit the files.",
+      "request": "Check the six-line pluralization change before it is published on every museum caption. A wrong plural would be visible to visitors. A separate reader receives the wording list and the diff, not a note from the diff's writer saying it looks fine, and lists mismatches. Do not edit the files.",
       "expected_workflow": "review",
       "expected_template": "independent-review",
       "expected_topology": "generator-evaluator"
     },
     {
       "id": "h2-review-self-check",
-      "request": "The changelog fixes the spelling of 'catalogue' in one line. The author asks to run a separate evaluator model because reviews should always be independent. The line and the dictionary entry are both in the request. One owner can see whether the spelling matches. Do not treat a second model as required, and do not edit anything else.",
+      "request": "The changelog fixes the spelling of 'catalogue' in one line. The author asks to run a separate evaluator model because reviews should always be independent. The line and the dictionary entry are both in the request. Whether the spelling matches is visible without help. Do not treat a second model as required, and do not edit anything else.",
       "expected_workflow": "review",
       "expected_template": "direct",
       "expected_topology": "solo"
     },
     {
       "id": "h2-review-two-evidence",
-      "request": "The town-hall FAQ already states that hold notices go out within 24 hours. Determine whether that statement matches two sources that are still unknown. One question is what the posted statute requires, and the other is what the library's posted procedure actually says. Each question has its own notes file and its own check. Neither file uses the other. One owner writes the finding after both notes exist. Do not publish a finding yet.",
+      "request": "The town-hall FAQ already states that hold notices go out within 24 hours. Determine whether that statement matches two sources that are still unknown. One question is what the posted statute requires, and the other is what the library's posted procedure actually says. Put the statute question in one notes file and the procedure question in another, and check them apart. One owner writes the finding after both files exist. Do not publish a finding yet.",
       "expected_workflow": "review",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-review-dependent-checklist",
-      "request": "Two checking deliverables are approved. First accept a finding list for the signature parser. The retry-caller checklist may cite only findings from that accepted list, so it cannot be written yet. One owner handles the handoff. Do not treat the checklist as ready.",
+      "request": "A finding list for the signature parser has to be accepted before anyone writes the retry-caller checklist, because the checklist may cite only those findings. The checklist is therefore not ready. One person confirms the finding list first.",
       "expected_workflow": "review",
       "expected_template": "coordinated-delivery",
       "expected_topology": "sequential"
     },
     {
       "id": "h2-review-two-reports",
-      "request": "Two compliance reports are approved under one fixed rubric. One report covers the export package and the other covers the importer package. Their evidence folders and output paths are disjoint, neither report checks the other report, and each report's findings can be checked alone. One owner synthesizes the two reports. Do not describe the pair as a generator and an evaluator.",
+      "request": "Under one fixed rubric, prepare a compliance report on the export package and another on the importer package. Evidence folders do not overlap, and neither report inspects the other. Findings in each report can be verified by themselves. Someone then synthesizes the pair. They are peer reports, not a writer paired with a checker.",
       "expected_workflow": "review",
       "expected_template": "coordinated-delivery",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-review-rubric-eval",
-      "request": "Check the approved backup-restore runbook against the original recovery criteria. A missed step could drop a site's inventory snapshot. A separate evaluator receives the criteria and the runbook, not the author's checklist of why it passes, and records each unmet criterion. Do not run a restore.",
+      "request": "Check the approved backup-restore runbook against the original recovery criteria. A missed step could drop a site's inventory snapshot. A separate evaluator receives the criteria and the runbook, not a self-graded checklist, and records each unmet criterion. Do not run a restore.",
       "expected_workflow": "review",
       "expected_template": "independent-review",
       "expected_topology": "generator-evaluator"
     },
     {
       "id": "h2-review-program-resume",
-      "request": "Resume an approved multi-session check of the public grant claims after an interruption. The accepted finding ledger is the only record of which claims are closed. The ledger currently shows one open claim that a separate person must check against the original rubric before the owner accepts it. Keep the ledger. Do not treat this as a one-sitting check of a single artifact: if the ledger's open item is different at the next resume, follow the ledger, and do not reopen finished claims or change the rubric. No benchmark is authorized.",
+      "request": "Public grant claims are being checked across several sittings. A finding ledger records which claims are already closed. The open claim in that ledger needs someone who did not write it to compare it with the original rubric before the owner accepts it. Should another meeting find a different claim still open, check that claim instead. Closed claims stay closed, and the rubric stays as written. No timing trial is authorized.",
       "expected_workflow": "review",
       "expected_template": "adaptive-controller",
       "expected_topology": "generator-evaluator"
     },
     {
       "id": "h2-review-scanner-evidence",
-      "request": "The scanner team claims the device beeps only on unknown barcodes. Check that claim. Two evidence questions are independent: the posted beep specification, and the fixture log of known barcodes. The notes are disjoint and each check stands alone. One owner writes the finding after both notes exist. Do not change the scanner.",
+      "request": "The scanner team claims the device beeps only on unknown barcodes. Check that claim against the posted beep specification and against the fixture log of known barcodes. Those two sources should be written up apart from each other, and either write-up can stand without the other. The finding comes after both write-ups. Do not change the scanner.",
       "expected_workflow": "review",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
@@ -298,35 +298,35 @@
     },
     {
       "id": "h2-design-two-requirements",
-      "request": "Choose the archival filename for photo checksums, but first resolve two substantial independent unknowns: the public accessibility rules for the filename, and the public retention period that must appear in it. The sources and note paths are disjoint and each note is checked alone. One person reconciles both notes before choosing the pattern. Recommend the investigation. Do not rename files.",
+      "request": "The checksum archive still needs a filename pattern. Two open questions have to be settled from public documents before that pattern is chosen: which accessibility rules govern the name, and which retention period must be visible in it. Keep those questions in separate note files with separate checks. The person who picks the pattern reads both notes first. Do not rename any stored object yet.",
       "expected_workflow": "design",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-design-schema-then-protocol",
-      "request": "Two specialists are approved to specify the hold email before any code is written. The first produces an accepted field list. The second produces the wire order of those fields and cannot start until the field list is accepted. One owner checks the handoff. Do not build the email.",
+      "request": "Specify the hold email before writing code. A field list comes first and must be accepted. The wire order of those fields starts only after that acceptance. One person confirms the field list is really accepted before the wire order begins. Do not build the email.",
       "expected_workflow": "design",
       "expected_template": "coordinated-delivery",
       "expected_topology": "sequential"
     },
     {
       "id": "h2-design-icon-unknowns",
-      "request": "Choose the scanner's low-battery icon, but first resolve two substantial independent unknowns: the posted contrast rules for the device screen, and the posted icon-size rules. The sources and note paths are disjoint, and each note is checked alone. One person reconciles both notes before choosing the icon. Do not draw the final asset.",
+      "request": "A low-battery glyph for the scanner is undecided. Contrast limits posted for the device screen, and the posted size limits for glyphs, come from different documents and should be written up apart from each other. After both write-ups exist, pick the glyph. Do not draw the final asset during the write-ups.",
       "expected_workflow": "design",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-design-rotation-eval",
-      "request": "Propose an approved scheme for rotating the webhook signing key, including what happens during the overlap window. A wrong overlap would reject valid carrier calls. A separate evaluator receives the original uptime criteria and the scheme, and tries concrete overlap cases. The author's narrative is not evidence. Do not rotate any key.",
+      "request": "Propose an approved scheme for rotating the webhook signing key, including what happens during the overlap window. A wrong overlap would reject valid carrier calls. A separate evaluator receives the original uptime criteria and the scheme, and tries concrete overlap cases. A persuasive write-up from the person who proposed the scheme is not evidence. Do not rotate any key.",
       "expected_workflow": "design",
       "expected_template": "independent-review",
       "expected_topology": "generator-evaluator"
     },
     {
       "id": "h2-design-ordered-program",
-      "request": "Continue an approved multi-session specification of the photo archive after an interruption. The durable decision log is the only record of accepted constraints. It currently shows the retention field list accepted and the filename pattern blocked until it can use that list. One owner keeps the log and stops at the agreed date. Do not freeze that field-list-then-filename order as a standing plan: if the log shows a different blocked choice at the next resume, follow the log. Do not rename stored files and do not run a performance comparison.",
+      "request": "Photo-archive choices are being settled over more than one workday, and a decision log is what carries accepted constraints across those days. Today the log has finished the retention field list. The filename pattern still cannot proceed without it. The person keeping the log finishes when the chosen calendar day arrives. A later workday might show some other choice waiting, and that later page should be honored rather than locking in field-list then filename. Do not rename stored files, and do not compare performance.",
       "expected_workflow": "design",
       "expected_template": "adaptive-controller",
       "expected_topology": "sequential"
