@@ -1,6 +1,6 @@
 # Routing scorer
 
-Offline comparison of routing decisions with a routing pack. The default pack is the dev pack at `tests/fixtures/routing-scenarios.json`. The release pack is `benchmarks/routing/heldout-v2.json`. The scorer does not read request text to choose a workflow, and it does not call a model, a network API, or a cloud service. A number appears only after you point it at a decision file from a real run. This document has no results table.
+Offline comparison of routing decisions with a routing pack. The default pack is the dev pack at `tests/fixtures/routing-scenarios.json`. Tune only on that pack. The release pack is `benchmarks/routing/heldout-v2.json`. Score it once per release, with `--pack`, and do not tune on that file. The scorer does not read request text to choose a workflow, and it does not call a model, a network API, or a cloud service. A number appears only after you point it at a decision file from a real run. This document has no results table.
 
 Each pack's own `limits` text still applies: the expected fields and stage labels are evaluation data, not a production classifier, and they stay withheld from fresh host inputs.
 
@@ -32,7 +32,7 @@ python -m benchmarks.routing.compare --model MODEL_ID --output comparison-dir
 python -m benchmarks.routing.compare --model MODEL_ID --output comparison-dir --pack benchmarks/routing/heldout-v2.json
 ```
 
-`--scenarios` or `--pack` replaces the default dev pack. The replacement must use schema version 3. `--output` creates a new file and refuses a path that already exists or is a symlink. Decision, scenario, catalog, and output paths are not followed when the final component is a symlink.
+`--scenarios` or `--pack` replaces the default dev pack. Pass only one. The replacement must use schema version 3. The release pack is `benchmarks/routing/heldout-v2.json`. `--output` creates a new file and refuses a path that already exists or is a symlink. Decision, scenario, catalog, and output paths are not followed when the final component is a symlink.
 
 `--help` works with no model credential. Scoring does not read `ANTHROPIC_API_KEY`.
 
