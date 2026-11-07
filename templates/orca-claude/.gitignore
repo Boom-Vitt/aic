@@ -1,0 +1,6 @@
+.orca/*
+!.orca/gate.sh
+.env
+.env.*
+.env.worktree
+.work/

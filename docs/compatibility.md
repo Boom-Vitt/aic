@@ -92,6 +92,8 @@ The `0.0.N` development-package sequence is not a schema sequence or a rollback.
 
 The host supplies semantic selection using goal, acceptance, dependencies, available capabilities and effective authority. The catalog validates combinations; it does not schedule milestones, benchmark agents or make every host equally capable. Choose per stage using the [selection guide](../skills/aic/references/workflows.md) and [family contracts](../skills/aic/references/templates.md). Mixed projects retain their original acceptance while a stage's category, family, topology or authorized runtime may change. AIC makes no universal Orca/OMP/Claude/Codex quality ranking and adds no general cross-CLI execution backend.
 
+The Orca v0.4.0 project template in this checkout is a separate harness. Its offline plan, permission, bootstrap, and headless-result checks are contract tests. They do not show that Claude Code loaded the plugin, that a model ran, or that a Mac mini doctor was executed.
+
 ## Optional local supervision
 
 The original [tmux profile](../skills/aic/assets/tmux.conf) and [supervision guide](../skills/aic/references/supervision.md) target stable tmux 3.8; see the [official-source evidence](../skills/aic/references/research.md#tmux-2026). This optional procedure is separate from skill discovery and the existing Orca-to-omp adapter. It requires explicit approval for task-local launch/cleanup, an explicit task-owned socket, trusted per-run config and exact session/pane IDs. It neither installs/upgrades tmux nor modifies existing servers, `~/.tmux.conf`, global settings or managed services.

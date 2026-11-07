@@ -20,3 +20,10 @@ AIC (AI Culture) is a skills-first workflow library, distributed as a portable A
 - Use explicit subprocess argument arrays, never a shell for user-provided input. Do not follow untrusted symlinks or overwrite unmanaged/modified files.
 - Only the integration owner commits/pushes. Preserve unrelated work; no force pushes. Verification itself is offline after declared dependencies are installed; never install models or activate managed services to verify.
 - Before final delivery, exercise the changed skill/plugin/MCP consumer surface (or internal helper when changed), review security-sensitive behavior and record actual evidence and limitations.
+
+## Orca and Claude Code template
+- AIC plans, researches, and states acceptance. Implementation in an Orca worktree is a separate approved step. The user approves publication and merge.
+- The native AIC plugin stays skills-only. Project `.claude` settings belong to the Orca harness template; they are not plugin hooks.
+- Codex in that harness is a role inside Claude Code. Do not require or install a Codex CLI for it.
+- Headless runs invoke only the operator's own `claude` CLI when `--apply` is set. They must not embed keys, call extra model APIs, push, or delete.
+- A cloud-agent commit does not grant credentials, webhooks, or deployment authority.

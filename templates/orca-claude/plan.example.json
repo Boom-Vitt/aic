@@ -1,0 +1,24 @@
+{
+  "$schema": "https://github.com/Boom-Vitt/claude-mods-boombignose/blob/ad1a6032465546883d57299fda5677d6b2a7750d/boom-big-nose-workflow/orca.plan.schema.json",
+  "version": 1,
+  "title": "Document the project command",
+  "status": "draft",
+  "goal": "Name the project's verify command in the README and show that the existing check still exits 0.",
+  "nonGoals": ["No dependency upgrades.", "No deployment."],
+  "base": "main",
+  "risks": ["A docs-only edit can still mention a command that does not exist."],
+  "replanTriggers": ["The verify command changes.", "The edit needs a second owned path."],
+  "streams": [
+    {
+      "slug": "docs",
+      "role": "claude-code",
+      "summary": "Update the README usage section only.",
+      "paths": ["README.md"],
+      "dependsOn": [],
+      "acceptance": [
+        "README.md names the exact verify command.",
+        "The existing project check exits 0."
+      ]
+    }
+  ]
+}
