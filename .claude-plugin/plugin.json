@@ -1,7 +1,7 @@
 {
   "name": "aic",
   "displayName": "AIC",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Skills-first workflow selection, scoped memory and approved handoff guidance for your existing agent.",
   "author": {
     "name": "Boom-Vitt"

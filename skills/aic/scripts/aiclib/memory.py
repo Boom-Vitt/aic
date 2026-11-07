@@ -1,15 +1,74 @@
 """Approved scoped reference notes; neither evidence nor prose grants authority."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import date
 import hashlib
 import json
+import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from .safety import AICError, canonical_json, checked_root, relative_path, safe_path
 
 _CANDIDATE = {'claim', 'source', 'source_date', 'checked_at', 'scope', 'status'}
+_MAX_NOTE_BYTES = 1024 * 1024
+_MAX_NOTE_ENTRIES = 256
+_MAX_TOTAL_BYTES = 8 * 1024 * 1024
+
+
+def _bounded_json(value):
+    try:
+        data = canonical_json(value)
+    except (RecursionError, UnicodeError) as exc:
+        raise AICError('Memory note cannot be represented safely as JSON.') from exc
+    if len(data) > _MAX_NOTE_BYTES:
+        raise AICError('Memory notes cannot exceed 1 MiB of canonical JSON.')
+    return data
+
+
+def _read_collection(root):
+    folder = safe_path(root, '.aic/memory/notes')
+    if not folder.exists():
+        return []
+    if not folder.is_dir():
+        raise AICError('Memory notes state is not a directory.')
+    paths = []
+    # scandir streams entries on all supported Python versions; Path.iterdir may list eagerly.
+    with os.scandir(folder) as entries:
+        for entry in entries:
+            if len(paths) == _MAX_NOTE_ENTRIES:
+                raise AICError('Memory collections cannot exceed 256 note entries.')
+            paths.append(Path(entry.path))
+    result = []
+    total = 0
+    for entry in sorted(paths):
+        path = safe_path(root, entry.relative_to(root).as_posix(), must_exist=True)
+        if not path.is_file() or path.suffix != '.json':
+            raise AICError('Unexpected object in owned memory notes.')
+        limit = min(_MAX_NOTE_BYTES, _MAX_TOTAL_BYTES - total)
+        with path.open('rb') as stream:
+            raw = stream.read(limit + 1)
+        if len(raw) > limit:
+            raise AICError('Memory note or collection exceeds its byte budget.')
+        total += len(raw)
+        result.append((path, raw))
+    return result
+
+
+@contextmanager
+def _promotion_lock(root):
+    folder = safe_path(root, '.aic/memory')
+    folder.mkdir(parents=True, exist_ok=True)
+    lock = safe_path(root, '.aic/memory/.promotion-lock')
+    try:
+        lock.mkdir()
+    except FileExistsError as exc:
+        raise AICError('Memory promotion is already locked; no note was written.') from exc
+    try:
+        yield
+    finally:
+        lock.rmdir()
 
 
 def _text(value):
@@ -36,8 +95,26 @@ def _reference(value):
 
 
 def _candidate(value, root=None):
-    if not isinstance(value, dict) or set(value) != _CANDIDATE:
+    if not isinstance(value, dict) or len(value) != len(_CANDIDATE) or set(value) != _CANDIDATE:
         raise AICError('Memory requires only claim, source, dates, scope and status; no authorization fields.')
+    # Bound flat candidate work before text scans, path checks or JSON allocation.
+    size = 0
+    for key in _CANDIDATE - {'scope'}:
+        text = value[key]
+        if not isinstance(text, str):
+            raise AICError('Memory candidate fields must contain text.')
+        size += len(text)
+        if size > _MAX_NOTE_BYTES:
+            raise AICError('Memory candidate exceeds the note byte budget.')
+    scope = value['scope']
+    if not isinstance(scope, list) or not scope or len(scope) > _MAX_NOTE_BYTES // 3:
+        raise AICError('Memory requires a bounded nonempty scoped path list.')
+    for path in scope:
+        if not isinstance(path, str):
+            raise AICError('Memory scope must contain relative path text.')
+        size += len(path) + 3
+        if size > _MAX_NOTE_BYTES:
+            raise AICError('Memory candidate exceeds the note byte budget.')
     _text(value['claim'])
     _reference(value['source'])
     for key in ('source_date', 'checked_at'):
@@ -49,13 +126,12 @@ def _candidate(value, root=None):
             raise AICError('Memory dates must be ISO YYYY-MM-DD dates.') from exc
     if value['status'] not in ('observed', 'source-declared'):
         raise AICError('Only observed or source-declared claims can be promoted; hypotheses remain candidates.')
-    if not isinstance(value['scope'], list) or not value['scope']:
-        raise AICError('Memory requires a nonempty scoped path list.')
+    data = _bounded_json(value)
     for path in value['scope']:
         relative_path(path)
         if root is not None:
             safe_path(root, path)
-    return json.loads(canonical_json(value))
+    return json.loads(data)
 
 
 def _source_hash(root, candidate, *, require):
@@ -77,45 +153,43 @@ def promote(root: Path, candidate: dict, *, approved=False) -> dict:
         raise AICError('Explicit promotion approval is required; no note was written.')
     note = {'schema_version': 1, 'kind': 'aic-scoped-reference', 'candidate': candidate,
             'source_sha256': _source_hash(root, candidate, require=True)}
-    data = canonical_json(note)
+    data = _bounded_json(note)
     digest = hashlib.sha256(data).hexdigest()
     relative = f'.aic/memory/notes/{digest}.json'
     target = safe_path(root, relative)
-    if target.exists():
-        if not target.is_file() or target.read_bytes() != data:
-            raise AICError('Refusing a modified or colliding owned memory note.')
-        return {'status': 'unchanged', 'path': relative, 'digest': digest}
-    target.parent.mkdir(parents=True, exist_ok=True)
-    # Exclusive creation prevents overwriting an existing note on a concurrent promotion.
-    try:
-        with target.open('xb') as stream:
-            stream.write(data)
-    except FileExistsError as exc:
-        raise AICError('Memory note appeared concurrently; nothing was overwritten.') from exc
-    return {'status': 'promoted', 'path': relative, 'digest': digest}
+    # Serialize capacity checks and exclusive creation across cooperating promoters.
+    with _promotion_lock(root):
+        existing = _read_collection(root)
+        for path, raw in existing:
+            if path == target:
+                if raw != data:
+                    raise AICError('Refusing a modified or colliding owned memory note.')
+                return {'status': 'unchanged', 'path': relative, 'digest': digest}
+        if (len(existing) == _MAX_NOTE_ENTRIES
+                or sum(len(raw) for _, raw in existing) + len(data) > _MAX_TOTAL_BYTES):
+            raise AICError('Memory promotion would exceed the collection budget.')
+        target.parent.mkdir(parents=True, exist_ok=True)
+        # Exclusive creation also refuses a note created by a noncooperating writer.
+        try:
+            with target.open('xb') as stream:
+                stream.write(data)
+        except FileExistsError as exc:
+            raise AICError('Memory note appeared concurrently; nothing was overwritten.') from exc
+        return {'status': 'promoted', 'path': relative, 'digest': digest}
 
 
 def read_notes(root: Path) -> list[dict]:
     root = checked_root(root)
-    folder = safe_path(root, '.aic/memory/notes')
-    if not folder.exists():
-        return []
-    if not folder.is_dir():
-        raise AICError('Memory notes state is not a directory.')
     result = []
-    for entry in sorted(folder.iterdir()):
-        path = safe_path(root, entry.relative_to(root).as_posix(), must_exist=True)
-        if not path.is_file() or path.suffix != '.json':
-            raise AICError('Unexpected object in owned memory notes.')
+    for path, raw in _read_collection(root):
         try:
-            raw = path.read_bytes()
             note = json.loads(raw)
-        except (ValueError, UnicodeError) as exc:
+        except (ValueError, UnicodeError, RecursionError) as exc:
             raise AICError('Memory note is malformed.') from exc
         if (not isinstance(note, dict) or set(note) != {'schema_version', 'kind', 'candidate', 'source_sha256'}
                 or type(note['schema_version']) is not int or note['schema_version'] != 1
                 or note['kind'] != 'aic-scoped-reference'
-                or canonical_json(note) != raw
+                or _bounded_json(note) != raw
                 or path.stem != hashlib.sha256(raw).hexdigest()):
             raise AICError('Memory ownership or integrity validation failed.')
         candidate = _candidate(note['candidate'], root)

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.3 — 2026-11-08 (unreleased)
+- Filter public issue/comment markers by approved-author provenance before uniqueness and reconciliation; retain owner ambiguity, assignment checks and uncertain-effect non-replay.
+- Bound recommendation JSON, aggregate paths, path geometry and overlap work before project I/O across MCP, internal validation and approved handoff consumers. Preserve schema 3, detached unchanged values and physical isolation.
+- Enforce end-to-end source deadlines with cancellable/reaped spawn-isolated transport, bounded non-executable IPC and parent-owned arXiv spacing.
+- Bound reference-note size, entry count and aggregate bytes for both reading and promotion, preserving immutable/idempotent notes at capacity and controlled parser failures.
+- Add reusable hosted dependency/secret security checks, a daily schedule and conservative Dependabot proposals. Make the existing required contract job explicitly depend on successful security checks without weakening branch protection.
+- Retain security-tool provenance and license credits, private reporting guidance and measured verification limits. No release tag, PyPI publication, global installation or immutable-service upgrade is implied.
+
 ## 0.0.2 — 2026-11-07 (unreleased)
 - Make the portable Agent Skill the default user experience: ask the existing host agent to use AIC, without a manual AIC CLI or Python prerequisite. Retain deterministic helper and maintainer commands as explicitly optional developer/operator interfaces.
 - Add a native skills-only Claude Code plugin and single-plugin marketplace. Installation adds the same skill, not hooks, permission overrides, models or an automatically started server.

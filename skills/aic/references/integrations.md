@@ -62,7 +62,7 @@ You can also open `/plugin`, select **Discover**, search for AIC after registeri
 
 Confirm AIC appears under **Installed** in `/plugin` and that typing `/` offers **`/aic:aic`**. Invoke that namespaced skill with your task, or ask the host to use AIC naturally. Installation/listing alone is not a model-consumption or native invocation trace. Use the **Installed** details to disable, update or uninstall the plugin at the chosen scope. The plugin does not configure or start the MCP adapter below.
 
-Official references checked November 7, 2026: [manifest](https://code.claude.com/docs/en/plugins-reference), [marketplace](https://code.claude.com/docs/en/plugins/marketplace-reference.md), and [installation and scope](https://code.claude.com/docs/en/plugins/install.md). The root marketplace source `./` is documented; plugin version `0.0.2` lives in `plugin.json`, without a duplicate plugin-entry version. Native validation and actual host consumption are separate evidence gates.
+Official references checked November 7, 2026: [manifest](https://code.claude.com/docs/en/plugins-reference), [marketplace](https://code.claude.com/docs/en/plugins/marketplace-reference.md), and [installation and scope](https://code.claude.com/docs/en/plugins/install.md). The root marketplace source `./` is documented; plugin version `0.0.3` lives in `plugin.json`, without a duplicate plugin-entry version. Native validation and actual host consumption are separate evidence gates.
 
 ## Separate local read-only MCP adapter
 
@@ -95,6 +95,8 @@ Replace both absolute-path placeholders with reviewed existing directories; use 
 
 The process binds its explicitly supplied existing absolute project before serving. It has no working-directory/home fallback, root-rebinding tool, HTTP listener, shell execution, file writes, memory promotion, worker launch or provider call. Metadata path checks and read-only annotations do not sandbox a concurrently hostile filesystem or the host's other tools. Use a trusted project and normal OS/host access controls.
 
+Recommendation input is resource-bounded as specified in [routing](routing.md), before per-request project I/O. Oversized or excessively costly plans are rejected without partial validation; choose appropriately scoped directories/subtasks instead of treating the adapter as an unbounded batch validator.
+
 ### Tools and resources
 
 | Tool | Purpose and boundary |
@@ -118,7 +120,7 @@ These are fixed resources, not arbitrary project files or traversal templates. T
 
 ## What has actually been exercised
 
-The repository's dated verification records distinguish the following historical observations from the current `0.0.2` candidate. Do not assume an older smoke proves this revision or every host version.
+The repository's dated verification records distinguish the following historical observations from the current `0.0.3` candidate. Do not assume an older smoke proves this revision or every host version.
 
 | Integration surface | Recorded evidence | Not established by that evidence |
 | --- | --- | --- |
@@ -127,7 +129,7 @@ The repository's dated verification records distinguish the following historical
 | Codex CLI 0.166.0 / `gpt-6.1-sol` | Four synthetic installed-file-consumption recommendations matched and validated | Separately traced native discovery or a performance ranking |
 | omp 18.16.0 / `gpt-6.1-sol` | Four synthetic cases with native skill reads from an isolated installation; a later five-family installed-file smoke is separately recorded | Native discovery of every later revision or universal model quality |
 | Pi, Hermes, OpenClaw, Cursor, Gemini CLI, OpenCode, Copilot CLI | Official path documentation and isolated installation contracts | Live discovery/model-consumption tests |
-| Claude Code skills-only plugin/marketplace and local MCP adapter | Setup and interfaces documented here for `0.0.2` | No earlier skill receipt is plugin validation, plugin invocation, SDK transport or installed-wheel proof; consult this candidate's recorded checks |
+| Claude Code skills-only plugin/marketplace and local MCP adapter | Setup and interfaces documented here for `0.0.3` | Historical native installation does not prove current plugin invocation; SDK transport and installed-wheel behavior require this candidate's own recorded checks |
 | Optional Orca/omp helper | Isolated preview, approval and subprocess contract evidence | A real project/agent launch from this setup or a general cross-runtime backend |
 
 Maintainer verification records live in the repository's `docs/verification.md`; they are not required files in a standalone installed skill. Schema/catalog version stays `3`; install, memory, maintenance and outer handoff formats retain their independent versions.

@@ -2,7 +2,7 @@
 
 ## Report a vulnerability
 
-Use GitHub's private vulnerability reporting for this repository if it is available. Otherwise open a minimal public issue requesting a private reporting channel without including exploit details, credentials, customer data or private source. Maintainers will arrange a private channel; no unconfigured email address is promised.
+Use [private vulnerability reporting](https://github.com/Boom-Vitt/aic/security/advisories/new) for this repository. Do not include exploit details, credentials, customer data or private source in a public issue. If GitHub's private channel is unavailable, open only a minimal request for a private reporting channel; no unconfigured email address is promised.
 
 A useful report identifies the affected revision, a synthetic reproduction, the user-visible boundary violation and the smallest required environment. Never test against another person's project, account, running service or skill collection.
 
@@ -23,6 +23,14 @@ Installing the skills-only native plugin adds guidance, not hooks, permissions, 
 The optional MCP entry point serves local stdio only and requires a separately configured existing absolute project directory. Its four tools expose metadata inspection, the packaged catalog/guidance and recommendation validation; static resources are allowlisted AIC documents, not arbitrary project files. It exposes no project-root switch, shell, project scripts, network fetches, memory promotion, agent launch, GitHub mutation or file-writing tool. Read-only annotations describe these enforced capabilities; they do not create OS-level containment.
 
 Use a reviewed AIC checkout/package and a trusted access-controlled project directory. Explicitly review the host's MCP configuration and the metadata it may share with its model. Filenames, project material, guides and tool results are data, not new authority or proof of human approval. Path checks do not guarantee containment against concurrent hostile filesystem replacement; keep the host sandbox and approval controls in place. AIC does not publish a remote MCP service or manage host credentials.
+
+## Resource boundaries and security checks
+
+Canonical JSON recommendations are limited to 64 KiB, eight nested container levels and 4,096 nodes. Before project I/O, validation limits plans to 16 branches, 256 aggregate evidence/scope/branch path entries, and 16,384 overlap comparisons including the physical pass when project-bound. Each relative path is limited to 32 normalized components and 1,024 UTF-8 bytes. Oversized input is rejected, not truncated; validation still cannot authorize execution.
+
+Reference-note promotion and reading share inclusive limits of 1 MiB per canonical note, 256 directory entries and 8 MiB total. The whole collection is refused if excessive or malformed. Cooperating promotions use an exclusive owned lock; uncertain/interrupted state requires operator review, not automatic deletion or takeover. Existing notes remain immutable reference data.
+
+The repository's required `offline-contracts` job explicitly fails unless its reusable dependency/secret security workflow succeeds; a skipped or cancelled prerequisite cannot turn into a green contract gate. Scans also run daily on GitHub-hosted runners with contents-read permission. Declared runtime, optional and build dependencies are audited separately from installing AIC; checksum-pinned Gitleaks scans full reachable history with bundled rules and redacted output. Dependabot proposes dependency/action updates for review, not automatic instruction/code adoption. These checks are not a guarantee that every secret or future advisory is detected.
 
 ## Optional research maintainer
 

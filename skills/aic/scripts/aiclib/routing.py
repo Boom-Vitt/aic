@@ -27,6 +27,72 @@ _TEMPLATES = {item["id"]: frozenset(item["topologies"]) for item in _CATALOG["te
 _TEMPLATE_IDS = frozenset(_TEMPLATES)
 _RISKS = frozenset({"low", "medium", "high"})
 
+_MAX_PLAN_BYTES = 64 * 1024
+_MAX_PLAN_NESTING = 8
+_MAX_PLAN_NODES = 4096
+_MAX_BRANCHES = 16
+_MAX_PATH_ENTRIES = 256
+_MAX_OVERLAP_COMPARISONS = 16_384
+_MAX_PATH_BYTES = 1024
+_MAX_PATH_COMPONENTS = 32
+
+
+def _bounded_json(value: object) -> None:
+    """Bound traversal and canonical JSON bytes without serializing the input tree."""
+    nodes = 0
+    size = 0
+    active: set[int] = set()
+
+    def charge(amount: int) -> None:
+        nonlocal size
+        size += amount
+        if size > _MAX_PLAN_BYTES:
+            raise AICError("Recommendation exceeds the 64 KiB canonical JSON budget.")
+
+    def visit(item: object, depth: int) -> None:
+        nonlocal nodes
+        nodes += 1
+        if nodes > _MAX_PLAN_NODES:
+            raise AICError("Recommendation exceeds the 4096-node JSON budget.")
+        kind = type(item)
+        if kind in (dict, list):
+            if depth >= _MAX_PLAN_NESTING:
+                raise AICError("Recommendation exceeds eight JSON container levels.")
+            identity = id(item)
+            if identity in active:
+                raise AICError("Recommendation must not contain recursive containers.")
+            children = len(item) * (2 if kind is dict else 1)
+            if children > _MAX_PLAN_NODES - nodes:
+                raise AICError("Recommendation exceeds the 4096-node JSON budget.")
+            charge(2 + max(0, len(item) - 1) + (len(item) if kind is dict else 0))
+            active.add(identity)
+            if kind is dict:
+                for key, child in item.items():
+                    if type(key) is not str:
+                        raise AICError("Recommendation JSON object keys must be strings.")
+                    visit(key, depth + 1)
+                    visit(child, depth + 1)
+            else:
+                for child in item:
+                    visit(child, depth + 1)
+            active.remove(identity)
+            return
+        if kind not in (str, int, float, bool, type(None)):
+            raise AICError("Recommendation must contain only finite JSON data.")
+        # Bound individual conversions before encoding, including giant integers.
+        if kind is str and len(item) > _MAX_PLAN_BYTES:
+            raise AICError("Recommendation exceeds the 64 KiB canonical JSON budget.")
+        if kind is int and item.bit_length() > _MAX_PLAN_BYTES * 4:
+            raise AICError("Recommendation exceeds the 64 KiB canonical JSON budget.")
+        try:
+            encoded = json.dumps(item, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+            encoded_size = len(encoded.encode("utf-8"))
+        except (TypeError, ValueError, UnicodeError) as exc:
+            raise AICError("Recommendation must contain only finite UTF-8 JSON data.") from exc
+        charge(encoded_size)
+
+    visit(value, 0)
+
 
 def _object(value: object, keys: frozenset[str], label: str) -> dict:
     if type(value) is not dict:
@@ -59,21 +125,20 @@ def _choice(value: object, choices: frozenset[str], label: str) -> None:
         raise AICError(f"{label} must be one of: {', '.join(sorted(choices))}.")
 
 
-def _path(value: object, label: str, project: Path | None, *, must_exist: bool = False) -> Path:
+def _path(value: object, label: str) -> Path:
     if type(value) is not str:
         raise AICError(f"{label} must be a relative path string.")
+    if len(value.encode("utf-8")) > _MAX_PATH_BYTES:
+        raise AICError("Recommendation paths must not exceed 1024 UTF-8 bytes.")
     normalized = relative_path(value)
-    if project is not None:
-        try:
-            safe_path(project, value, must_exist=must_exist)
-        except OSError as exc:
-            raise AICError(f"{label} cannot be inspected safely.") from exc
+    if len(normalized.parts) > _MAX_PATH_COMPONENTS:
+        raise AICError("Recommendation paths must not exceed 32 components.")
     return normalized
 
 
-def _paths(value: object, label: str, project: Path | None, *, nonempty: bool = False) -> list[Path]:
+def _paths(value: object, label: str, *, nonempty: bool = False) -> list[Path]:
     return [
-        _path(item, f"{label}[{index}]", project)
+        _path(item, f"{label}[{index}]")
         for index, item in enumerate(_list(value, label, nonempty=nonempty))
     ]
 
@@ -144,7 +209,10 @@ def validate_plan(plan: dict, *, project: Path | None = None) -> dict:
     reject distinct future case-only names on a case-sensitive filesystem.
     These selected-path metadata checks are not global alias detection, a
     filesystem lock, or protection against subsequent filesystem changes.
+    Input structure, canonical JSON size, path sizes and worst-case cross-branch
+    comparison work are bounded before project metadata or overlap inspection.
     """
+    _bounded_json(plan)
     value = _object(plan, _PLAN_KEYS, "Recommendation")
     if type(value["schema_version"]) is not int or value["schema_version"] != 3:
         raise AICError("schema_version must be the integer 3; select a current workflow family explicitly.")
@@ -162,31 +230,61 @@ def validate_plan(plan: dict, *, project: Path | None = None) -> dict:
     if value["approval_required"] is not True:
         raise AICError("approval_required must be the boolean true; validation does not grant approval.")
 
-    root = checked_root(project) if project is not None else None
+    evidence_paths = []
     for index, item in enumerate(_list(value["evidence"], "evidence")):
         label = f"evidence[{index}]"
         evidence = _object(item, frozenset({"path", "observation"}), label)
-        _path(evidence["path"], f"{label}.path", root, must_exist=True)
+        evidence_paths.append(_path(evidence["path"], f"{label}.path"))
         _text(evidence["observation"], f"{label}.observation")
 
     scope = _object(value["scope"], frozenset({"read", "write"}), "scope")
-    _paths(scope["read"], "scope.read", root)
-    _paths(scope["write"], "scope.write", root)
+    scope_paths = [
+        _paths(scope["read"], "scope.read"),
+        _paths(scope["write"], "scope.write"),
+    ]
 
     branch_paths = []
-    for index, item in enumerate(_list(value["independent_subtasks"], "independent_subtasks")):
+    branches = _list(value["independent_subtasks"], "independent_subtasks")
+    if len(branches) > _MAX_BRANCHES:
+        raise AICError("Recommendations must not exceed 16 independent subtasks.")
+    for index, item in enumerate(branches):
         label = f"independent_subtasks[{index}]"
         branch = _object(item, frozenset({"goal", "allowed_paths", "acceptance"}), label)
         _text(branch["goal"], f"{label}.goal")
         _texts(branch["acceptance"], f"{label}.acceptance")
-        branch_paths.append(_paths(branch["allowed_paths"], f"{label}.allowed_paths", root, nonempty=True))
+        branch_paths.append(_paths(branch["allowed_paths"], f"{label}.allowed_paths", nonempty=True))
 
     if value["topology"] != "parallel" and branch_paths:
         raise AICError("independent_subtasks must be empty unless topology is parallel.")
 
+    path_count = len(evidence_paths) + sum(map(len, scope_paths)) + sum(map(len, branch_paths))
+    if path_count > _MAX_PATH_ENTRIES:
+        raise AICError("Recommendation evidence, scope and branches must not exceed 256 total path entries.")
+    pairs = 0
+    previous_paths = 0
+    for paths in branch_paths:
+        pairs += len(paths) * previous_paths
+        previous_paths += len(paths)
+    if pairs * (2 if project is not None else 1) > _MAX_OVERLAP_COMPARISONS:
+        raise AICError("Recommendation exceeds 16384 cross-branch overlap comparisons.")
+    if value["topology"] == "parallel" and len(branch_paths) < 2:
+        raise AICError("Parallel recommendations require at least two separately checkable subtasks.")
+
+    root = checked_root(project) if project is not None else None
+    if root is not None:
+        try:
+            for path in evidence_paths:
+                safe_path(root, path.as_posix(), must_exist=True)
+            for paths in scope_paths:
+                for path in paths:
+                    safe_path(root, path.as_posix())
+            for paths in branch_paths:
+                for path in paths:
+                    safe_path(root, path.as_posix())
+        except OSError as exc:
+            raise AICError("Recommendation paths cannot be inspected safely.") from exc
+
     if value["topology"] == "parallel":
-        if len(branch_paths) < 2:
-            raise AICError("Parallel recommendations require at least two separately checkable subtasks.")
         physical_branches = (
             [[_physical_scope(root, path) for path in paths] for paths in branch_paths]
             if root is not None else None

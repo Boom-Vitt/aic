@@ -40,6 +40,10 @@ The [research ledger](../skills/aic/references/research.md) records the baseline
 
 Discovery obeys [arXiv's API terms](https://info.arxiv.org/help/api/tou.html): one connection and at least three seconds between legacy API requests. Descriptive metadata's CC0 status does not license paper content. Other primary interfaces include [Crossref's REST documentation](https://www.crossref.org/documentation/retrieve-metadata/rest-api/). Source outages and partial coverage are reported rather than silently replaced with an empty success.
 
+Source fetches share one 60-second monotonic budget across redirects. Each transport request runs in a safely spawned worker; the parent enforces the remaining deadline through resolution, connect/TLS, request, status/headers and body, then cancels and reaps overdue work. Socket inactivity limits alone are not the wall-clock bound. Worker result metadata/headers are capped at 64 KiB and response bytes remain capped at 2 MiB; IPC carries bounded JSON and bytes, not executable response objects. The parent retains arXiv's connection lock and completion spacing, including deadline-bounded waits. Source outages and deadline failures remain visible, not successful empty evidence.
+
+Only owner-authored issue and assessment-comment markers enter reconciliation/uniqueness checks. Foreign public markers, including closed issues, cannot occupy an owned effect identity. Multiple owner markers, missing owner assignment and genuinely uncertain mutations still hold work without blind replay or journal clearing.
+
 ## Execution and merge gates
 
 ```mermaid

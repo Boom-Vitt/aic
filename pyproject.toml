@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aiculture-skills"
-version = "0.0.2"
+version = "0.0.3"
 description = "Skills-first, evidence-backed AI workflow guidance with native plugin and optional read-only MCP"
 readme = "README.md"
 requires-python = ">=3.11"

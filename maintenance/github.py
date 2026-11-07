@@ -229,7 +229,10 @@ class GitHub:
     def find_issue(self, marker):
         self._marker(marker)
         rows = self._pages(self.root + '/issues', params={'state': 'all'})
-        matches = [r for r in rows if 'pull_request' not in r and marker in (r.get('body') or '').splitlines()]
+        # Public markers identify effects only within the approved author's namespace.
+        matches = [r for r in rows if 'pull_request' not in r
+                   and (r.get('user') or {}).get('login') == ACTOR
+                   and marker in (r.get('body') or '').splitlines()]
         if len(matches) > 1:
             raise GitHubError('Ambiguous controller issue marker')
         return matches[0] if matches else None
@@ -376,9 +379,10 @@ class GitHub:
         self._marker(marker)
         self.pr(number)
         rows = self._pages(self.root + '/issues/' + self._number(number) + '/comments')
-        matches = [row for row in rows if marker in (row.get('body') or '').splitlines()]
-        if len(matches) > 1 or any((row.get('user') or {}).get('login') != ACTOR for row in matches):
-            raise GitHubError('Ambiguous or foreign assessment marker')
+        matches = [row for row in rows if (row.get('user') or {}).get('login') == ACTOR
+                   and marker in (row.get('body') or '').splitlines()]
+        if len(matches) > 1:
+            raise GitHubError('Ambiguous assessment marker')
         return bool(matches)
 
     def merge(self, number, expected_sha):

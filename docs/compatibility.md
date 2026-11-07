@@ -58,7 +58,11 @@ Claude Code plugin support is not a claim about claude.ai chat, Cowork, browser/
 
 Do not promote a lower level to a higher one. Current delivery evidence and unexercised integrations are stated in [verification.md](verification.md). Initial OS checks cover only the actually recorded environments, not every platform.
 
-### Current 0.0.2 functional observations
+### Current 0.0.3 security revision
+
+The current source keeps the same integration channels and schema 3, while bounding recommendation and reference-note resource consumption and correcting repository-maintenance provenance/deadlines. See the [security policy](../SECURITY.md) for enforced boundaries and this revision's [verification receipt](verification.md) for actually exercised runtimes. Older native installation/model-consumption evidence remains historical; no global installation, live scheduler upgrade or universal host certification is implied.
+
+### Historical 0.0.2 functional observations
 
 The [dated receipt](verification.md) records actual native strict manifest validation and task-private local-scope installation/listing of `aic@aic-marketplace` 0.0.2. It does **not** claim current native skill invocation or an official directory listing.
 
@@ -66,7 +70,7 @@ Actual official-SDK stdio clients exercised the source launcher, installed wheel
 
 ### Recorded integration coverage
 
-The following summarizes dated records in [verification.md](verification.md), not new `0.0.2` execution receipts:
+The following summarizes dated records in [verification.md](verification.md), not new `0.0.3` execution receipts:
 
 | Surface | Actual recorded coverage | Untested or not established |
 | --- | --- | --- |
@@ -82,7 +86,7 @@ Small routing smokes are functional observations, not statistical benchmarks. Ke
 
 ## Workflow and recommendation compatibility
 
-AIC 0.0.2 uses recommendation/catalog schema 3 and exactly five workflow families: `direct` (`solo`), `explore-build` (`parallel`), `coordinated-delivery` (`sequential` or `parallel`), `independent-review` (`generator-evaluator`) and `adaptive-controller` (any supported current-stage topology). Schema-1/2 recommendations and retired template IDs are rejected without aliases or silent migration. Reassess real task properties and authorization before regenerating; installer, memory, maintenance and outer handoff formats keep their independent versions.
+AIC 0.0.3 uses recommendation/catalog schema 3 and exactly five workflow families: `direct` (`solo`), `explore-build` (`parallel`), `coordinated-delivery` (`sequential` or `parallel`), `independent-review` (`generator-evaluator`) and `adaptive-controller` (any supported current-stage topology). Schema-1/2 recommendations and retired template IDs are rejected without aliases or silent migration. Reassess real task properties and authorization before regenerating; installer, memory, maintenance and outer handoff formats keep their independent versions.
 
 The `0.0.N` development-package sequence is not a schema sequence or a rollback. Renumbering does not make old recommendations valid or change current format versions; see [development versioning](../CONTRIBUTING.md#development-versioning).
 
