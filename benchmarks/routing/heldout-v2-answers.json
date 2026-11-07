@@ -65,7 +65,7 @@
       "expected_template": "adaptive-controller",
       "expected_topology": "parallel",
       "hard_negative": false,
-      "rationale": "The outcome is an answer. Long interruptible work with a durable ledger is adaptive-controller. The current stage is two ready independent branches with a fixed interface, so the recorded topology is parallel. The family stays adaptive-controller because the program, not only this stage, needs durable state."
+      "rationale": "The outcome is a reader-facing FAQ, so the category is answer. Deciding fact: the owner must reselect the ready set from the durable ledger after interruption, and the request forbids freezing the two current questions into a standing pair. That requirement is adaptive-controller. Parallel is only the stage the ledger shows now. coordinated-delivery would apply only if those ready branches and their interface were themselves the delivery plan. No optimization is authorized. adaptive-controller allows the current topology to be parallel."
     },
     {
       "id": "h2-research-short-read",
@@ -97,7 +97,7 @@
       "expected_template": "coordinated-delivery",
       "expected_topology": "sequential",
       "hard_negative": true,
-      "rationale": "Hard negative: the ticket says parallel. The second memo is blocked on the first memo's accepted glossary, so the branches are not ready. coordinated-delivery uses sequential for an accepted-artifact handoff. The outcome is still research."
+      "rationale": "Hard negative: two unfinished notes tempt a concurrent pair. The signature note is blocked on the retry-rules note's accepted glossary, so the branches are not ready. coordinated-delivery uses sequential for an accepted-artifact handoff. The outcome is research because the deliverables are cited notes from posted carrier documents, not a code change."
     },
     {
       "id": "h2-research-ready-memos",
@@ -193,7 +193,7 @@
       "expected_template": "adaptive-controller",
       "expected_topology": "sequential",
       "hard_negative": false,
-      "rationale": "The outcome is implementation. A multi-week migration with a checkpoint file is adaptive-controller. The current stage is an accepted-artifact handoff, so the topology is sequential. The durable program is why this is not only coordinated-delivery."
+      "rationale": "The outcome is a change to the webhook, so the category is implementation. Deciding fact: the owner must reselect the blocked unit from the checkpoint after interruption, and the request forbids freezing the parser-then-caller order as a standing plan. That requirement is adaptive-controller. Sequential is only the stage the checkpoint shows now. coordinated-delivery would apply only if that accepted-artifact handoff were the plan. adaptive-controller allows sequential as the current stage."
     },
     {
       "id": "h2-debug-holiday-notes",
@@ -249,7 +249,7 @@
       "expected_template": "adaptive-controller",
       "expected_topology": "sequential",
       "hard_negative": false,
-      "rationale": "The outcome is debug. The incident spans sessions and needs a durable file, so the family is adaptive-controller. The current handoff is sequential because reproduction waits on the accepted trace. No optimization has been authorized."
+      "rationale": "The outcome is diagnosis of a failing stale tile, so the category is debug. Deciding fact: the owner must reselect the blocked step from the durable incident file after a context reset, and the request forbids freezing the trace-then-reproduction order as a standing plan. That requirement is adaptive-controller. Sequential is only the stage the file shows now. coordinated-delivery would apply only if that handoff were the plan. adaptive-controller allows sequential as the current stage."
     },
     {
       "id": "h2-debug-writeup-eval-stage",
@@ -313,7 +313,7 @@
       "expected_template": "adaptive-controller",
       "expected_topology": "generator-evaluator",
       "hard_negative": false,
-      "rationale": "The outcome is review. The program is interruptible and ledger-backed, so the family is adaptive-controller. The current stage is a separate evaluation of one artifact, so the topology is generator-evaluator."
+      "rationale": "The outcome is a check of existing grant claims against a rubric, so the category is review. Deciding fact: the owner must reselect the open item from the durable ledger after interruption, and the request forbids treating the current separate check as a one-sitting assignment. That requirement is adaptive-controller. generator-evaluator is only the stage the ledger shows now. coordinated-delivery does not fit: there is no accepted-artifact handoff and no pair of ready branches, and that family does not allow generator-evaluator. independent-review would fit only a single consequential check with no reselection."
     },
     {
       "id": "h2-review-scanner-evidence",
@@ -377,7 +377,7 @@
       "expected_template": "adaptive-controller",
       "expected_topology": "sequential",
       "hard_negative": false,
-      "rationale": "The outcome is design. The work is interruptible and log-backed, so the family is adaptive-controller. The current units are an accepted-artifact sequence, so the topology is sequential."
+      "rationale": "The outcome is a field list and filename pattern chosen before any rename, so the category is design. Deciding fact: the owner must reselect the blocked choice from the durable decision log after interruption, and the request forbids freezing the field-list-then-filename order as a standing plan. That requirement is adaptive-controller. Sequential is only the stage the log shows now. coordinated-delivery would apply only if that handoff were the plan. adaptive-controller allows sequential as the current stage."
     },
     {
       "id": "h2-design-measured-options",

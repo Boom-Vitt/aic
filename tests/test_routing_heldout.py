@@ -32,8 +32,8 @@ ANSWERS_NAME = "benchmarks/routing/heldout-v2-answers.json"
 # Frozen digests. Add the next integer when the bytes change. Do not edit version 1.
 FROZEN = {
     1: {
-        PACK_NAME: "e26c69eb2b81e4536dea8e4aab59d798b6a1381c9ba9fde3598ee275590f0479",
-        ANSWERS_NAME: "bbd33ad04bdee9ee25c1ca5280036553a8b84ca06d45aae5e45fc5739b03d9e6",
+        PACK_NAME: "7cee89c4899c53268a59d98d04acd3bb64fff24eecd9e7777fc664e6be5fb3cf",
+        ANSWERS_NAME: "3606c4c397ed015d038ce4ee729959dbb66e0a77faef2f120cf105537e9d76c9",
     }
 }
 ALLOWED = {
@@ -48,6 +48,18 @@ LOCK_ROW = re.compile(
     r"^\|\s*(\d+)\s*\|\s*`([^`]+)`\s*\|\s*`([0-9a-f]{64})`\s*\|$",
     re.MULTILINE,
 )
+LABEL_TOKEN = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*")
+DECIDING_FACT_CASES = (
+    "h2-answer-faq-branches",
+    "h2-impl-ordered-resume",
+    "h2-debug-incident-resume",
+    "h2-design-ordered-program",
+    "h2-review-program-resume",
+)
+
+
+def label_tokens(text: str) -> set[str]:
+    return {match.group(0).lower() for match in LABEL_TOKEN.finditer(text)}
 
 
 def sha256(path: Path) -> str:
@@ -90,6 +102,28 @@ class HeldoutPackTests(unittest.TestCase):
         self.assertIn("doc role `dev`", benchmarks)
         self.assertNotIn("## Held-out routing pack", benchmarks)
         self.assertNotIn("%", benchmarks)
+
+    def test_requests_do_not_contain_their_gold_label_tokens(self):
+        pack = json.loads(PACK_PATH.read_text(encoding="utf-8"))
+        answers = json.loads(ANSWERS_PATH.read_text(encoding="utf-8"))
+        leaks: list[str] = []
+        for case in pack["cases"]:
+            present = label_tokens(case["request"])
+            for field in ("expected_workflow", "expected_template", "expected_topology"):
+                if case[field] in present:
+                    leaks.append(f"{case['id']} {field}={case[field]}")
+        project = pack["project_case"]
+        project_tokens = label_tokens(project["request"])
+        for stage in project["stages"]:
+            for field in ("expected_workflow", "expected_template", "expected_topology"):
+                if stage[field] in project_tokens:
+                    leaks.append(f"{project['id']} {stage['id']} {field}={stage[field]}")
+        self.assertEqual(leaks, [])
+        ordered = next(case["request"] for case in pack["cases"] if case["id"] == "h2-research-ordered-memos")
+        self.assertNotIn("parallel", label_tokens(ordered))
+        by_id = {item["id"]: item for item in answers["cases"]}
+        for ident in DECIDING_FACT_CASES:
+            self.assertIn("Deciding fact:", by_id[ident]["rationale"])
 
     def test_cases_use_the_public_catalog_and_answers_justify_every_label(self):
         pack = json.loads(PACK_PATH.read_text(encoding="utf-8"))

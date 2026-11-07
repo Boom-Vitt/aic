@@ -4,28 +4,28 @@
   "cases": [
     {
       "id": "h2-answer-flag",
-      "request": "Explain the difference between the museum caption tool's --dry-run flag and its --apply flag. The man-page paragraph for both flags is pasted below this sentence and is the only source. The explanation is a short answer for one operator. Do not change the tool, open a second investigation, or launch anyone. Pasted paragraph: --dry-run prints the caption ids that would change and writes nothing; --apply writes those captions only after the same id list is shown.",
+      "request": "Explain the difference between the museum caption tool's --dry-run flag and its --apply flag. The man-page paragraph for both flags is pasted below this sentence and is the only source. The explanation is one short paragraph for one operator. Do not change the tool, open a second investigation, or launch anyone. Pasted paragraph: --dry-run prints the caption ids that would change and writes nothing; --apply writes those captions only after the same id list is shown.",
       "expected_workflow": "answer",
       "expected_template": "direct",
       "expected_topology": "solo"
     },
     {
       "id": "h2-answer-no-team",
-      "request": "Please spin up several researchers and a reviewer team to explain what a 'hold slip' means in our library email. The only source is this sentence from the style guide, already pasted: a hold slip tells a patron which branch has the reserved book and the date the hold expires. The answer is one paragraph. No files change, no extra sources are authorized, and no one else may be assigned.",
+      "request": "Please spin up several researchers and a reviewer team to explain what a 'hold slip' means in our library email. The only source is this sentence from the style guide, already pasted: a hold slip tells a patron which branch has the reserved book and the date the hold expires. The result is one paragraph. No files change, no extra sources are authorized, and no one else may be assigned.",
       "expected_workflow": "answer",
       "expected_template": "direct",
       "expected_topology": "solo"
     },
     {
       "id": "h2-answer-two-sources",
-      "request": "Answer a patron question that needs two substantial, independent public sources: the town's posted meeting-notice statute, and the library's posted privacy notice. Each source has its own citation checklist and its own notes file. Neither investigation uses the other's notes. One editor writes the final answer after both citation files exist. Recommend the shape only. Do not publish the answer or contact the patron.",
+      "request": "A patron needs a written reply that uses two substantial, independent public sources: the town's posted meeting-notice statute, and the library's posted privacy notice. Each source has its own citation checklist and its own notes file. Neither investigation uses the other's notes. One editor writes the final reply after both citation files exist. Recommend the shape only. Do not publish the reply or contact the patron.",
       "expected_workflow": "answer",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-answer-glossary-then-notice",
-      "request": "Produce two approved answer units for the library. First, a specialist writes the accepted glossary of hold, renewal, and fine. Second, a specialist writes the patron email, and that email may use only terms from the accepted glossary. The email is not ready until the glossary is accepted. One editor owns both handoffs. Do not send the email.",
+      "request": "Produce two approved writing units for the library. First, a specialist writes the accepted glossary of hold, renewal, and fine. Second, a specialist writes the patron email, and that email may use only terms from the accepted glossary. The email is not ready until the glossary is accepted. One editor owns both handoffs. Do not send the email.",
       "expected_workflow": "answer",
       "expected_template": "coordinated-delivery",
       "expected_topology": "sequential"
@@ -46,21 +46,21 @@
     },
     {
       "id": "h2-answer-faq-resume",
-      "request": "Resume an approved multi-session FAQ after a context reset. The durable ledger already lists the accepted answers, the open question, and the stop date. One owner must finish the single remaining answer, which depends on the accepted ledger and cannot be split. There is no speed target and no benchmark. Do not add writers or republish completed answers.",
+      "request": "Resume an approved multi-session FAQ after a context reset. The durable ledger already lists the accepted paragraphs, the open question, and the stop date. One owner must finish the single remaining paragraph, which depends on the accepted ledger and cannot be split. There is no speed target and no benchmark. Do not add writers or republish completed paragraphs.",
       "expected_workflow": "answer",
       "expected_template": "adaptive-controller",
       "expected_topology": "solo"
     },
     {
       "id": "h2-answer-faq-branches",
-      "request": "Continue an approved multi-session town-hall FAQ from its durable ledger of accepted decisions and blocked questions. The current stage has two ready answer files: one for meeting notice and one for records retention. Their outlines and paths are already fixed, the paths do not overlap, and each file has its own citation check. One editor accepts both. This stage is delivery continuity, not a speed trial. Do not rerun finished questions.",
+      "request": "Continue an approved multi-session town-hall FAQ after a context reset. The only memory that may be trusted is the durable ledger of accepted decisions and blocked questions. That ledger currently lists two questions as ready: meeting notice and records retention. Their files do not overlap, and each has its own citation check. One editor accepts whatever the ledger lists. Do not freeze those two questions into a standing pair: if the ledger shows a different ready set at the next resume, follow the ledger. This is continuity of the FAQ, not a speed trial. Do not rerun finished questions.",
       "expected_workflow": "answer",
       "expected_template": "adaptive-controller",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-research-short-read",
-      "request": "Check two sentences that are already pasted here. Sentence A: the caption tool reads skills from the project skills directory. Sentence B: the paper's limitation is that the trial used one model snapshot. One owner can verify both sentences against the attached one-page excerpt. Separate research files would take longer to set up than the check. Produce a short cited note. Do not recruit investigators.",
+      "request": "Check two sentences that are already pasted here. Sentence A: the caption tool reads skills from the project skills directory. Sentence B: the paper's limitation is that the trial used one model snapshot. One owner can verify both sentences against the attached one-page excerpt. Separate note files would take longer to set up than the check. Produce a short cited note. Do not recruit investigators.",
       "expected_workflow": "research",
       "expected_template": "direct",
       "expected_topology": "solo"
@@ -74,28 +74,28 @@
     },
     {
       "id": "h2-research-two-rfcs",
-      "request": "Research two substantial public documents for the package-tracking webhook: the carrier's posted retry rules, and the posted signature scheme for webhook bodies. Each document needs its own citation log and its own notes file. Neither log depends on the other. One lead will write the combined research note after both logs are checked. Recommend the shape only. Do not implement the webhook.",
+      "request": "Read two substantial public documents for the package-tracking webhook: the carrier's posted retry rules, and the posted signature scheme for webhook bodies. Each document needs its own citation log and its own notes file. Neither log depends on the other. One lead will write the combined cited note after both logs are checked. Recommend the shape only. Do not build the webhook.",
       "expected_workflow": "research",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-research-ordered-memos",
-      "request": "The ticket says to research the webhook's retry rules and signature scheme in parallel. The signature memo is not allowed to invent terms: it must use the accepted glossary produced by the retry-rules memo, and that glossary does not exist yet. Keep one research owner and an accepted-artifact handoff. Do not start the signature memo early.",
+      "request": "Produce two cited notes from the carrier's posted webhook documents. The signature note may use only terms from the glossary in the retry-rules note, and that glossary does not exist yet. One owner keeps the handoff. Do not start the signature note until that glossary is accepted.",
       "expected_workflow": "research",
       "expected_template": "coordinated-delivery",
       "expected_topology": "sequential"
     },
     {
       "id": "h2-research-ready-memos",
-      "request": "Two research memos for the cafeteria menu board are ready to write. The shared citation template, the question list, and the output paths are already accepted. One memo covers allergen labels and the other covers posted calorie rules. The paths are disjoint, neither memo waits on the other's prose, and each has its own citation check. One lead integrates the two files. Do not change the menu software.",
+      "request": "Two cited memos for the cafeteria menu board are ready to write. The shared citation template, the question list, and the output paths are already accepted. One memo covers allergen labels and the other covers posted calorie rules. The paths are disjoint, neither memo waits on the other's prose, and each has its own citation check. One lead integrates the two files. Do not change the menu software.",
       "expected_workflow": "research",
       "expected_template": "coordinated-delivery",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-research-claim-check",
-      "request": "A research note will be quoted in a public grant report: it claims the warehouse scanner's posted error rate. A wrong citation would misstate a public specification. The note's author must not be the person who checks it. A separate reader gets the original specification and the note, and marks each claim that the specification does not support. Do not submit the grant.",
+      "request": "A cited note will be quoted in a public grant report: it claims the warehouse scanner's posted error rate. A wrong citation would misstate a public specification. The note's author must not be the person who checks it. A separate reader gets the original specification and the note, and marks each claim that the specification does not support. Do not submit the grant.",
       "expected_workflow": "research",
       "expected_template": "independent-review",
       "expected_topology": "generator-evaluator"
@@ -109,7 +109,7 @@
     },
     {
       "id": "h2-research-label-sources",
-      "request": "Research two substantial public sources for the cafeteria menu board before any combined note: the posted allergen-label statute, and the posted calorie-rounding rule. Each source has its own citation log and its own check. Neither log uses the other. One lead writes the combined note only after both logs exist. Do not change the menu software.",
+      "request": "Read two substantial public sources for the cafeteria menu board before any combined note: the posted allergen-label statute, and the posted calorie-rounding rule. Each source has its own citation log and its own check. Neither log uses the other. One lead writes the combined note only after both logs exist. Do not change the menu software.",
       "expected_workflow": "research",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
@@ -144,7 +144,7 @@
     },
     {
       "id": "h2-impl-disjoint-modules",
-      "request": "Two modules of the cafeteria menu board are approved to implement. The shared menu-item interface is already accepted. allergens.py and calories.py have disjoint write paths and separate acceptance checks, and neither module reads the other's uncommitted work. One integration owner merges the accepted results. Recommend the concurrent implementation. Do not launch it from this recommendation.",
+      "request": "Two modules of the cafeteria menu board are approved to build. The shared menu-item interface is already accepted. allergens.py and calories.py have disjoint write paths and separate acceptance checks, and neither module reads the other's uncommitted work. One integration owner merges the accepted results. Recommend the concurrent build. Do not launch it from this recommendation.",
       "expected_workflow": "implementation",
       "expected_template": "coordinated-delivery",
       "expected_topology": "parallel"
@@ -165,7 +165,7 @@
     },
     {
       "id": "h2-impl-ordered-resume",
-      "request": "Resume an approved multi-week migration of the package-tracking webhook. The checkpoint file is the source of what has been accepted. The current plan has two units: first replace the signature parser and accept its contract, then update the retry caller to that accepted contract. The caller is blocked until the parser artifact is accepted. One owner keeps the checkpoint. Stop at the agreed date. This is migration continuity, not a speed trial.",
+      "request": "Resume an approved multi-week change to the package-tracking webhook after an interruption. The checkpoint file is the only record of what has been accepted. It currently shows the signature parser accepted and the retry caller blocked on that accepted contract. One owner must continue from the checkpoint and stop at the agreed date. Do not freeze that parser-then-caller order as a standing plan: if the checkpoint shows a different blocked unit at the next resume, follow the checkpoint. This is continuity of the change, not a speed trial.",
       "expected_workflow": "implementation",
       "expected_template": "adaptive-controller",
       "expected_topology": "sequential"
@@ -214,7 +214,7 @@
     },
     {
       "id": "h2-debug-incident-resume",
-      "request": "Continue a multi-session diagnosis of the stale map tile. A durable incident file must survive context resets and records which evidence is accepted. The trace unit has to be accepted before a specialist may reproduce the cache-key failure from that artifact. One owner keeps the file and stops at the agreed time. This is diagnosis continuity, not a benchmark. Do not flush the production cache.",
+      "request": "Continue a multi-session diagnosis of the stale map tile after a context reset. A durable incident file must survive the reset and is the only record of which evidence is accepted. It currently shows the trace accepted and reproduction of the cache-key failure still blocked on that trace. One owner keeps the file and stops at the agreed time. Do not freeze that trace-then-reproduction order as a standing plan: if the file shows a different blocked step at the next resume, follow the file. This is continuity of the diagnosis, not a benchmark. Do not flush the production cache.",
       "expected_workflow": "debug",
       "expected_template": "adaptive-controller",
       "expected_topology": "sequential"
@@ -228,7 +228,7 @@
     },
     {
       "id": "h2-review-caption-eval",
-      "request": "Review the six-line pluralization change before it is published on every museum caption. A wrong plural would be visible to visitors. A separate reviewer receives the wording list and the diff, not the author's note that it looks fine, and lists mismatches. Do not edit the files.",
+      "request": "Check the six-line pluralization change before it is published on every museum caption. A wrong plural would be visible to visitors. A separate reader receives the wording list and the diff, not the author's note that it looks fine, and lists mismatches. Do not edit the files.",
       "expected_workflow": "review",
       "expected_template": "independent-review",
       "expected_topology": "generator-evaluator"
@@ -242,91 +242,91 @@
     },
     {
       "id": "h2-review-two-evidence",
-      "request": "Review whether the town-hall FAQ may claim 24-hour hold notices. Two substantial evidence questions are independent: what the posted statute requires, and what the library's posted procedure actually says. Each question has its own notes file and its own check. Neither file uses the other. One reviewer writes the finding after both notes exist. Do not publish a finding yet.",
+      "request": "The town-hall FAQ already states that hold notices go out within 24 hours. Determine whether that statement matches two sources that are still unknown. One question is what the posted statute requires, and the other is what the library's posted procedure actually says. Each question has its own notes file and its own check. Neither file uses the other. One owner writes the finding after both notes exist. Do not publish a finding yet.",
       "expected_workflow": "review",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-review-dependent-checklist",
-      "request": "Two review deliverables are approved. First accept a finding list for the signature parser. The retry-caller checklist may cite only findings from that accepted list, so it cannot be written yet. One review owner handles the handoff. Do not treat the checklist as ready.",
+      "request": "Two checking deliverables are approved. First accept a finding list for the signature parser. The retry-caller checklist may cite only findings from that accepted list, so it cannot be written yet. One owner handles the handoff. Do not treat the checklist as ready.",
       "expected_workflow": "review",
       "expected_template": "coordinated-delivery",
       "expected_topology": "sequential"
     },
     {
       "id": "h2-review-two-reports",
-      "request": "Two compliance review reports are approved under one fixed rubric. One report covers the export package and the other covers the importer package. Their evidence folders and output paths are disjoint, neither report reviews the other report, and each report's findings can be checked alone. One owner synthesizes the two reports. Do not describe the pair as a generator and an evaluator.",
+      "request": "Two compliance reports are approved under one fixed rubric. One report covers the export package and the other covers the importer package. Their evidence folders and output paths are disjoint, neither report checks the other report, and each report's findings can be checked alone. One owner synthesizes the two reports. Do not describe the pair as a generator and an evaluator.",
       "expected_workflow": "review",
       "expected_template": "coordinated-delivery",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-review-rubric-eval",
-      "request": "Review the approved backup-restore runbook against the original recovery criteria. A missed step could drop a site's inventory snapshot. A separate evaluator receives the criteria and the runbook, not the author's checklist of why it passes, and records each unmet criterion. Do not run a restore.",
+      "request": "Check the approved backup-restore runbook against the original recovery criteria. A missed step could drop a site's inventory snapshot. A separate evaluator receives the criteria and the runbook, not the author's checklist of why it passes, and records each unmet criterion. Do not run a restore.",
       "expected_workflow": "review",
       "expected_template": "independent-review",
       "expected_topology": "generator-evaluator"
     },
     {
       "id": "h2-review-program-resume",
-      "request": "Resume an approved multi-session review of the public grant claims from the accepted finding ledger. The current claim needs a separate evaluator against the original rubric before the owner accepts it. Keep the ledger of decisions and blocked claims. Do not reopen finished claims or change the rubric. No benchmark is authorized.",
+      "request": "Resume an approved multi-session check of the public grant claims after an interruption. The accepted finding ledger is the only record of which claims are closed. The ledger currently shows one open claim that a separate person must check against the original rubric before the owner accepts it. Keep the ledger. Do not treat this as a one-sitting check of a single artifact: if the ledger's open item is different at the next resume, follow the ledger, and do not reopen finished claims or change the rubric. No benchmark is authorized.",
       "expected_workflow": "review",
       "expected_template": "adaptive-controller",
       "expected_topology": "generator-evaluator"
     },
     {
       "id": "h2-review-scanner-evidence",
-      "request": "Review the claim that the scanner beeps only on unknown barcodes. Two evidence questions are independent: the posted beep specification, and the fixture log of known barcodes. The notes are disjoint and each check stands alone. One reviewer writes the finding after both notes exist. Do not change the scanner.",
+      "request": "The scanner team claims the device beeps only on unknown barcodes. Check that claim. Two evidence questions are independent: the posted beep specification, and the fixture log of known barcodes. The notes are disjoint and each check stands alone. One owner writes the finding after both notes exist. Do not change the scanner.",
       "expected_workflow": "review",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-design-two-names",
-      "request": "Choose between hold_until and expires_on for one date field in the library email. The existing field names are camel case with a verb, and both candidates are in the request. The choice is small and reversible. Give one design recommendation. Do not implement it or delegate it.",
+      "request": "Choose between hold_until and expires_on for one date field in the library email. The existing field names are camel case with a verb, and both candidates are in the request. The choice is small and reversible. Give one recommendation for the field name. Do not build the email or delegate the choice.",
       "expected_workflow": "design",
       "expected_template": "direct",
       "expected_topology": "solo"
     },
     {
       "id": "h2-design-one-sitting",
-      "request": "The epic title is 'multi-week design program' for the menu board. The only approved decision is whether the allergen icon is a triangle or a circle. The style guide snippet is pasted here and says warning icons are triangles. Nothing must be stored for a later session, and no second designer is useful. Recommend the icon. Do not start a program.",
+      "request": "The epic title is 'multi-week icon program' for the menu board. The only approved decision is whether the allergen icon is a triangle or a circle. The style guide snippet is pasted here and says warning icons are triangles. Nothing must be stored for a later session, and no second person is useful. Recommend the icon. Do not start a program.",
       "expected_workflow": "design",
       "expected_template": "direct",
       "expected_topology": "solo"
     },
     {
       "id": "h2-design-two-requirements",
-      "request": "Design the archival filename for photo checksums, but first resolve two substantial independent unknowns: the public accessibility rules for the filename, and the public retention period that must appear in it. The sources and note paths are disjoint and each note is checked alone. One designer reconciles both notes before choosing the pattern. Recommend the investigation. Do not rename files.",
+      "request": "Choose the archival filename for photo checksums, but first resolve two substantial independent unknowns: the public accessibility rules for the filename, and the public retention period that must appear in it. The sources and note paths are disjoint and each note is checked alone. One person reconciles both notes before choosing the pattern. Recommend the investigation. Do not rename files.",
       "expected_workflow": "design",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-design-schema-then-protocol",
-      "request": "Two design specialists are approved. The first produces an accepted field list for the hold email. The second produces the wire order of those fields and cannot start until the field list is accepted. One design owner checks the handoff. Do not implement the email.",
+      "request": "Two specialists are approved to specify the hold email before any code is written. The first produces an accepted field list. The second produces the wire order of those fields and cannot start until the field list is accepted. One owner checks the handoff. Do not build the email.",
       "expected_workflow": "design",
       "expected_template": "coordinated-delivery",
       "expected_topology": "sequential"
     },
     {
       "id": "h2-design-icon-unknowns",
-      "request": "Design the scanner's low-battery icon, but first resolve two substantial independent unknowns: the posted contrast rules for the device screen, and the posted icon-size rules. The sources and note paths are disjoint, and each note is checked alone. One designer reconciles both notes before choosing the icon. Do not draw the final asset.",
+      "request": "Choose the scanner's low-battery icon, but first resolve two substantial independent unknowns: the posted contrast rules for the device screen, and the posted icon-size rules. The sources and note paths are disjoint, and each note is checked alone. One person reconciles both notes before choosing the icon. Do not draw the final asset.",
       "expected_workflow": "design",
       "expected_template": "explore-build",
       "expected_topology": "parallel"
     },
     {
       "id": "h2-design-rotation-eval",
-      "request": "Propose an approved design for rotating the webhook signing key, including what happens during the overlap window. A wrong overlap would reject valid carrier calls. A separate evaluator receives the original uptime criteria and the design, and tries concrete overlap cases. The designer's narrative is not evidence. Do not rotate any key.",
+      "request": "Propose an approved scheme for rotating the webhook signing key, including what happens during the overlap window. A wrong overlap would reject valid carrier calls. A separate evaluator receives the original uptime criteria and the scheme, and tries concrete overlap cases. The author's narrative is not evidence. Do not rotate any key.",
       "expected_workflow": "design",
       "expected_template": "independent-review",
       "expected_topology": "generator-evaluator"
     },
     {
       "id": "h2-design-ordered-program",
-      "request": "Continue an approved multi-session design of the photo archive. The durable decision log is the record of accepted constraints. The current units are ordered: the retention field list must be accepted before the filename pattern may use it. One designer keeps the log and stops at the agreed review date. Do not rename stored files and do not run a performance comparison.",
+      "request": "Continue an approved multi-session specification of the photo archive after an interruption. The durable decision log is the only record of accepted constraints. It currently shows the retention field list accepted and the filename pattern blocked until it can use that list. One owner keeps the log and stops at the agreed date. Do not freeze that field-list-then-filename order as a standing plan: if the log shows a different blocked choice at the next resume, follow the log. Do not rename stored files and do not run a performance comparison.",
       "expected_workflow": "design",
       "expected_template": "adaptive-controller",
       "expected_topology": "sequential"
