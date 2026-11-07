@@ -98,7 +98,7 @@ class SecurityMemoryTests(unittest.TestCase):
 
     def test_overlong_or_deep_scope_path_is_rejected_quickly_without_mutation(self):
         before = self._snapshot()
-        for scope in ('a/' * 32 + 'b', 'a' * 1025):
+        for scope in ('a/' * 64 + 'b', 'a' * 1025, 'bad\udcff.txt'):
             candidate = dict(self._candidate('deep'), scope=[scope])
             with self.assertRaises(AICError):
                 memory.promote(self.root, candidate, approved=True)

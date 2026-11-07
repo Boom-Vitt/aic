@@ -8,9 +8,10 @@ from typing import Any
 
 
 # Every scoped relative path (routing, memory, inspection) shares these bounds,
-# which also cap the per-component symlink walk.
+# which also cap the per-component symlink walk. 64 components leaves room for
+# inspection's deepest level (max_depth 32 -> 33 parts); routing keeps its own 32.
 MAX_PATH_BYTES = 1024
-MAX_PATH_COMPONENTS = 32
+MAX_PATH_COMPONENTS = 64
 
 
 class AICError(ValueError):
@@ -60,7 +61,11 @@ def checked_root(value: str | Path, *, must_exist: bool = True) -> Path:
 def relative_path(value: str, *, allow_dot: bool = False) -> Path:
     if not isinstance(value, str) or not value or value != value.strip() or "\x00" in value or "\\" in value:
         raise AICError("Expected a nonempty relative path without traversal or backslashes.")
-    if len(value.encode("utf-8")) > MAX_PATH_BYTES:
+    try:
+        encoded = value.encode("utf-8")
+    except UnicodeError as exc:
+        raise AICError("Scoped paths must be valid UTF-8.") from exc
+    if len(encoded) > MAX_PATH_BYTES:
         raise AICError(f"Scoped paths must not exceed {MAX_PATH_BYTES} UTF-8 bytes.")
     raw_parts = value.split("/")
     if len(raw_parts) > MAX_PATH_COMPONENTS:
