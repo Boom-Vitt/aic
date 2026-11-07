@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "task": "Create a concise project README after approval.",
   "workflow": "implementation",
   "template": "direct",

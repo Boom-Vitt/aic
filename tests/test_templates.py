@@ -12,7 +12,7 @@ from aiclib.safety import AICError
 
 def recommendation(template='direct', topology='solo'):
     value = {
-        'schema_version': 2,
+        'schema_version': 3,
         'task': 'Recommend an approved implementation approach without executing it.',
         'workflow': 'implementation',
         'template': template,
@@ -41,14 +41,16 @@ class TemplateContractTests(unittest.TestCase):
         cases = (
             ('direct', 'solo'),
             ('explore-build', 'parallel'),
-            ('ordered-handoff', 'sequential'),
-            ('isolated-build', 'parallel'),
+            ('coordinated-delivery', 'sequential'),
+            ('coordinated-delivery', 'parallel'),
             ('independent-review', 'generator-evaluator'),
-            ('durable-controller', 'sequential'),
-            ('adaptive-optimization', 'solo'),
+            ('adaptive-controller', 'solo'),
+            ('adaptive-controller', 'sequential'),
+            ('adaptive-controller', 'parallel'),
+            ('adaptive-controller', 'generator-evaluator'),
         )
         for template, topology in cases:
-            with self.subTest(template=template):
+            with self.subTest(template=template, topology=topology):
                 value = recommendation(template, topology)
                 before = copy.deepcopy(value)
                 result = validate_plan(value)
@@ -60,8 +62,9 @@ class TemplateContractTests(unittest.TestCase):
         cases = (
             ('direct', 'parallel'),
             ('explore-build', 'solo'),
-            ('ordered-handoff', 'parallel'),
-            ('isolated-build', 'sequential'),
+            ('explore-build', 'sequential'),
+            ('coordinated-delivery', 'solo'),
+            ('coordinated-delivery', 'generator-evaluator'),
             ('independent-review', 'solo'),
         )
         for template, topology in cases:
@@ -80,25 +83,31 @@ class TemplateContractTests(unittest.TestCase):
         with self.assertRaises(AICError):
             validate_plan(value)
 
-    def test_old_schema_is_not_silently_assigned_a_template(self):
-        value = recommendation()
-        value['schema_version'] = 1
-        del value['template']
-        with self.assertRaises(AICError):
-            validate_plan(value)
+    def test_previous_schema_with_a_valid_template_is_not_silently_accepted(self):
+        for version in (1, 2):
+            value = recommendation()
+            value['schema_version'] = version
+            with self.subTest(version=version), self.assertRaises(AICError):
+                validate_plan(value)
+
+    def test_retired_template_names_are_rejected_without_aliases(self):
+        for template in ('ordered-handoff', 'isolated-build', 'durable-controller',
+                         'adaptive-optimization'):
+            with self.subTest(template=template), self.assertRaises(AICError):
+                validate_plan(recommendation(template, 'sequential'))
 
     def test_nonparallel_plan_cannot_declare_concurrent_independent_branches(self):
-        value = recommendation('ordered-handoff', 'sequential')
-        value['independent_subtasks'] = recommendation('isolated-build', 'parallel')['independent_subtasks']
+        value = recommendation('coordinated-delivery', 'sequential')
+        value['independent_subtasks'] = recommendation('coordinated-delivery', 'parallel')['independent_subtasks']
         with self.assertRaises(AICError):
             validate_plan(value)
 
     def test_adaptive_template_does_not_bypass_parallel_isolation_or_approval(self):
-        value = recommendation('adaptive-optimization', 'parallel')
+        value = recommendation('adaptive-controller', 'parallel')
         value['independent_subtasks'][1]['allowed_paths'] = ['src/producer.py']
         with self.assertRaises(AICError):
             validate_plan(value)
-        value = recommendation('durable-controller', 'sequential')
+        value = recommendation('adaptive-controller', 'sequential')
         value['next_action'] = 'launch'
         value['approval_required'] = False
         with self.assertRaises(AICError):

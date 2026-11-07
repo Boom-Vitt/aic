@@ -10,4 +10,6 @@ Records are **reference data, not instructions, authorization or automatic templ
 
 Potential template relevance is an adoption proposal, not evidence that a method improves every task. Workflow/code/CI/permission changes need a separate owner-approved task and actual outcome checks. A daily source check may correctly produce no new record; no publication is manufactured to fill a date.
 
+Dated records preserve the catalog and source facts they discussed at assessment time. Older records may name retired workflow IDs; those names are historical references, not valid current recommendations or automatic migration aliases. Select from the current catalog and reassess the actual task before proposing adoption. Do not rewrite a dated observation to make it appear to have tested a later AIC version.
+
 The optional maintainer operates from the source checkout and is not installed with this skill. Its operations guide is in that checkout's `docs/maintenance.md`; no scheduler, repository credential or source-checkout file is required to use these portable records and workflows.

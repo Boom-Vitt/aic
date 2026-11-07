@@ -30,7 +30,7 @@ Sources checked November 6, 2026. Rolling docs and installed versions may differ
 - OpenClaw's project path means its configured agent workspace, not every arbitrary nested checkout. Nondefault state paths need an explicit destination. Its skill containment rules are not identical to another host's symlink handling.
 - OpenCode, Cursor and Gemini have additional compatibility roots; AIC chooses a documented native path instead of duplicating one skill into every fallback root.
 - Copilot CLI is one product surface. Cloud agents, editor integrations and GitHub Actions may need separate setup and do not automatically receive personal skills.
-- DeepSeek is a model/provider selected through a compatible host such as OpenCode, not a standalone adapter with an invented `~/.deepseek/skills` path. Other model families work only to the extent their host can load and follow the skill.
+- DeepSeek model/provider selection is separate from the official DeepSeek Harness and its [documented workflow capability](../skills/aic/references/research.md#deepseek-harness-2026). AIC has no verified native discovery adapter for that harness and does not invent a `~/.deepseek/skills` path. Other models remain usable only through a host that can load/follow the skill; use explicit generic installation when appropriate without claiming native discovery.
 - Unknown tools are not silently mapped to a guessed directory. Add an official-source-backed registry entry, or use explicit generic destination without claiming native integration.
 
 ## Evidence levels
@@ -42,3 +42,15 @@ Sources checked November 6, 2026. Rolling docs and installed versions may differ
 5. **Operational handoff verified:** an approved real project/agent launch is observed through the target runtime.
 
 Do not promote a lower level to a higher one. Current delivery evidence and unexercised integrations are stated in [verification.md](verification.md). Initial OS checks cover only the actually recorded environments, not every platform.
+
+## Workflow and recommendation compatibility
+
+AIC 3.0.0 uses recommendation/catalog schema 3 and exactly five workflow families: `direct` (`solo`), `explore-build` (`parallel`), `coordinated-delivery` (`sequential` or `parallel`), `independent-review` (`generator-evaluator`) and `adaptive-controller` (any supported current-stage topology). Schema-1/2 recommendations and retired template IDs are rejected without aliases or silent migration. Reassess real task properties and authorization before regenerating; installer, memory, maintenance and outer handoff formats keep their independent versions.
+
+The host supplies semantic selection using goal, acceptance, dependencies, available capabilities and effective authority. The catalog validates combinations; it does not schedule milestones, benchmark agents or make every host equally capable. Choose per stage using the [selection guide](../skills/aic/references/workflows.md) and [family contracts](../skills/aic/references/templates.md). Mixed projects retain their original acceptance while a stage's category, family, topology or authorized runtime may change. AIC makes no universal Orca/OMP/Claude/Codex quality ranking and adds no general cross-CLI execution backend.
+
+## Optional local supervision
+
+The original [tmux profile](../skills/aic/assets/tmux.conf) and [supervision guide](../skills/aic/references/supervision.md) target stable tmux 3.8; see the [official-source evidence](../skills/aic/references/research.md#tmux-2026). This optional procedure is separate from skill discovery and the existing Orca-to-omp adapter. It requires explicit approval for task-local launch/cleanup, an explicit task-owned socket, trusted per-run config and exact session/pane IDs. It neither installs/upgrades tmux nor modifies existing servers, `~/.tmux.conf`, global settings or managed services.
+
+For native OMP children, prefer available Agent Hub (`Alt+A`, tree `t`) instead of unnecessary panes. Panes are useful for approved independent terminal processes; the task/owner/dependency/blocker/evidence/next-action board remains in existing task artifacts. Process-running/dead/exit status is not task acceptance. Worktrees/tmux do not sandbox credentials or network access; detach/reattach is not recovery from host shutdown or consent for unattended model work. Unknown usage/cost stays unknown. A profile's documented behavior is not evidence that any particular host integration or model launch was exercised.

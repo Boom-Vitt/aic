@@ -17,7 +17,7 @@ from aiclib.safety import AICError, canonical_json
 
 
 def recommendation():
-    return dict(schema_version=2, task='Review the requested project', workflow='review', template='direct',
+    return dict(schema_version=3, task='Review the requested project', workflow='review', template='direct',
                 topology='solo', risk='low', reasons=['Owner requested review'], evidence=[],
                 scope={'read': ['README.txt'], 'write': []}, acceptance=['Report evidence'],
                 independent_subtasks=[], next_action='recommend', approval_required=True)
@@ -31,6 +31,27 @@ class OrcaTests(unittest.TestCase):
 
     def plan(self):
         return orca.plan_handoff(self.root, recommendation(), name='review', model=None)
+
+    def test_outer_handoff_format_stays_one_with_schema_three_recommendation(self):
+        plan = self.plan()
+        self.assertEqual(plan['schema_version'], 1)
+        self.assertEqual(plan['recommendation']['schema_version'], 3)
+
+    def test_old_recommendations_and_retired_templates_cannot_enter_handoff(self):
+        invalid = []
+        for version in (1, 2):
+            value = recommendation()
+            value['schema_version'] = version
+            invalid.append(value)
+        for template in ('ordered-handoff', 'isolated-build', 'durable-controller', 'adaptive-optimization'):
+            value = recommendation()
+            value['template'] = template
+            invalid.append(value)
+        with patch('subprocess.run', side_effect=AssertionError('No process')):
+            for value in invalid:
+                with self.subTest(recommendation=value), self.assertRaises(AICError):
+                    orca.plan_handoff(self.root, value, name='review')
+        self.assertFalse(self.root.exists())
 
     def test_dry_run_has_no_writes_or_processes_even_without_binaries(self):
         with patch('subprocess.run', side_effect=AssertionError('No process')):

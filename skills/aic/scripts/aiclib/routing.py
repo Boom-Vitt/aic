@@ -129,7 +129,7 @@ def _physical_overlap(first: _PhysicalScope, second: _PhysicalScope) -> bool:
 
 
 def validate_plan(plan: dict, *, project: Path | None = None) -> dict:
-    """Return a detached, unchanged-value copy of a schema-version-2 plan.
+    """Return a detached, unchanged-value copy of a schema-version-3 plan.
 
     An optional existing project enables symlink checks for every selected path
     and existence checks for evidence. Without it, paths are checked lexically;
@@ -146,8 +146,8 @@ def validate_plan(plan: dict, *, project: Path | None = None) -> dict:
     filesystem lock, or protection against subsequent filesystem changes.
     """
     value = _object(plan, _PLAN_KEYS, "Recommendation")
-    if type(value["schema_version"]) is not int or value["schema_version"] != 2:
-        raise AICError("schema_version must be the integer 2; select a template explicitly.")
+    if type(value["schema_version"]) is not int or value["schema_version"] != 3:
+        raise AICError("schema_version must be the integer 3; select a current workflow family explicitly.")
     _text(value["task"], "task")
     _choice(value["workflow"], _WORKFLOWS, "workflow")
     _choice(value["template"], _TEMPLATE_IDS, "template")
