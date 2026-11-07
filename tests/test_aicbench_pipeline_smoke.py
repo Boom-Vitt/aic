@@ -71,6 +71,21 @@ class PipelineSmokeTests(unittest.TestCase):
             self.assertNotIn(key, report)
         self.assertEqual(_oracle_bytes(), self.oracle_before)
 
+    def test_container_probe_uses_system_python(self):
+        from benchmarks.aicbench.pipeline_smoke import _interpreter
+        system = Path('/usr/bin/python3')
+        if not system.is_file():
+            self.skipTest('/usr/bin/python3 is not installed')
+        version = subprocess.run(
+            [str(system), '-c', 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)'],
+            check=False,
+        )
+        if version.returncode != 0:
+            self.skipTest('/usr/bin/python3 is older than 3.11')
+        chosen = _interpreter(ROOT, 'container')
+        self.assertTrue(str(chosen).startswith(('/usr/', '/bin/')))
+        self.assertEqual(chosen, system.resolve())
+
     def test_stub_refuses_to_run_as_a_model(self):
         completed = subprocess.run(
             [sys.executable, str(STUB)],

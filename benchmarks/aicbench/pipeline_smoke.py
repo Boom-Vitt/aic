@@ -39,16 +39,51 @@ class SmokeError(RuntimeError):
     """The pipeline smoke could not be executed."""
 
 
-def _interpreter(repo: Path) -> Path:
-    candidates = (Path(sys.executable), Path("/usr/bin/python3"))
-    for candidate in candidates:
-        try:
-            resolved = candidate.resolve()
-        except OSError:
-            continue
-        if resolved.is_file() and resolved != repo and repo not in resolved.parents:
-            return resolved
-    raise SmokeError("Pipeline smoke needs a Python interpreter outside the repository.")
+def _python_ok(path: Path) -> bool:
+    try:
+        completed = subprocess.run(
+            [str(path), "-c", "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)"],
+            check=False,
+            capture_output=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return completed.returncode == 0
+
+
+def _resolve_outside(candidate: Path, repo: Path) -> Path | None:
+    try:
+        resolved = candidate.resolve()
+    except OSError:
+        return None
+    if not resolved.is_file() or resolved == repo or repo in resolved.parents:
+        return None
+    return resolved
+
+
+def _interpreter(repo: Path, sandbox: str) -> Path:
+    """Pick Python for the stub.
+
+    The container mounts system directories such as /usr and /lib. A Python
+    from another prefix, including GitHub's setup-python install, cannot load
+    its own libpython there. The container probe therefore uses /usr/bin/python3.
+    """
+    system = _resolve_outside(Path("/usr/bin/python3"), repo)
+    if sandbox == "container":
+        if system is not None and str(system).startswith(("/usr/", "/bin/")) and _python_ok(system):
+            return system
+        raise SmokeError(
+            "The container sandbox needs Python 3.11 or newer at /usr/bin/python3. "
+            "It does not mount a separate interpreter prefix."
+        )
+    if sandbox != "none":
+        raise SmokeError("Pipeline smoke sandbox must be none or container.")
+    current = _resolve_outside(Path(sys.executable), repo)
+    for candidate in (current, system):
+        if candidate is not None and _python_ok(candidate):
+            return candidate
+    raise SmokeError("Pipeline smoke needs Python 3.11 or newer outside the repository.")
 
 
 def _smoke_env(parent: dict[str, str], *, home: Path, tmp: Path) -> dict[str, str]:
@@ -90,7 +125,7 @@ def _parse_probe(stdout: str) -> dict:
 
 def _run_probe(sandbox: str, task, parent: dict[str, str]) -> dict:
     repo = Path(__file__).resolve().parents[2]
-    interpreter = _interpreter(repo)
+    interpreter = _interpreter(repo, sandbox)
     if not STUB_PATH.is_file() or STUB_PATH.is_symlink():
         raise SmokeError("Pipeline smoke stub is missing.")
     stub_bytes = STUB_PATH.read_bytes()
