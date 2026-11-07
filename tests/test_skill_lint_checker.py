@@ -361,6 +361,12 @@ class SkillLintTests(unittest.TestCase):
         self.assertEqual([finding.rule for finding in packaged.findings], ["nested-reference"])
         self.assertEqual(packaged.score, 95)
         self.assertEqual(packaged.score_without_aic_rules, 95)
+        self.assertLess(packaged.lines, 500)
+        self.assertIsNotNone(packaged.instruction_units)
+        self.assertLess(packaged.instruction_units, 5000)
+        entry = (ROOT / "skills" / "aic" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("references/editing.md", entry)
+        self.assertLess(len(entry.splitlines()), 500)
 
 
 if __name__ == "__main__":
