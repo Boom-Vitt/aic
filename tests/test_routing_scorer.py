@@ -396,19 +396,29 @@ class ScorerCliTests(unittest.TestCase):
         self.assertTrue(all(set(item) == {"id", "request"} for item in seen))
         self.assertTrue(all("expected_workflow" not in item for item in seen))
 
-    def test_missing_or_blank_key_exits_3_and_writes_no_baseline_pack(self):
+    def test_prompt_generation_needs_no_key_and_does_not_exit_3(self):
         output = self.base / "prompts.jsonl"
-        output.write_text("keep\n", encoding="utf-8")
         for label, key in (("unset", None), ("empty", ""), ("blank", " \n\t")):
             with self.subTest(label=label):
+                if output.exists():
+                    output.unlink()
                 env = {} if key is None else {"ANTHROPIC_API_KEY": key}
                 result = self.run_baseline("--output", str(output), env=env)
-                self.assertEqual(result.returncode, 3, result.stderr)
-                self.assertIn("ANTHROPIC_API_KEY is unset or blank.", result.stderr)
-                self.assertIn("no prompts were written", result.stderr)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotEqual(result.returncode, 3)
                 self.assertNotIn("Traceback", result.stderr)
-                self.assertEqual(result.stdout, "")
-                self.assertEqual(output.read_text(encoding="utf-8"), "keep\n")
+                receipt = json.loads(result.stdout)
+                self.assertFalse(receipt["invokes_model"])
+                self.assertFalse(receipt["calls_api"])
+                self.assertGreater(receipt["prompt_count"], 0)
+                self.assertNotIn(KEY, output.read_text(encoding="utf-8"))
+        kept = self.base / "existing.jsonl"
+        kept.write_text("keep\n", encoding="utf-8")
+        refused = self.run_baseline("--output", str(kept))
+        self.assertEqual(refused.returncode, 2, refused.stderr)
+        self.assertNotEqual(refused.returncode, 3)
+        self.assertEqual(kept.read_text(encoding="utf-8"), "keep\n")
+        self.assertEqual(refused.stdout, "")
 
     def test_baseline_help_works_without_a_key(self):
         result = self.run_baseline("--help")
@@ -435,8 +445,8 @@ class ScorerCliTests(unittest.TestCase):
             """
         )
         env = dict(os.environ)
+        env.pop("ANTHROPIC_API_KEY", None)
         env["PYTHONDONTWRITEBYTECODE"] = "1"
-        env["ANTHROPIC_API_KEY"] = KEY
         env["PROMPT_OUT"] = str(output)
         result = subprocess.run(
             [sys.executable, "-B", "-c", code],

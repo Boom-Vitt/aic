@@ -12,6 +12,7 @@ From the repository root:
 python -m benchmarks.routing.score --decisions decisions.jsonl
 python -m benchmarks.routing.score --decisions decisions.jsonl --output report.json
 python -m benchmarks.routing.baseline --output prompts.jsonl
+python -m benchmarks.routing.compare --model MODEL_ID --output comparison-dir
 ```
 
 `--scenarios` replaces the default pack. The replacement must use schema version 3. `--output` creates a new file and refuses a path that already exists or is a symlink. Decision, scenario, catalog, and output paths are not followed when the final component is a symlink.
@@ -81,32 +82,50 @@ The report's `rate` is `k / n` as an IEEE float. `k` and `n` are the integers to
 
 `python -m benchmarks.routing.score --from-router` looks for `route_scenario` in `benchmarks.routing.router`. This repository does not include that module. The command exits 2 and does not guess labels from the request. If a later change adds the function, it is called with only `id` and `request` for each flat case and for the project case. Gold fields are not passed in. There is no keyword router in this package.
 
-## No-skill baseline template
+## Prompt pack
 
-`python -m benchmarks.routing.baseline` prepares the prompts a no-skill arm would see.
+`python -m benchmarks.routing.baseline` writes the prompt pack. It does not read `ANTHROPIC_API_KEY`, does not call a model, and does not exit 3. `--help` and a normal write both work with no key. Overwrite and symlink refusal exit 2.
 
-- Without `ANTHROPIC_API_KEY`, or when the value is empty or whitespace, the process exits 3. It prints the refusal on stderr, leaves stdout empty, and does not create or replace the output file.
-- `--help` does not need the key and does not write a pack.
-- With a non-blank key, the process writes a JSONL prompt pack and a JSON receipt. It still does not start Claude Code, open a provider connection, or copy the key into the pack, the receipt, or a child environment. `calls_api`, `invokes_model`, `executed`, and `skill_loaded` are false. The receipt is not a score.
+Each prompt object has `id`, `instruction`, and `request`. The instruction is the same for every row and names the catalog ids from `skills/aic/assets/workflows.json`. It does not say which id belongs to which scenario. The request is the pack's request string. Expected fields, required milestone lists, required invariant lists, and stage objects are not copied. The receipt has `invokes_model` false. A prompt pack is not a comparison result.
 
-Each prompt object has `id`, `instruction`, and `request`. The instruction is the same for every row and names the catalog ids from `skills/aic/assets/workflows.json`. It does not say which id belongs to which scenario. The request is the pack's request string. Expected fields, required milestone lists, required invariant lists, and stage objects are not copied. The project case is one prompt, containing its request and not its stage table.
+## Paired comparison
 
-The other adapters in this repository start a model only when the key is set. This file is the routing template those runs would consume. Producing decisions is an external step. Score the JSONL that step writes. Do not treat the prompt pack, or a run that exited 3, as a baseline result.
+`python -m benchmarks.routing.compare` runs two arms on one pack:
 
-A no-skill harness should not load the AIC skill. The aicbench baseline arm is the local precedent: Claude Code without the AIC skill directory. Wiring that command, including any live credential, stays outside this template.
+- `no-skill` receives the request and the closed catalog.
+- `aic` receives the same request, the same catalog, and the same output schema, plus `skills/aic/SKILL.md` and the relative files that page links. Linked web URLs are not fetched. Gold fields are not added to either arm.
+
+Both arms send the same `model`, `temperature`, and `max_tokens` to `https://api.anthropic.com/v1/messages` over HTTPS. The client does not follow redirects. The API key is the `x-api-key` header only. `--timeout` is the per-call limit, shared by both arms.
+
+The Messages API has no seed parameter. `--seed` is recorded on the receipt and is not sent. `--model` is required; this command does not pick a model for you.
+
+Without `ANTHROPIC_API_KEY`, or when the value is empty or whitespace, the process exits 3, writes nothing, and does not open a connection. `--help` does not need the key.
+
+A finished run creates a new directory with `no-skill.jsonl`, `aic.jsonl`, and `report.json`. Each JSONL file is scored with the scorer above. The receipt's top-level `invokes_model` is true and `transport` is `anthropic-https`. Nested score objects still say `invokes_model` false: those objects only describe the decision files. `date` is the UTC calendar date of the run. `temperature`, `max_tokens`, `seed`, and `model` are the settings that were used.
+
+The paired block uses flat cases only. For a field, or for exact match:
+
+- `k_delta` is the AIC arm's correct count minus the no-skill arm's correct count.
+- `rate_delta` is `k_delta / n`. It is null when `n` is 0.
+- `baseline_only_correct` is the count correct only on the no-skill arm. `aic_only_correct` is the count correct only on the AIC arm.
+
+The exact McNemar test is the two-sided exact binomial test on those discordant pairs. With `n = b + c` and `b` the no-skill-only count, the probability is the sum of `Binomial(n, 0.5)` masses whose likelihood is at most the likelihood of `b`, as a reduced rational `p_numerator / p_denominator`. When `b + c` is 0 the probability is null. There is no significance cutoff in the receipt.
+
+Unparseable model text is an abstention for that case, not a fabricated label. An HTTP or transport failure exits 1 and writes no directory.
 
 ## Exit codes
 
-| Code | Score | Baseline |
-| --- | --- | --- |
-| 0 | Report written. Accuracy can be anywhere in range. | Prompt pack written. No model was called. |
-| 2 | Usage, malformed input, unknown id, or no deterministic router. | Usage, or the pack could not be read. |
-| 3 | Symlink or overwrite refused. | `ANTHROPIC_API_KEY` missing or blank, or the output path was refused. |
+| Code | Score | Prompt pack | Compare |
+| --- | --- | --- | --- |
+| 0 | Report written. Accuracy can be anywhere in range. | Prompt pack written. No model was called. | Both arms finished and the receipt was written. |
+| 1 | Unused. | Unused. | The API call failed. No receipt was written. |
+| 2 | Usage, malformed input, unknown id, or no deterministic router. | Usage, unreadable pack, or refused output path. | Usage, unreadable pack, or refused output path. |
+| 3 | Symlink or overwrite refused. | Unused. | `ANTHROPIC_API_KEY` missing or blank. |
 
 A traceback is not part of these exits.
 
 ## Limits
 
-The scorer checks string equality with the pack. It does not judge whether a recommendation was wise, whether the host actually withheld the labels, or whether two runs are comparable. Schema validation of a full AIC recommendation is the separate `check-plan` helper, not this report.
+The scorer checks string equality with the pack. It does not judge whether a recommendation was wise. Two arms are comparable here only when they share the model id, temperature, max_tokens, timeout, pack, and output schema recorded in the receipt. A different seed value is a different recorded run even though the API does not receive it.
 
-Catalog ids in the baseline instruction describe the closed label set. They are not predictions. Adding a keyword table, a model client, or a checked-in score file would cross the boundary this package is held to.
+Catalog ids describe the closed label set. They are not predictions. Stage ids in the project prompt are alignment keys for the output schema, not gold labels. This document has no results table. Do not check a score file into the repository from a local run unless that run's receipt is the artifact under review.

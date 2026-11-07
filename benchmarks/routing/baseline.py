@@ -1,16 +1,12 @@
-"""Write a no-skill prompt pack for the held-out routing scenarios.
+"""Write prompts for the held-out routing scenarios.
 
-This is a template, not a model client. A missing or blank ANTHROPIC_API_KEY
-exits 3 and writes nothing, matching the other benchmark adapters. When a
-non-blank key is present, the command still does not read the key into the
-pack, pass it to a child, or contact a provider. An external harness has to
-run the prompts and produce JSONL for the scorer.
+Prompt generation does not read ANTHROPIC_API_KEY and does not call a model.
+The paired model run is ``python -m benchmarks.routing.compare``.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 import sys
 
@@ -26,10 +22,6 @@ from benchmarks.routing.score import (
 )
 
 
-MISSING_KEY_MESSAGE = (
-    "ANTHROPIC_API_KEY is unset or blank. "
-    "The no-skill routing baseline was not started and no prompts were written."
-)
 WITHHELD = (
     "expected_template",
     "expected_topology",
@@ -38,15 +30,6 @@ WITHHELD = (
     "required_milestones",
     "stages",
 )
-
-
-def credential_present(environ: dict[str, str]) -> bool:
-    value = environ.get("ANTHROPIC_API_KEY")
-    return isinstance(value, str) and value.strip() != ""
-
-
-def help_requested(argv: list[str]) -> bool:
-    return any(argument in ("-h", "--help") for argument in argv)
 
 
 def _catalog_ids(value: object, label: str) -> tuple[str, ...]:
@@ -126,10 +109,7 @@ def receipt(path: Path, count: int) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="benchmarks.routing.baseline",
-        description=(
-            "Prepare no-skill prompts for the held-out routing pack. "
-            "Does not call a model. Exits 3 when ANTHROPIC_API_KEY is missing or blank."
-        ),
+        description="Write routing prompts from the held-out pack. Does not call a model or read an API key.",
     )
     parser.add_argument("--scenarios", type=Path, help="Routing pack JSON. Defaults to the held-out fixture.")
     parser.add_argument("--output", type=Path, help="Write the JSONL prompt pack here. Refuses to overwrite.")
@@ -137,12 +117,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    arguments = list(sys.argv[1:] if argv is None else argv)
-    if not help_requested(arguments) and not credential_present(os.environ):
-        print(MISSING_KEY_MESSAGE, file=sys.stderr)
-        return EXIT_REFUSED
     parser = build_parser()
-    args = parser.parse_args(arguments)
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     if args.output is None:
         print("A prompt pack requires --output.", file=sys.stderr)
         return EXIT_USAGE
@@ -151,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
         write_exclusive(args.output, render_prompts(rows))
     except ScoreError as exc:
         print(str(exc), file=sys.stderr)
+        if exc.code == EXIT_REFUSED:
+            return EXIT_USAGE
         return exc.code
     print(receipt(args.output, len(rows)), end="")
     return 0
