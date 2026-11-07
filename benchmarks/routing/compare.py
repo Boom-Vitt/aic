@@ -1,4 +1,7 @@
-"""Compare a no-skill arm with an AIC arm on the held-out routing pack.
+"""Compare a no-skill arm with an AIC arm on one routing pack.
+
+The default pack is the dev fixture. Pass ``--pack`` to score another file,
+including the release pack ``benchmarks/routing/heldout-v2.json``.
 
 Both arms share one model id, temperature, max_tokens, timeout, and output
 schema. The no-skill arm sees the request and the closed catalog. The AIC arm
@@ -34,12 +37,13 @@ from benchmarks.routing.score import (
     MAX_LABEL,
     MAX_TEXT,
     ScoreError,
-    default_scenarios_path,
+    add_pack_arguments,
     load_pack,
     read_text,
     render_report,
     repo_root,
     score_decisions,
+    selected_pack_path,
     write_exclusive,
 )
 
@@ -600,19 +604,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--model", help="Model id sent to both arms. Required.")
     parser.add_argument("--output", type=Path, help="New directory for both decision files and the receipt.")
-    parser.add_argument(
-        "--scenarios",
-        type=Path,
-        help="Routing pack JSON. Defaults to the dev pack tests/fixtures/routing-scenarios.json.",
-    )
-    parser.add_argument(
-        "--pack",
-        type=Path,
-        help=(
-            "Routing pack JSON. Same choice as --scenarios. "
-            "The release pack is benchmarks/routing/heldout-v2.json."
-        ),
-    )
+    add_pack_arguments(parser)
     parser.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature sent to both arms. Default: 0.")
     parser.add_argument("--max-tokens", type=int, default=1024, help="max_tokens sent to both arms. Default: 1024.")
     parser.add_argument("--seed", type=int, default=0, help="Recorded run seed. The Messages API does not accept it.")
@@ -639,10 +631,6 @@ def main(
     if args.model is None or args.output is None:
         print("A comparison requires --model and --output.", file=sys.stderr)
         return EXIT_USAGE
-    if args.pack is not None and args.scenarios is not None:
-        print("Pass only one of --scenarios and --pack.", file=sys.stderr)
-        return EXIT_USAGE
-    chosen_pack = args.pack if args.pack is not None else args.scenarios
     key = str(env.get("ANTHROPIC_API_KEY", "")).strip()
     try:
         if isinstance(args.timeout, bool) or not isinstance(args.timeout, (int, float)) or not math.isfinite(float(args.timeout)):
@@ -658,7 +646,7 @@ def main(
             timeout=timeout,
             date=utc_date((clock or (lambda: datetime.now(timezone.utc)))()),
         )
-        pack = load_pack(chosen_pack if chosen_pack is not None else default_scenarios_path())
+        pack = load_pack(selected_pack_path(args.scenarios, args.pack))
         transport = "injected" if client is not None else "anthropic-https"
         sender = client if client is not None else https_client(key, settings.timeout)
         report, files = compare_pack(pack, settings=settings, client=sender, transport=transport)

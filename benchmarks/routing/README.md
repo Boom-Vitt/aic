@@ -1,8 +1,23 @@
 # Routing scorer
 
-Offline comparison of routing decisions. `tests/fixtures/routing-scenarios.json` is the dev pack: tune on it. Score `benchmarks/routing/heldout-v2.json` once per release, with `--pack`, and do not tune on that file. The scorer does not read request text to choose a workflow, and it does not call a model, a network API, or a cloud service. A number appears only after you point it at a decision file from a real run. This document has no results table.
+Offline comparison of routing decisions with a routing pack. The default pack is the dev pack at `tests/fixtures/routing-scenarios.json`. Tune only on that pack. The release pack is `benchmarks/routing/heldout-v2.json`. Score it once per release, with `--pack`, and do not tune on that file. The scorer does not read request text to choose a workflow, and it does not call a model, a network API, or a cloud service. A number appears only after you point it at a decision file from a real run. This document has no results table.
 
-The pack's own `limits` text still applies: the expected fields and stage labels are evaluation data, not a production classifier, and they stay withheld from fresh host inputs.
+Each pack's own `limits` text still applies: the expected fields and stage labels are evaluation data, not a production classifier, and they stay withheld from fresh host inputs.
+
+## Pack roles
+
+Tuning happens only on the dev pack, `tests/fixtures/routing-scenarios.json`. Its doc role is `dev`. Do not read it when editing `skills/aic`.
+
+`benchmarks/routing/heldout-v2.json` is scored once per release. Do not tune the skill against it, and do not read it when editing `skills/aic`. `benchmarks/routing/heldout-v2-answers.json` holds one rationale for each label. The scorer does not read that file, and it is not model input.
+
+`--scenarios` and `--pack` select the same kind of schema-3 pack. Pass only one. Omitting both uses the dev pack. A byte change to heldout-v2 or its answers requires a new `pack_version` and a new row in the lock below. Do not replace the digest of a version that has already been published.
+
+## heldout-v2 lock
+
+| pack_version | file | sha256 |
+| --- | --- | --- |
+| 1 | `benchmarks/routing/heldout-v2.json` | `bb0a6a4788b02911d827beed0a47f46bf66f9822a97bc55bea2a77cb02c13ec4` |
+| 1 | `benchmarks/routing/heldout-v2-answers.json` | `10aab94fa5c4bce424cff792f39c2d642aa7beb10ff8c23133fcb0e7add3b6ba` |
 
 ## Commands
 
@@ -11,17 +26,19 @@ From the repository root:
 ```sh
 python -m benchmarks.routing.score --decisions decisions.jsonl
 python -m benchmarks.routing.score --decisions decisions.jsonl --output report.json
+python -m benchmarks.routing.score --decisions decisions.jsonl --pack benchmarks/routing/heldout-v2.json
 python -m benchmarks.routing.baseline --output prompts.jsonl
 python -m benchmarks.routing.compare --model MODEL_ID --output comparison-dir
+python -m benchmarks.routing.compare --model MODEL_ID --output comparison-dir --pack benchmarks/routing/heldout-v2.json
 ```
 
-`--scenarios` and `--pack` select a pack. The default is the dev pack. Pass only one of them. The replacement must use schema version 3. The release pack is `benchmarks/routing/heldout-v2.json`. `--output` creates a new file and refuses a path that already exists or is a symlink. Decision, scenario, catalog, and output paths are not followed when the final component is a symlink.
+`--scenarios` or `--pack` replaces the default dev pack. Pass only one. The replacement must use schema version 3. The release pack is `benchmarks/routing/heldout-v2.json`. `--output` creates a new file and refuses a path that already exists or is a symlink. Decision, scenario, catalog, and output paths are not followed when the final component is a symlink.
 
 `--help` works with no model credential. Scoring does not read `ANTHROPIC_API_KEY`.
 
 ## Decision file
 
-UTF-8 JSONL, one JSON object per line. Blank lines are ignored. Each object needs an `id` that matches a pack case, or the project case id `mixed-project-plan`, exactly once.
+UTF-8 JSONL, one JSON object per line. Blank lines are ignored. Each object needs an `id` that matches a pack case, or that pack's project case id, exactly once. The dev pack's project id is `mixed-project-plan`. The release pack's project id is `h2-library-hold-plan`.
 
 Flat cases supply `workflow`, `template`, and `topology`. Those three strings may sit on the object or one level down under `recommendation`, `decision`, `plan`, or `structured_output`. If more than one of those places sets the same field, the strings must be identical. JSON `null`, or a missing field, is an abstention. An abstention is not a predicted class.
 

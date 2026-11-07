@@ -117,16 +117,31 @@ class ComparisonCommandTests(unittest.TestCase):
         self.assertIsNone(estimate["public_benchmark_scores"])
         self.assertFalse((self.results / "results").exists())
 
-    def test_heldout_pack_fails_clearly_when_the_file_is_missing(self):
-        def explode(*_args, **_kwargs):
-            raise AssertionError("missing pack called a model")
+    def test_heldout_pack_is_scored_from_the_release_file(self):
+        seen = []
 
-        code, output, err = self._run(["--routing-pack", "heldout-v2"], client=explode, aicbench_runner=explode)
-        self.assertEqual(code, 2)
-        self.assertEqual(output, "")
-        self.assertIn("benchmarks/routing/heldout-v2.json", err)
-        self.assertIn("No model call was started", err)
-        self.assertFalse((self.results / "results").exists())
+        def spy(argv, client=None, environ=None, clock=None):
+            seen.append(list(argv))
+            return runner.compare_main(argv, client=client, environ=environ, clock=clock)
+
+        code, output, err = self._run(
+            ["--routing-pack", "heldout-v2"],
+            compare_runner=spy,
+            aicbench_runner=lambda argv, environ=None: 0,
+        )
+        self.assertEqual(code, 0, err + output)
+        pack_flag = seen[0][seen[0].index("--pack") + 1]
+        pack_path = Path(pack_flag)
+        self.assertEqual(pack_path, (ROOT / "benchmarks" / "routing" / "heldout-v2.json").resolve())
+        digest = hashlib.sha256(pack_path.read_bytes()).hexdigest()
+        estimate = json.loads(output)
+        self.assertEqual(estimate["routing_pack"], "heldout-v2")
+        self.assertEqual(estimate["routing_pack_sha256"], digest)
+        sha = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
+        provenance = json.loads((self.results / "results" / f"2026-11-07-{sha}" / "provenance.json").read_text(encoding="utf-8"))
+        self.assertEqual(provenance["routing_pack"], "heldout-v2")
+        self.assertEqual(provenance["routing_pack_path"], "benchmarks/routing/heldout-v2.json")
+        self.assertEqual(provenance["routing_pack_sha256"], digest)
 
     def test_fake_client_records_the_dev_pack_digest_and_passes_pack_to_compare(self):
         seen = []
@@ -162,7 +177,7 @@ class ComparisonCommandTests(unittest.TestCase):
             if path.is_file():
                 self.assertNotIn(KEY, path.read_text(encoding="utf-8"))
 
-    def test_shell_rejects_a_missing_key_and_a_missing_release_pack(self):
+    def test_shell_rejects_a_missing_key_and_dry_runs_heldout_v2(self):
         env = os.environ.copy()
         env.pop("ANTHROPIC_API_KEY", None)
         missing = subprocess.run(
@@ -176,9 +191,11 @@ class ComparisonCommandTests(unittest.TestCase):
             [str(ROOT / "scripts" / "run-benchmarks.sh"), "--routing-pack", "heldout-v2", "--dry-run"],
             cwd=ROOT, env=env, capture_output=True, text=True, check=False,
         )
-        self.assertEqual(heldout.returncode, 2, heldout.stderr)
-        self.assertIn("benchmarks/routing/heldout-v2.json", heldout.stderr)
-        self.assertIn("No model call was started", heldout.stderr)
+        self.assertEqual(heldout.returncode, 0, heldout.stderr)
+        estimate = json.loads(heldout.stdout)
+        pack_path = ROOT / "benchmarks" / "routing" / "heldout-v2.json"
+        self.assertEqual(estimate["routing_pack"], "heldout-v2")
+        self.assertEqual(estimate["routing_pack_sha256"], hashlib.sha256(pack_path.read_bytes()).hexdigest())
         self.assertFalse((ROOT / "results").exists())
 
     def test_workflow_is_manual_read_only_and_defaults_the_pack_to_dev(self):
@@ -203,7 +220,7 @@ class ComparisonCommandTests(unittest.TestCase):
     def test_documented_command_calls_the_dev_pack_by_its_name(self):
         doc = (ROOT / "docs" / "BENCHMARKS.md").read_text(encoding="utf-8")
         self.assertIn("No public benchmark score is claimed.", doc)
-        self.assertIn("tests/fixtures/routing-scenarios.json` is the dev pack", doc)
+        self.assertIn("doc role `dev`", doc)
         self.assertIn("once per release", doc)
         self.assertNotIn("held-out requests in `tests/fixtures/routing-scenarios.json`", doc)
         self.assertNotIn("%", doc)

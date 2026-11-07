@@ -117,12 +117,7 @@ def resolve_pack(root: Path, settings: dict, name: str) -> Path:
         raise RunError("routing pack must be dev or heldout-v2.", 2)
     path = root / relative
     if path.is_symlink() or not path.is_file():
-        raise RunError(
-            f"routing pack {name} is not in this checkout: {relative}. "
-            "The release pack is benchmarks/routing/heldout-v2.json. "
-            "No model call was started.",
-            2,
-        )
+        raise RunError(f"routing pack {name} is not a real file: {relative}", 2)
     return path
 
 

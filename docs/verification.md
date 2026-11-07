@@ -178,7 +178,7 @@ All ten documented adapter paths were exercised by isolated project/user CLI ins
 5. Compare workflow/template/topology against the fixture's expected fields, require all case IDs exactly once and preserve the recommendation/approval boundary. Evaluate the separate project case against its preserved acceptance, dependency and ownership invariants; do not mistake its milestone table for executable scheduling. Record failures as well as successes.
 6. Record the host/version, actual model and trace-based discovery level. Do not turn file consumption into native-discovery proof or a small smoke into a benchmark. Uninstall only the intact owned test copy.
 
-`tests/fixtures/routing-scenarios.json` is the dev pack. Tune on that pack only. Score `benchmarks/routing/heldout-v2.json` once per release, and do not tune on it.
+Skill text must never be derived from the dev pack at `tests/fixtures/routing-scenarios.json` or from the release pack at `benchmarks/routing/heldout-v2.json`. Do not read either file when editing `skills/aic`. Tuning happens only on the dev pack. Score heldout-v2 once per release.
 
 ## Orca template checks — 2026-11-07
 

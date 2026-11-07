@@ -38,11 +38,11 @@ The smoke receipt sets `public_benchmark_scores` to null, `invokes_model` to fal
 
 ## Routing packs
 
-`tests/fixtures/routing-scenarios.json` is the dev pack. Tune prompts and the skill on that pack only.
+`tests/fixtures/routing-scenarios.json` has doc role `dev`. Tune only on that pack. Do not read it when editing `skills/aic`. A skill written from those requests or labels measures the fixture instead of the skill.
 
-`benchmarks/routing/heldout-v2.json` is the release pack. Score it once per release. Do not tune on it. This checkout does not contain that file until the heldout-v2 change is present. `./scripts/run-benchmarks.sh --routing-pack heldout-v2` exits 2 before any model call when the file is missing, and it names that path.
+`benchmarks/routing/heldout-v2.json` is the release pack. Score it once per release. Do not tune the skill against it, and do not read it when editing `skills/aic`. Its answers file is not model input.
 
-A run records the selected pack name and the SHA-256 digest of the pack file in `provenance.json`.
+`./scripts/run-benchmarks.sh --routing-pack heldout-v2` passes that file to `benchmarks.routing.compare --pack`. The default remains the dev pack. A run records the selected pack name and the SHA-256 digest of the pack file in `provenance.json`.
 
 ## What a scale run still needs
 
