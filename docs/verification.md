@@ -8,6 +8,18 @@ Run `./scripts/verify.sh` with Python 3.11+. The script prefers the checkout's i
 
 Tests use isolated targets beneath the checkout's ignored `.work/` directory. They exercise manifest-owned install/update/uninstall, all documented adapter path contracts, modified/unmanaged preservation, symlink/traversal refusal, bounded metadata inspection, strict recommendation schemas and parallel scope boundaries, scoped note approval/integrity/staleness, read-only handoff data, canonical launch approval and dry-run immutability. Controlled subprocess fixtures check protocol and uncertainty handling; they are not live Orca/model proof.
 
+## Development-version correction — November 7, 2026
+
+The owner selected **`0.0.1`, `0.0.2`, `0.0.3`, and onward** for current/future development versions. Larger package labels in earlier receipts below are historical observations, not the current versioning policy; their actual past output is not rewritten. This correction does not reset any format/schema version or change the five-family workflow behavior.
+
+- Actual current source and isolated installed CLIs reported **`AIC 0.0.1`**; the installed skill metadata also reported `0.0.1`.
+- An intact owned installation of the actual previous source at commit `3f8f74646aa11938927f1b814e9294a8fc188d96` was updated through the real managed installer. It returned `upgraded`, then the installed CLI reported `0.0.1`; repeated installation returned `unchanged`. Managed uninstall completed and the synthetic fixture was removed. A numerically lower development label did not block the content-owned update.
+- Actual installed `check-plan --project` preserved a valid schema-3 recommendation unchanged and refused schema-1/2 recommendations with exit 2. No legacy recommendation was silently accepted because the package was renumbered.
+- No global skill/settings, Git tags/releases or running service were changed by the smoke. It launched no model or scenario. This is explicit installed-file consumption, not native discovery or a live runtime/service upgrade.
+
+Publication checks belong to the actual candidate head and are recorded in its associated GitHub pull request. The dated receipts below retain their original evidence and limitations.
+
+
 ## Five-family local update receipt — November 7, 2026
 
 This receipt records the local verification stage of **unreleased AIC 3.0.0 / recommendation schema 3** in the standalone AIC checkout on the Mac mini, captured before the owner's subsequent GitHub publication request. Older receipts below preserve their actual version-specific observations. Repository settings, global installed skills and the immutable maintainer service were not changed by this verification stage. Track later source publication through its GitHub pull request separately; a source merge does not imply a release tag, global installation or service upgrade.
