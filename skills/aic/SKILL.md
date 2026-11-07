@@ -4,7 +4,7 @@ description: Match tasks and project milestones to evidence-backed workflow temp
 license: Apache-2.0
 metadata:
   author: Boom-Vitt
-  version: "3.0.0"
+  version: "0.0.1"
 ---
 
 # AIC: AI Culture

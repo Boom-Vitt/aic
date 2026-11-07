@@ -2,6 +2,15 @@
 
 Use English for authored documentation, skill instructions, examples and CLI messages. Keep the package self-contained, standard-library-only and compatible with the declared Python versions.
 
+## Development versioning
+
+Use **`0.0.1`, `0.0.2`, `0.0.3`, and onward** for AIC development versions. Increment the final component for subsequent versions; stay in `0.0.N` until the owner explicitly changes this policy. Keep `pyproject.toml`, `skills/aic/scripts/aiclib/__init__.py` and `skills/aic/SKILL.md` metadata synchronized.
+
+Package versions do not derive from workflow counts, features or schema numbers. Recommendation/catalog, installer, memory, handoff and maintenance formats retain their independent versions and compatibility rules. Renumbering the package must not reset schemas, accept retired contracts or imply a compatibility migration.
+
+Earlier provisional labels in dated verification receipts and existing Git history remain historical evidence, not the current versioning policy. Do not rewrite old results, move/delete existing tags or releases, refresh global installations or activate services merely to renumber the source. Publishing a GitHub source change is separate from creating a release tag.
+
+
 ## Propose a focused change
 
 Explain the user-visible behavior, boundaries, expected evidence and compatibility impact. Do not add a permanent team, paid provider, memory database or app-specific plugin without a demonstrated requirement. Use an issue or pull request; never include real credentials, private prompts or customer code.

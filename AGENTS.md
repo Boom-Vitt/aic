@@ -11,6 +11,7 @@ AIC (AI Culture) is a portable Agent Skills package for evidence-backed task rou
 
 ## Engineering and verification
 - Prefer the Python standard library and the Agent Skills specification over a new framework or dependency stack. Declare supported Python versions in pyproject.toml.
+- AIC development versions follow `0.0.1`, `0.0.2`, `0.0.3`, and onward until the owner changes the policy. Follow CONTRIBUTING.md; schema/format versions are independent.
 - Keep SKILL.md entry points concise; use relative references for detailed contracts, workflows and scripts. Preserve template/license provenance.
 - The integration owner runs ./scripts/verify.sh after implementation. The initial delivery has a hard cap of three failed full verification runs; record each outcome and stop on the third failure. Workers must not run builds, linters, tests or formatters mid-flight.
 - Tests must exercise consumer-visible behavior: non-destructive installs/uninstalls, approval boundaries, actual routing contracts, privacy filtering, memory scope and non-mutating dry runs. No source-text/wiring tautologies or false live-support claims.

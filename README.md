@@ -12,6 +12,8 @@ Your existing host supplies the reasoning. AIC provides portable instructions an
 
 AIC is a normal **public GitHub repository**, not a GitHub template repository. Its workflow families are approaches to doing work, not repository scaffolds.
 
+**Development version: `0.0.1`.** Subsequent versions follow `0.0.2`, `0.0.3`, and onward until the owner changes the policy. Package and schema versions are separate; see [development versioning](CONTRIBUTING.md#development-versioning).
+
 ## Install
 
 Requirements: Git for obtaining the repository; Python **3.11+** for helpers; a compatible host agent. Managed installation/uninstallation requires POSIX directory-descriptor support (macOS/Linux); Windows mutations fail closed instead of using an unsafe fallback. No pip packages or model keys are required by AIC.

@@ -45,7 +45,9 @@ Do not promote a lower level to a higher one. Current delivery evidence and unex
 
 ## Workflow and recommendation compatibility
 
-AIC 3.0.0 uses recommendation/catalog schema 3 and exactly five workflow families: `direct` (`solo`), `explore-build` (`parallel`), `coordinated-delivery` (`sequential` or `parallel`), `independent-review` (`generator-evaluator`) and `adaptive-controller` (any supported current-stage topology). Schema-1/2 recommendations and retired template IDs are rejected without aliases or silent migration. Reassess real task properties and authorization before regenerating; installer, memory, maintenance and outer handoff formats keep their independent versions.
+AIC 0.0.1 uses recommendation/catalog schema 3 and exactly five workflow families: `direct` (`solo`), `explore-build` (`parallel`), `coordinated-delivery` (`sequential` or `parallel`), `independent-review` (`generator-evaluator`) and `adaptive-controller` (any supported current-stage topology). Schema-1/2 recommendations and retired template IDs are rejected without aliases or silent migration. Reassess real task properties and authorization before regenerating; installer, memory, maintenance and outer handoff formats keep their independent versions.
+
+The `0.0.N` development-package sequence is not a schema sequence or a rollback. Renumbering does not make old recommendations valid or change current format versions; see [development versioning](../CONTRIBUTING.md#development-versioning).
 
 The host supplies semantic selection using goal, acceptance, dependencies, available capabilities and effective authority. The catalog validates combinations; it does not schedule milestones, benchmark agents or make every host equally capable. Choose per stage using the [selection guide](../skills/aic/references/workflows.md) and [family contracts](../skills/aic/references/templates.md). Mixed projects retain their original acceptance while a stage's category, family, topology or authorized runtime may change. AIC makes no universal Orca/OMP/Claude/Codex quality ranking and adds no general cross-CLI execution backend.
 

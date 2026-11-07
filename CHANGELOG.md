@@ -1,6 +1,7 @@
 # Changelog
 
-## 3.0.0 — 2026-11-07 (unreleased)
+## 0.0.1 — 2026-11-07 (unreleased)
+- Use the owner's development-version sequence `0.0.1`, `0.0.2`, `0.0.3`, and onward. Renumber the active package/CLI/skill metadata without changing independently versioned schemas, runtime behavior or historical verification results.
 - Consolidate the active catalog into five original task-adaptive workflow families: `direct`, `explore-build`, `coordinated-delivery`, `independent-review` and `adaptive-controller`. Select and compose by evidence, dependencies, risk and cost, not a universal winner, permanent team or keyword classifier.
 - Require recommendation/catalog schema 3. Reject schema-1/2 recommendations and retired IDs without aliases or silent migration; independently versioned installation, memory, handoff and maintenance formats remain unchanged.
 - Combine accepted-artifact ordered handoffs and ready isolated branches under coordinated delivery. Keep controller durable delivery separate from explicitly authorized, correctness-gated measured optimization; ordinary continuity needs no benchmark.
@@ -9,6 +10,8 @@
 - Add an original optional tmux 3.8 profile and supervision guide: private socket/config, role/title borders, retained exit/signal states, native navigation, scoped cleanup and verified OMP Agent Hub controls. Process visibility never establishes task acceptance or launch/spend authority.
 - Clarify that AIC is a normal public GitHub repository, not a GitHub template repository. Keep the owner-focused README and separate required legal/source credits.
 - Source publication does not automatically refresh installed skills or upgrade the immutable maintainer service. This change creates no release tag or service activation; actual checks and limits are recorded in [verification](docs/verification.md).
+
+Earlier entries below retain historical provisional labels and existing publication facts; they are not the current development-version sequence.
 
 ## 2.0.2 — 2026-11-07
 - Read only service-level launchd lifecycle fields. Nested resource-coalition states and PIDs no longer block owned removal or get mistaken for the controller; missing or ambiguous controller evidence still fails closed.
