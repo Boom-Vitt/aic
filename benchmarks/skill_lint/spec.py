@@ -26,6 +26,13 @@ ERROR_WEIGHT = 20
 WARNING_WEIGHT = 5
 MAX_REPORTED_FINDINGS = 40
 
+# These two checks are AIC's. The Agent Skills specification does not require
+# a fixed trigger phrase, and it does not forbid a relative link from one
+# skill to another skill in the same repository. ``description-trigger``
+# treats "use before" as a trigger; that phrase is AIC's own description
+# wording, so a pass on this rule is not independent of AIC.
+AIC_OWN_RULES = frozenset({"description-trigger", "link-escapes"})
+
 ALLOWED_FIELDS = frozenset(
     {"allowed-tools", "compatibility", "description", "license", "metadata", "name"}
 )

@@ -88,6 +88,10 @@ def _measure_local(name: str, root: Path) -> dict[str, object]:
         "error_count": payload["error_count"],
         "warning_count": payload["warning_count"],
         "mean_score": payload["mean_score"],
+        "mean_score_without_aic_rules": payload["mean_score_without_aic_rules"],
+        "format_pass_count_without_aic_rules": payload["format_pass_count_without_aic_rules"],
+        "format_pass_rate_without_aic_rules": payload["format_pass_rate_without_aic_rules"],
+        "aic_own_rules": payload["aic_own_rules"],
         "rules": payload["rules"],
     }
 

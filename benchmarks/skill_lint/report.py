@@ -7,6 +7,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from .model import Finding
 from .spec import (
+    AIC_OWN_RULES,
     ANTHROPIC_BEST_PRACTICES,
     ANTHROPIC_SKILL_DOCS,
     ERROR_WEIGHT,
@@ -65,12 +66,30 @@ class SkillReport:
     def format_pass(self) -> bool:
         return self.error_count == 0
 
+    @property
+    def findings_without_aic_rules(self) -> tuple[Finding, ...]:
+        """Findings other than ``description-trigger`` and ``link-escapes``."""
+
+        return tuple(finding for finding in self.findings if finding.rule not in AIC_OWN_RULES)
+
+    @property
+    def score_without_aic_rules(self) -> int:
+        errors, warnings = _counts(self.findings_without_aic_rules)
+        return skill_score(errors, warnings)
+
+    @property
+    def format_pass_without_aic_rules(self) -> bool:
+        errors, _warnings = _counts(self.findings_without_aic_rules)
+        return errors == 0
+
     def to_dict(self, *, summary: bool) -> dict[str, object]:
         payload: dict[str, object] = {
             "path": self.path,
             "name": self.name,
             "score": self.score,
+            "score_without_aic_rules": self.score_without_aic_rules,
             "format_pass": self.format_pass,
+            "format_pass_without_aic_rules": self.format_pass_without_aic_rules,
             "errors": self.error_count,
             "warnings": self.warning_count,
             "lines": self.lines,
@@ -111,6 +130,30 @@ class RepoReport:
     def mean_score(self) -> str:
         return format_mean([skill.score for skill in self.skills])
 
+    @property
+    def mean_score_without_aic_rules(self) -> str:
+        return format_mean([skill.score_without_aic_rules for skill in self.skills])
+
+    @property
+    def format_pass_count_without_aic_rules(self) -> int:
+        return sum(skill.format_pass_without_aic_rules for skill in self.skills)
+
+    @property
+    def error_count_without_aic_rules(self) -> int:
+        return sum(
+            finding.severity == "error"
+            for skill in self.skills
+            for finding in skill.findings_without_aic_rules
+        )
+
+    @property
+    def warning_count_without_aic_rules(self) -> int:
+        return sum(
+            finding.severity == "warning"
+            for skill in self.skills
+            for finding in skill.findings_without_aic_rules
+        )
+
     def rules(self) -> tuple[tuple[str, str, int], ...]:
         """``(rule, severity, count)`` sorted by count, then severity, then rule."""
 
@@ -133,9 +176,17 @@ class RepoReport:
             "skill_count": self.skill_count,
             "format_pass_count": self.format_pass_count,
             "format_pass_rate": format_rate(self.format_pass_count, self.skill_count),
+            "format_pass_count_without_aic_rules": self.format_pass_count_without_aic_rules,
+            "format_pass_rate_without_aic_rules": format_rate(
+                self.format_pass_count_without_aic_rules, self.skill_count
+            ),
             "error_count": self.error_count,
             "warning_count": self.warning_count,
+            "error_count_without_aic_rules": self.error_count_without_aic_rules,
+            "warning_count_without_aic_rules": self.warning_count_without_aic_rules,
             "mean_score": self.mean_score,
+            "mean_score_without_aic_rules": self.mean_score_without_aic_rules,
+            "aic_own_rules": sorted(AIC_OWN_RULES),
             "score_weights": {"error": ERROR_WEIGHT, "warning": WARNING_WEIGHT},
             "rules": [
                 {"rule": rule, "severity": severity, "count": count}
@@ -154,6 +205,7 @@ class RepoReport:
             f"errors: {self.error_count}",
             f"warnings: {self.warning_count}",
             f"mean_score: {self.mean_score}",
+            f"mean_score_without_aic_rules: {self.mean_score_without_aic_rules}",
             "rules:",
         ]
         rule_rows = self.rules()
@@ -176,3 +228,9 @@ class RepoReport:
                 if omitted:
                     lines.append(f"  ... {omitted} more findings omitted")
         return "\n".join(lines) + "\n"
+
+
+def _counts(findings: tuple[Finding, ...] | list[Finding]) -> tuple[int, int]:
+    errors = sum(finding.severity == "error" for finding in findings)
+    warnings = sum(finding.severity == "warning" for finding in findings)
+    return errors, warnings

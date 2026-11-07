@@ -275,6 +275,33 @@ class SkillLintTests(unittest.TestCase):
         self.assertEqual(by_path["skills/clean-b"], 100)
         self.assertEqual(by_path["skills/broken"], 0)
         self.assertEqual(report.mean_score, "66.67")
+        self.assertEqual(report.mean_score_without_aic_rules, "66.67")
+
+    def test_aic_own_rules_are_omitted_from_the_second_score(self):
+        outside = self.root / "outside.md"
+        outside.write_text("outside\n", encoding="utf-8")
+        neutral = "Extract notes from a repository for later reading by another person."
+        linked = _skill(self.root / "skills", "linked", description=neutral)
+        entry = linked / "SKILL.md"
+        entry.write_text(
+            entry.read_text(encoding="utf-8") + "See [other](../outside.md).\n",
+            encoding="utf-8",
+        )
+        _skill(self.root / "skills", "clean")
+        report = lint_path(self.root)
+        linked_report = next(item for item in report.skills if item.path == "skills/linked")
+        self.assertEqual(
+            sorted(finding.rule for finding in linked_report.findings),
+            ["description-trigger", "link-escapes"],
+        )
+        self.assertFalse(linked_report.format_pass)
+        self.assertEqual(linked_report.score, 75)
+        self.assertTrue(linked_report.format_pass_without_aic_rules)
+        self.assertEqual(linked_report.score_without_aic_rules, 100)
+        self.assertEqual(report.format_pass_count, 1)
+        self.assertEqual(report.format_pass_count_without_aic_rules, 2)
+        self.assertEqual(report.mean_score, "87.50")
+        self.assertEqual(report.mean_score_without_aic_rules, "100.00")
 
     def test_cli_json_is_deterministic_and_exits_from_the_error_count(self):
         skill = _skill(self.root, "alpha")
@@ -287,6 +314,8 @@ class SkillLintTests(unittest.TestCase):
         payload = json.loads(first.stdout)
         self.assertEqual(payload["skill_count"], 1)
         self.assertEqual(payload["mean_score"], "100.00")
+        self.assertEqual(payload["mean_score_without_aic_rules"], "100.00")
+        self.assertEqual(payload["aic_own_rules"], ["description-trigger", "link-escapes"])
         self.assertEqual(payload["spec_revision"], "83021e2be457a9b6679148719c1f6074f0ad975e")
         entry = skill / "SKILL.md"
         entry.write_text(entry.read_text(encoding="utf-8") + "See [missing](references/missing.md).\n", encoding="utf-8")
@@ -331,6 +360,7 @@ class SkillLintTests(unittest.TestCase):
         self.assertEqual(packaged.error_count, 0)
         self.assertEqual([finding.rule for finding in packaged.findings], ["nested-reference"])
         self.assertEqual(packaged.score, 95)
+        self.assertEqual(packaged.score_without_aic_rules, 95)
 
 
 if __name__ == "__main__":

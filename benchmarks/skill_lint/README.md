@@ -14,30 +14,40 @@ Run the module from this repository so `benchmarks` is on the Python path. The c
 
 A skill **format-passes** when it has zero errors. Warnings do not fail the process; the exit code is 0 for warnings only, 1 when any skill has an error, and 2 when the path cannot be read. A symlinked path is refused rather than followed.
 
-Each skill starts at 100. Each error subtracts 20 and each warning subtracts 5, with a floor of 0. The repository **mean score** is the arithmetic mean of those scores, rounded half up to two decimals. This is AIC's hygiene metric. It is not an Anthropic ranking and it does not measure whether a skill completes tasks.
+Each skill starts at 100. Each error subtracts 20 and each warning subtracts 5, with a floor of 0. The repository mean is the arithmetic mean of those per-skill scores, rounded half up to two decimals. The JSON report has two means:
+
+- `mean_score` counts every rule below.
+- `mean_score_without_aic_rules` drops `description-trigger` and `link-escapes` before scoring. Those two are AIC's own rules. `format_pass_without_aic_rules` uses the same omission.
+
+AIC's published skill tree contains **1** skill. The pinned comparison trees contain **15** (obra/superpowers), **192** (google/skills), and **210** (microsoft/skills). A mean over 1 skill is not comparable to a mean over 15, 192, or 210 skills. The tables in [RESULTS.md](RESULTS.md) are ordered alphabetically by upstream repository, with AIC last. That order is not a ranking, and no repository beats another.
 
 ## Checks
 
-Errors use the Agent Skills specification pinned at `83021e2be457a9b6679148719c1f6074f0ad975e` (checked 2026-11-07) unless a row names Anthropic's skill documents.
+Sources are the Agent Skills specification at `83021e2be457a9b6679148719c1f6074f0ad975e` (checked 2026-11-07), Anthropic's skill overview and authoring guidance, or a rule defined by this checker.
 
 | Rule | Severity | Source |
 | --- | --- | --- |
 | `frontmatter-invalid`, `unreadable`, `undecodable` | error | Spec: YAML frontmatter between `---` lines |
 | `field-unknown` | error | Spec: only `name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools` |
 | `name-missing`, `name-type`, `name-empty`, `name-length`, `name-case`, `name-hyphen-affix`, `name-consecutive-hyphens`, `name-characters`, `name-directory` | error | Spec: 1–64 character lowercase name matching the directory, NFKC-normalized |
-| `name-reserved` | error | Anthropic skill overview: `name` must not contain `anthropic` or `claude` |
-| `description-missing`, `description-type`, `description-empty`, `description-length` | error | Spec: non-empty description of at most 1024 characters |
-| `xml-tag` | error | Anthropic skill overview: no XML tags in `name` or `description` |
+| `description-missing`, `description-type`, `description-empty`, `description-length` | error | Spec: non-empty description of at most 1024 characters. The spec says the description should state what the skill does and when to use it; it does not require a fixed phrase |
 | `license-type`, `compatibility-type`, `compatibility-length`, `metadata-type`, `metadata-value`, `allowed-tools-type` | error | Spec: string license, compatibility of 1–500 characters, string metadata values, string `allowed-tools` |
-| `missing-reference`, `link-escapes`, `symlink-reference`, `link-invalid` | error | Spec: relative files inside the skill directory. Symlinks are not followed |
-| `secret-pattern`, `secret-filename` | error | AIC: high-confidence credential patterns and sensitive filenames |
-| `description-trigger`, `description-terse` | warning | AIC heuristic for the spec's "what it does and when to use it" requirement. Terse means under 40 characters |
-| `description-person` | warning | Anthropic authoring guidance: third-person descriptions |
-| `skill-line-limit` | warning | Spec and authoring guidance: keep `SKILL.md` under 500 lines |
+| `missing-reference`, `symlink-reference`, `link-invalid` | error | Spec: a relative file cited from the skill should exist. Symlinks are not followed |
+| `name-reserved` | error | Anthropic skill overview: `name` must not contain `anthropic` or `claude` |
+| `xml-tag` | error | Anthropic skill overview: no XML tags in `name` or `description` |
+| `description-person` | warning | Anthropic authoring guidance: write descriptions in third person |
+| `skill-line-limit` | warning | Spec and Anthropic authoring guidance: keep `SKILL.md` under 500 lines |
 | `instruction-size` | warning | Spec: instructions under about 5000 tokens. Counted as UTF-8 bytes / 4, not a model tokenizer |
-| `empty-body`, `nested-reference`, `absolute-reference`, `file-truncated` | warning | Spec guidance for a body, one-level references, and portable relative paths |
+| `empty-body`, `nested-reference`, `absolute-reference` | warning | Spec guidance: a body, one-level references, and portable relative paths |
+| `description-trigger` | warning | AIC's own rule. A fixed phrase list stands in for "when to use it". The list includes `use before`, which is the phrase in AIC's own description. A skill can pass this rule because it copies AIC's wording. That is self-favouring and is not a spec requirement |
+| `description-terse` | warning | AIC's own floor: a description under 40 characters is treated as unclear. The spec's minimum is 1 character |
+| `link-escapes` | error | AIC's own rule. A relative link that leaves the skill directory is reported. The spec does not forbid a relative link from one skill to another skill in the same repository |
+| `secret-pattern`, `secret-filename` | error | AIC's own credential patterns and sensitive filenames |
+| `file-truncated` | warning | AIC's own scan cap: only the first 1 MiB of a text file is scanned |
 
-`skills-ref validate` checks frontmatter shape and naming only. This checker is stricter: it also checks links, disclosure size, and secrets. A skill can pass the reference demo library and still fail here.
+`description-trigger` and `link-escapes` are the two rules removed for `mean_score_without_aic_rules`. Secret checks, the terse-description floor, and `file-truncated` stay in both means.
+
+`skills-ref validate` checks frontmatter shape and naming only. This checker also checks links, disclosure size, and secrets. A skill can pass the reference demo library and still fail here.
 
 ## Discovery
 
