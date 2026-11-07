@@ -1,0 +1,8 @@
+{
+  "id": "feature-cursor-page",
+  "title": "Add cursor pagination beside the existing window helper",
+  "category": "feature",
+  "timeout_seconds": 30,
+  "remove": [],
+  "license": "Apache-2.0"
+}

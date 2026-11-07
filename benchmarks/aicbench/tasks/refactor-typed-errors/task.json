@@ -1,0 +1,8 @@
+{
+  "id": "refactor-typed-errors",
+  "title": "Raise typed configuration errors",
+  "category": "refactor",
+  "timeout_seconds": 30,
+  "remove": [],
+  "license": "Apache-2.0"
+}

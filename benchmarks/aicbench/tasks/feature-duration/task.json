@@ -1,0 +1,8 @@
+{
+  "id": "feature-duration",
+  "title": "Parse hour minute second durations",
+  "category": "feature",
+  "timeout_seconds": 30,
+  "remove": [],
+  "license": "Apache-2.0"
+}
