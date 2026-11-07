@@ -1,0 +1,439 @@
+{
+  "schema_version": 3,
+  "pack_version": 1,
+  "pack": "benchmarks/routing/heldout-v2.json",
+  "cases": [
+    {
+      "id": "h2-answer-flag",
+      "expected_workflow": "answer",
+      "expected_template": "direct",
+      "expected_topology": "solo",
+      "hard_negative": false,
+      "rationale": "The requested outcome is an explanation, so the category is answer. One owner can finish a bounded explanation from one pasted paragraph, which is the direct family. direct allows only solo."
+    },
+    {
+      "id": "h2-answer-no-team",
+      "expected_workflow": "answer",
+      "expected_template": "direct",
+      "expected_topology": "solo",
+      "hard_negative": true,
+      "rationale": "Hard negative: the request names a team, which tempts explore-build or parallel delivery. The outcome is still one bounded answer from a single pasted sentence, and one owner can carry it. Extra people would only move that sentence around. direct allows only solo."
+    },
+    {
+      "id": "h2-answer-two-sources",
+      "expected_workflow": "answer",
+      "expected_template": "explore-build",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is an answer. The current bottleneck is two substantial unknowns with separate sources, notes, and checks, so the family is explore-build. That family allows only parallel discovery before one owner synthesizes."
+    },
+    {
+      "id": "h2-answer-glossary-then-notice",
+      "expected_workflow": "answer",
+      "expected_template": "coordinated-delivery",
+      "expected_topology": "sequential",
+      "hard_negative": false,
+      "rationale": "The outcome is an answer. The second unit cannot start from an agreed interface; it needs the first unit's accepted artifact. That is coordinated-delivery with a sequential handoff, not parallel discovery."
+    },
+    {
+      "id": "h2-answer-grant-sentence",
+      "expected_workflow": "answer",
+      "expected_template": "independent-review",
+      "expected_topology": "generator-evaluator",
+      "hard_negative": false,
+      "rationale": "The outcome is an answer that will be quoted publicly. A wrong figure is a consequential acceptance risk, so a separately briefed evaluator of the sentence is justified. independent-review allows only generator-evaluator."
+    },
+    {
+      "id": "h2-answer-incident",
+      "expected_workflow": "answer",
+      "expected_template": "independent-review",
+      "expected_topology": "generator-evaluator",
+      "hard_negative": false,
+      "rationale": "The outcome is an answer. A wrong public statement is a consequential acceptance risk, and the check is a separately briefed evaluator of the draft rather than another author. independent-review allows only generator-evaluator."
+    },
+    {
+      "id": "h2-answer-faq-resume",
+      "expected_workflow": "answer",
+      "expected_template": "adaptive-controller",
+      "expected_topology": "solo",
+      "hard_negative": false,
+      "rationale": "The outcome is an answer. The work is interruptible and needs the durable ledger, so the family is adaptive-controller even though no optimization is authorized. The current stage is one coupled unit, so the topology is solo. Durable delivery does not require a benchmark."
+    },
+    {
+      "id": "h2-answer-faq-branches",
+      "expected_workflow": "answer",
+      "expected_template": "adaptive-controller",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is an answer. Long interruptible work with a durable ledger is adaptive-controller. The current stage is two ready independent branches with a fixed interface, so the recorded topology is parallel. The family stays adaptive-controller because the program, not only this stage, needs durable state."
+    },
+    {
+      "id": "h2-research-short-read",
+      "expected_workflow": "research",
+      "expected_template": "direct",
+      "expected_topology": "solo",
+      "hard_negative": true,
+      "rationale": "Hard negative: two topics tempt explore-build. Both passages are already supplied and one owner can check them, so the transfer cost of a second investigator is the whole task. The outcome is a short research note, and direct allows only solo."
+    },
+    {
+      "id": "h2-research-no-oracle",
+      "expected_workflow": "research",
+      "expected_template": "direct",
+      "expected_topology": "solo",
+      "hard_negative": true,
+      "rationale": "Hard negative: a timing result tempts an adaptive-controller optimization campaign. There is no correctness baseline and the measurements are not comparable, so optimization is not authorized. The outcome is a bounded research note for one owner: direct and solo."
+    },
+    {
+      "id": "h2-research-two-rfcs",
+      "expected_workflow": "research",
+      "expected_template": "explore-build",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is research. Two substantial independent unknowns have separate sources and checks, so the family is explore-build, whose only topology is parallel discovery before one synthesis."
+    },
+    {
+      "id": "h2-research-ordered-memos",
+      "expected_workflow": "research",
+      "expected_template": "coordinated-delivery",
+      "expected_topology": "sequential",
+      "hard_negative": true,
+      "rationale": "Hard negative: the ticket says parallel. The second memo is blocked on the first memo's accepted glossary, so the branches are not ready. coordinated-delivery uses sequential for an accepted-artifact handoff. The outcome is still research."
+    },
+    {
+      "id": "h2-research-ready-memos",
+      "expected_workflow": "research",
+      "expected_template": "coordinated-delivery",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is research. The questions and interface are already fixed, and the two memos are ready independent branches, so this is coordinated-delivery in parallel rather than explore-build discovery."
+    },
+    {
+      "id": "h2-research-claim-check",
+      "expected_workflow": "research",
+      "expected_template": "independent-review",
+      "expected_topology": "generator-evaluator",
+      "hard_negative": false,
+      "rationale": "The outcome is research. The note will be quoted publicly, so acceptance risk justifies a separately briefed evaluator of the artifact. independent-review allows only generator-evaluator. The author's own confidence is not the check."
+    },
+    {
+      "id": "h2-research-resume",
+      "expected_workflow": "research",
+      "expected_template": "adaptive-controller",
+      "expected_topology": "solo",
+      "hard_negative": false,
+      "rationale": "The outcome is research. Interruptible work that must keep a source ledger is adaptive-controller. The current stage is one owner and one coupled citation, so the topology is solo. Continuity is not a measured-optimization campaign."
+    },
+    {
+      "id": "h2-research-label-sources",
+      "expected_workflow": "research",
+      "expected_template": "explore-build",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is research. The two statutes are substantial independent unknowns, not ready branches with a fixed interface. explore-build allows only parallel discovery before one owner synthesizes the note."
+    },
+    {
+      "id": "h2-impl-tiny-labels",
+      "expected_workflow": "implementation",
+      "expected_template": "direct",
+      "expected_topology": "solo",
+      "hard_negative": true,
+      "rationale": "Hard negative: disjoint files tempt coordinated-delivery in parallel. Each change is a few characters of tightly coupled copy, and one owner can carry both through acceptance with less handoff than two branches. direct allows only solo."
+    },
+    {
+      "id": "h2-impl-forbid-optimize",
+      "expected_workflow": "implementation",
+      "expected_template": "direct",
+      "expected_topology": "solo",
+      "hard_negative": true,
+      "rationale": "Hard negative: a baseline and a benchmark tempt adaptive-controller measured optimization. Optimization was forbidden, so the authorized work is one owner's bounded implementation assessment. That is direct and solo."
+    },
+    {
+      "id": "h2-impl-discover-first",
+      "expected_workflow": "implementation",
+      "expected_template": "explore-build",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is implementation, but the current bottleneck is two substantial independent unknowns. explore-build is parallel discovery before one owner synthesizes any later build. The build itself is not this stage."
+    },
+    {
+      "id": "h2-impl-shared-invariant",
+      "expected_workflow": "implementation",
+      "expected_template": "coordinated-delivery",
+      "expected_topology": "sequential",
+      "hard_negative": true,
+      "rationale": "Hard negative: different files tempt a parallel branch. The consumer is blocked on an unresolved shared invariant, so the interface is not ready. coordinated-delivery uses sequential accepted-artifact handoff. The outcome is implementation."
+    },
+    {
+      "id": "h2-impl-disjoint-modules",
+      "expected_workflow": "implementation",
+      "expected_template": "coordinated-delivery",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is implementation. Both branches are ready, the interface is fixed, and the write scopes are disjoint, so coordinated-delivery uses parallel with one integration owner."
+    },
+    {
+      "id": "h2-impl-auth-eval",
+      "expected_workflow": "implementation",
+      "expected_template": "independent-review",
+      "expected_topology": "generator-evaluator",
+      "hard_negative": false,
+      "rationale": "The outcome is implementation. Cross-site data exposure is a consequential acceptance risk, so a separately briefed evaluator of the actual behavior is required. independent-review allows only generator-evaluator."
+    },
+    {
+      "id": "h2-impl-resume-one-unit",
+      "expected_workflow": "implementation",
+      "expected_template": "adaptive-controller",
+      "expected_topology": "solo",
+      "hard_negative": false,
+      "rationale": "The outcome is implementation. The session can be interrupted and must keep a durable record of an external send, so the family is adaptive-controller. One ready coupled unit means the current topology is solo. Delivery continuity is not optimization."
+    },
+    {
+      "id": "h2-impl-ordered-resume",
+      "expected_workflow": "implementation",
+      "expected_template": "adaptive-controller",
+      "expected_topology": "sequential",
+      "hard_negative": false,
+      "rationale": "The outcome is implementation. A multi-week migration with a checkpoint file is adaptive-controller. The current stage is an accepted-artifact handoff, so the topology is sequential. The durable program is why this is not only coordinated-delivery."
+    },
+    {
+      "id": "h2-debug-holiday-notes",
+      "expected_workflow": "debug",
+      "expected_template": "explore-build",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is debug. Two substantial independent evidence questions remain, with disjoint notes and no shared fix yet. explore-build applies, and its only topology is parallel discovery before one owner chooses a change."
+    },
+    {
+      "id": "h2-debug-one-parser",
+      "expected_workflow": "debug",
+      "expected_template": "direct",
+      "expected_topology": "solo",
+      "hard_negative": true,
+      "rationale": "Hard negative: two failing commands tempt explore-build. The evidence is one shared function the owner already has, so a second investigation duplicates the same context. The outcome is debug, and the family is direct with solo."
+    },
+    {
+      "id": "h2-debug-two-hypotheses",
+      "expected_workflow": "debug",
+      "expected_template": "explore-build",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is debug. Two substantial independent unknowns remain, with disjoint evidence and no shared patch yet. explore-build is parallel discovery before one owner chooses the fix."
+    },
+    {
+      "id": "h2-debug-trace-then-repro",
+      "expected_workflow": "debug",
+      "expected_template": "coordinated-delivery",
+      "expected_topology": "sequential",
+      "hard_negative": false,
+      "rationale": "The outcome is debug. The second unit needs the first unit's accepted artifact, so coordinated-delivery is sequential. The units are not independent unknowns that can be explored together."
+    },
+    {
+      "id": "h2-debug-two-fixtures",
+      "expected_workflow": "debug",
+      "expected_template": "coordinated-delivery",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is debug. The fixtures are ready independent branches with an agreed report format and disjoint paths, so coordinated-delivery uses parallel. They are not a generator and an evaluator."
+    },
+    {
+      "id": "h2-debug-patch-eval",
+      "expected_workflow": "debug",
+      "expected_template": "independent-review",
+      "expected_topology": "generator-evaluator",
+      "hard_negative": false,
+      "rationale": "The outcome is debug. A customer-visible money error is a consequential acceptance risk, and the evaluator must see the artifact and the failing sale rather than the author's story. independent-review allows only generator-evaluator."
+    },
+    {
+      "id": "h2-debug-incident-resume",
+      "expected_workflow": "debug",
+      "expected_template": "adaptive-controller",
+      "expected_topology": "sequential",
+      "hard_negative": false,
+      "rationale": "The outcome is debug. The incident spans sessions and needs a durable file, so the family is adaptive-controller. The current handoff is sequential because reproduction waits on the accepted trace. No optimization has been authorized."
+    },
+    {
+      "id": "h2-debug-writeup-eval-stage",
+      "expected_workflow": "debug",
+      "expected_template": "adaptive-controller",
+      "expected_topology": "generator-evaluator",
+      "hard_negative": false,
+      "rationale": "The outcome is debug. The multi-session ledger makes the family adaptive-controller. The current stage is a separately briefed check of one artifact, so the topology is generator-evaluator. The stage topology is not a new family."
+    },
+    {
+      "id": "h2-review-caption-eval",
+      "expected_workflow": "review",
+      "expected_template": "independent-review",
+      "expected_topology": "generator-evaluator",
+      "hard_negative": false,
+      "rationale": "The outcome is a review. Publishing the change on every caption is a consequential acceptance risk, so a separately briefed evaluator of the diff is justified. independent-review allows only generator-evaluator."
+    },
+    {
+      "id": "h2-review-self-check",
+      "expected_workflow": "review",
+      "expected_template": "direct",
+      "expected_topology": "solo",
+      "hard_negative": true,
+      "rationale": "Hard negative: the word independent tempts independent-review. The change is one bounded line with the evidence attached, and there is no consequential acceptance risk or observed self-review gap that justifies another person. direct and solo."
+    },
+    {
+      "id": "h2-review-two-evidence",
+      "expected_workflow": "review",
+      "expected_template": "explore-build",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is a review, and the bottleneck is two substantial independent evidence unknowns. explore-build covers that discovery in parallel before one owner writes the finding."
+    },
+    {
+      "id": "h2-review-dependent-checklist",
+      "expected_workflow": "review",
+      "expected_template": "coordinated-delivery",
+      "expected_topology": "sequential",
+      "hard_negative": false,
+      "rationale": "The outcome is a review. The second deliverable waits on the first deliverable's accepted artifact. coordinated-delivery uses sequential for that handoff."
+    },
+    {
+      "id": "h2-review-two-reports",
+      "expected_workflow": "review",
+      "expected_template": "coordinated-delivery",
+      "expected_topology": "parallel",
+      "hard_negative": true,
+      "rationale": "Hard negative: two review branches tempt independent-review. Neither branch evaluates the other's artifact; both are ready peer deliverables with a fixed rubric and disjoint paths. That is coordinated-delivery in parallel. The category remains review."
+    },
+    {
+      "id": "h2-review-rubric-eval",
+      "expected_workflow": "review",
+      "expected_template": "independent-review",
+      "expected_topology": "generator-evaluator",
+      "hard_negative": false,
+      "rationale": "The outcome is a review of a consequential runbook. A separately briefed evaluator must see the artifact and the original criteria. independent-review allows only generator-evaluator."
+    },
+    {
+      "id": "h2-review-program-resume",
+      "expected_workflow": "review",
+      "expected_template": "adaptive-controller",
+      "expected_topology": "generator-evaluator",
+      "hard_negative": false,
+      "rationale": "The outcome is review. The program is interruptible and ledger-backed, so the family is adaptive-controller. The current stage is a separate evaluation of one artifact, so the topology is generator-evaluator."
+    },
+    {
+      "id": "h2-review-scanner-evidence",
+      "expected_workflow": "review",
+      "expected_template": "explore-build",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is a review, and the bottleneck is two substantial independent evidence unknowns. explore-build covers that discovery in parallel before one reviewer writes the finding."
+    },
+    {
+      "id": "h2-design-two-names",
+      "expected_workflow": "design",
+      "expected_template": "direct",
+      "expected_topology": "solo",
+      "hard_negative": false,
+      "rationale": "The outcome is a design choice. It is bounded and coupled to one field, so one owner can carry it. direct allows only solo."
+    },
+    {
+      "id": "h2-design-one-sitting",
+      "expected_workflow": "design",
+      "expected_template": "direct",
+      "expected_topology": "solo",
+      "hard_negative": true,
+      "rationale": "Hard negative: the epic title tempts adaptive-controller. The approved decision is one reversible choice with the rule already pasted, and no durable state is required. The outcome is design, the family is direct, and the topology is solo."
+    },
+    {
+      "id": "h2-design-two-requirements",
+      "expected_workflow": "design",
+      "expected_template": "explore-build",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is design. Two substantial independent requirements are still unknown, so explore-build applies, with parallel discovery and one designer synthesizing the pattern."
+    },
+    {
+      "id": "h2-design-schema-then-protocol",
+      "expected_workflow": "design",
+      "expected_template": "coordinated-delivery",
+      "expected_topology": "sequential",
+      "hard_negative": false,
+      "rationale": "The outcome is design. The wire order is an accepted-artifact handoff from the field list, so coordinated-delivery is sequential. The second unit is not an independent unknown."
+    },
+    {
+      "id": "h2-design-icon-unknowns",
+      "expected_workflow": "design",
+      "expected_template": "explore-build",
+      "expected_topology": "parallel",
+      "hard_negative": false,
+      "rationale": "The outcome is design. Contrast and size are substantial independent unknowns, so explore-build uses parallel discovery before one designer chooses the icon."
+    },
+    {
+      "id": "h2-design-rotation-eval",
+      "expected_workflow": "design",
+      "expected_template": "independent-review",
+      "expected_topology": "generator-evaluator",
+      "hard_negative": false,
+      "rationale": "The outcome is design. A failed key overlap is a consequential acceptance risk, so a separately briefed evaluator of the design is justified. independent-review allows only generator-evaluator."
+    },
+    {
+      "id": "h2-design-ordered-program",
+      "expected_workflow": "design",
+      "expected_template": "adaptive-controller",
+      "expected_topology": "sequential",
+      "hard_negative": false,
+      "rationale": "The outcome is design. The work is interruptible and log-backed, so the family is adaptive-controller. The current units are an accepted-artifact sequence, so the topology is sequential."
+    },
+    {
+      "id": "h2-design-measured-options",
+      "expected_workflow": "design",
+      "expected_template": "adaptive-controller",
+      "expected_topology": "solo",
+      "hard_negative": false,
+      "rationale": "The outcome is a design choice. Explicitly approved optimization with a correct baseline, comparable measurements, and a bound is adaptive-controller, not an ordinary direct edit. One designer owns the current stage, so the topology is solo."
+    }
+  ],
+  "project_case": {
+    "id": "h2-library-hold-plan",
+    "rationale": "The mailer is a mixed project. Each stage keeps the original acceptance and records only that stage's category, family, and current topology. Milestones and invariants are planning checks, not extra recommendation fields.",
+    "stages": [
+      {
+        "id": "requirement-notes",
+        "expected_workflow": "research",
+        "expected_template": "explore-build",
+        "expected_topology": "parallel",
+        "rationale": "The stage outcome is research. Two substantial independent public requirements are explore-build, which allows only parallel."
+      },
+      {
+        "id": "subject-contract",
+        "expected_workflow": "design",
+        "expected_template": "direct",
+        "expected_topology": "solo",
+        "rationale": "The stage outcome is design. The subject line is a small coupled choice for one owner, so the family is direct and the topology is solo."
+      },
+      {
+        "id": "template-then-html",
+        "expected_workflow": "implementation",
+        "expected_template": "coordinated-delivery",
+        "expected_topology": "sequential",
+        "rationale": "The stage outcome is implementation. The renderer needs the accepted template, so coordinated-delivery is sequential."
+      },
+      {
+        "id": "two-renderers",
+        "expected_workflow": "implementation",
+        "expected_template": "coordinated-delivery",
+        "expected_topology": "parallel",
+        "rationale": "The stage outcome is implementation. Both renderers are ready independent branches with a fixed field list, so coordinated-delivery is parallel."
+      },
+      {
+        "id": "mailer-acceptance",
+        "expected_workflow": "review",
+        "expected_template": "independent-review",
+        "expected_topology": "generator-evaluator",
+        "rationale": "The stage outcome is review. A separate evaluator of the mailer is independent-review, which allows only generator-evaluator."
+      },
+      {
+        "id": "later-session",
+        "expected_workflow": "implementation",
+        "expected_template": "adaptive-controller",
+        "expected_topology": "solo",
+        "rationale": "The stage outcome is implementation. An interruptible continuation with a send ledger is adaptive-controller. One coupled unit makes the current topology solo, and no benchmark is required."
+      }
+    ]
+  }
+}

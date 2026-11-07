@@ -1,4 +1,6 @@
-"""Write prompts for the held-out routing scenarios.
+"""Write prompts for a routing pack.
+
+The default pack is the dev fixture, tests/fixtures/routing-scenarios.json.
 
 Prompt generation does not read ANTHROPIC_API_KEY and does not call a model.
 The paired model run is ``python -m benchmarks.routing.compare``.
@@ -109,9 +111,13 @@ def receipt(path: Path, count: int) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="benchmarks.routing.baseline",
-        description="Write routing prompts from the held-out pack. Does not call a model or read an API key.",
+        description="Write routing prompts from a routing pack. Does not call a model or read an API key.",
     )
-    parser.add_argument("--scenarios", type=Path, help="Routing pack JSON. Defaults to the held-out fixture.")
+    parser.add_argument(
+        "--scenarios",
+        type=Path,
+        help="Routing pack JSON. Defaults to the dev pack tests/fixtures/routing-scenarios.json.",
+    )
     parser.add_argument("--output", type=Path, help="Write the JSONL prompt pack here. Refuses to overwrite.")
     return parser
 

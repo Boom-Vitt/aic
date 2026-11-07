@@ -36,9 +36,13 @@ The smoke receipt sets `public_benchmark_scores` to null, `invokes_model` to fal
 
 `plan` on a public suite exits 3 and writes no score. `run` on a public suite exits 3.
 
-## Held-out routing pack
+## Routing packs
 
-`tests/fixtures/routing-scenarios.json` is an evaluation fixture. Skill text must never be derived from its held-out cases. Do not read that pack when editing `skills/aic`. A skill written from those requests or labels measures the fixture instead of the skill.
+`tests/fixtures/routing-scenarios.json` has doc role `dev`. Tuning happens only on that pack. Skill text must never be derived from its cases. Do not read it when editing `skills/aic`. A skill written from those requests or labels measures the fixture instead of the skill.
+
+`benchmarks/routing/heldout-v2.json` is the release pack. Score it once per release. Do not tune the skill against it, and do not read it when editing `skills/aic`. Its answers file is not model input.
+
+`python -m benchmarks.routing.score` and `python -m benchmarks.routing.compare` accept `--pack` for either file. The default remains the dev pack.
 
 ## What a scale run still needs
 

@@ -49,6 +49,8 @@ The repository template under `templates/orca-claude/`, `.claude/`, and `scripts
 
 Do not publish a benchmark score without a receipt from `scripts/benchmark-run.sh`. Public suites stay blocked until a pinned checkout, its license, and a real run exist. The smoke suite is a recorder check, not a result.
 
+Tune routing guidance only on the dev pack `tests/fixtures/routing-scenarios.json`. Score `benchmarks/routing/heldout-v2.json` once per release. Do not read either pack while editing `skills/aic`.
+
 ## Implement and verify
 
 Write regressions for plausible consumer failures: traversal, unauthorized effects, modified/unmanaged preservation, evidence freshness, semantic interface overlap and uncertain launch replay. Do not pin prose, incidental implementation or mocked success as live behavior.
