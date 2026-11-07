@@ -8,6 +8,8 @@ AIC's product boundary stays in force for every recommendation below: skills-fir
 
 AIC 0.0.3 already ships one portable skill, five original workflow families, schema-3 recommendation validation, scoped memory and handoffs, a research and rights ledger, documented harness discovery paths with evidence levels, a one-plugin marketplace, and four read-only MCP tools bound to one approved project. The host reasons and executes. AIC does not launch agents, infer a workflow with a keyword classifier, or read project source through MCP.
 
+AIC also already has a held-out routing pack at `tests/fixtures/routing-scenarios.json`. That file pairs each request with `expected_workflow`, `expected_template`, and `expected_topology` (27 cases, plus one mixed project case with stage labels). Its `limits` text says those expected fields and stage labels are withheld from fresh host-AI inputs, and that offline tests check schema coverage and unchanged-value preservation rather than semantic request understanding. `docs/verification.md` records held-out comparisons in which hosts saw the request text without those labels. The unittest tree does not load this fixture to score a recommendation.
+
 A feature counts as missing only when that consumer-visible surface is absent. A large catalog of role prompts is not, by itself, a missing AIC feature.
 
 ## Inclusion rule
@@ -100,7 +102,7 @@ MIT. The GitHub description says the repo is Garry Tan's setup of 23 tools cover
 
 Traction tracks an opinionated sprint: plan, review, QA in a browser, then ship, with benchmarks in-tree.
 
-AIC lacks a review-finding artifact, a changed-surface verification procedure, and any in-repo evaluation of whether a workflow choice was the right one. AIC's families already warn against a fixed role roster, so the CEO/designer/QA agent team is not a feature to add. The sprint's evidence gates are the part that fits.
+AIC already records held-out routing comparisons against `tests/fixtures/routing-scenarios.json` in `docs/verification.md`. The open evaluation gap is an automated scorer for those labels, listed first below. Still absent are a review-finding artifact and a changed-surface verification procedure. AIC's families already warn against a fixed role roster, so the CEO/designer/QA agent team is not a feature to add. The sprint's evidence gates are the part that fits.
 
 ### thedotmack/claude-mem
 
@@ -116,7 +118,7 @@ MIT. Twenty-five skill directories, four agent files (`code-reviewer`, `security
 
 Traction tracks production engineering procedures plus an eval directory, from an author with an existing engineering audience. The eval cases were not copied or scored.
 
-AIC's catalog can express the same task shapes as family choices, and it does not ship these procedures or a scenario pack that checks the choice. That is the highest-signal gap in the set: comparable skills exist, and at least one peer stores eval fixtures beside them.
+AIC's catalog can express the same task shapes as family choices, and it does not ship these separate procedures. The labeled routing pack already exists; what that peer's `evals/` directory still highlights is an automated check that scores a recommendation against those labels.
 
 ### ruvnet/ruflo
 
@@ -154,13 +156,13 @@ This is the distribution channel AIC does not occupy. `docs/compatibility.md` al
 
 MIT. **92** plugin directories, plus `evals/` (including `static-score-snapshot.json`), `tools/`, and docs `architecture.md`, `authoring.md`, `harnesses.md`, `plugin-eval.md`, and `round-trip-results.md`. The repository description says plugins, agents, skills, and commands are written once in Markdown and adapted per tool by generators with validation and evals. Host folders include `.claude-plugin` and `.cursor-plugin`. The generator source was not reviewed line by line, and the score snapshot was not treated as an AIC result.
 
-AIC documents several skill discovery paths and ships a Claude Code plugin only. It does not generate per-host plugin manifests, and it should not add those manifests until a host is actually exercised. The portable idea is the eval snapshot: a checked artifact that records what was measured, on which fixture, with an explicit limit. AIC's verification receipts are maintainer logs, not a skill-impact fixture.
+AIC documents several skill discovery paths and ships a Claude Code plugin only. It does not generate per-host plugin manifests, and it should not add those manifests until a host is actually exercised. The portable idea is the eval snapshot: a checked artifact that records what was measured, on which fixture, with an explicit limit. AIC's held-out fixture and `docs/verification.md` already record dated match counts. Those receipts are observations. `./scripts/verify.sh` does not score a new recommendation against the fixture labels.
 
 ### davila7/claude-code-templates
 
 MIT. Description: an open-source registry and CLI for agents, commands, skills, hooks, MCPs, settings, and mods. The tree includes `cli-tool/`, `cli-rust/`, `dashboard/`, `cloudflare-workers/`, `docs/`, and `component-validation.json`. The live registry was not called.
 
-A public registry would be a different product and a second entry point. AIC's contributing guide already keeps the host agent as the way users work. Not recommended. `component-validation.json` is another existence proof that peers validate component shape in CI. AIC already validates recommendations; it does not yet validate a held-out choice against a labeled scenario.
+A public registry would be a different product and a second entry point. AIC's contributing guide already keeps the host agent as the way users work. Not recommended. `component-validation.json` is another existence proof that peers validate component shape in CI. AIC already validates recommendation shape, and `tests/fixtures/routing-scenarios.json` already labels held-out choices. The automated suite does not yet score a recommendation against those labels.
 
 ### alirezarezvani/claude-skills
 
@@ -194,7 +196,7 @@ Auto-activation by a hook or a second model conflicts with recommendation-first 
 
 ## Catalogs
 
-`hesreallyhim/awesome-claude-code` is the largest general Claude Code list in this search (**57,463** stars). The root `LICENSE` is Creative Commons Attribution-NonCommercial-NoDerivatives 4.0. The file says the maintainer chose that grant to limit modified reuse. AIC can cite the repository. AIC cannot adapt the list, copy the resource table, or build a derivative catalog from it. NonCommercial is also incompatible with folding the list into Apache-2.0 material. The list's scope, from its description and tree (`THE_RESOURCES_TABLE_NEW.csv`, `resources/`, a generator script), is skills, agents, status lines, hooks, and plugins. That scope explains demand. It is not a feature specification AIC can reuse.
+`hesreallyhim/awesome-claude-code` is the largest general Claude Code list in this search (**57,463** stars). The root `LICENSE` is Creative Commons Attribution-NonCommercial-NoDerivatives 4.0. The license file says that grant was adopted to prevent appropriation for harmful or predatory uses, and it invites contact for projects that use the list in a modified form. AIC can cite the repository. Copying the resource table, or folding a derivative catalog into this Apache-2.0 tree, stays outside that grant unless the maintainer agrees. The list's scope, from its description and tree (`THE_RESOURCES_TABLE_NEW.csv`, `resources/`, a generator script), is skills, agents, status lines, hooks, and plugins. That scope explains demand. It is not a feature specification AIC can reuse.
 
 `ComposioHQ/awesome-claude-skills` (**78,987** stars) has no root `LICENSE` file. The README license section states Apache-2.0 and says individual skills may differ. Several directories share names with Anthropic example skills (`skill-creator`, `mcp-builder`, document skills, `theme-factory`, `slack-gif-creator`). Until each folder's license is read, the bodies are not cleared. This note uses the repo only as evidence that skill catalogs attract stars.
 
@@ -208,7 +210,7 @@ The high-star repositories cluster into a few mechanisms:
 
 1. **Named procedures for daily work.** Superpowers and Addy Osmani ship plan, TDD, debug, review, and verify as separate skills. AIC ships the decision among five families and leaves the procedure in long references.
 2. **Something that survives compaction.** claude-mem captures sessions. planning-with-files and archived GSD put the plan in files and re-inject it. AIC can validate a handoff and promote a reviewed note; it does not give the host a plan file to reopen.
-3. **Evaluation artifacts.** Addy Osmani, wshobson, gstack, and planning-with-files keep evals, benchmarks, or score snapshots in the repo. AIC's tests check safety and schema behavior. They do not check that a labeled task selects a labeled family.
+3. **Evaluation artifacts.** Addy Osmani, wshobson, gstack, and planning-with-files keep evals, benchmarks, or score snapshots in the repo. AIC already stores labeled held-out requests and records manual host comparisons. Its offline tests check safety, schema coverage, and unchanged-value preservation. They do not score a recommendation against `expected_workflow`, `expected_template`, and `expected_topology`.
 4. **Many hosts.** Superpowers, ECC, and wshobson ship per-host packages. AIC copies one skill into documented discovery directories and only manifests a Claude Code plugin. Extra manifests without live discovery evidence would over-claim.
 5. **Injection.** Session hooks, status lines, auto-activation classifiers, and memory daemons are common and popular. They conflict with the skills-only plugin, the read-only MCP adapter, and scoped memory.
 6. **Breadth and personas.** ECC, wshobson, VoltAgent, Alireza Rezvani, and gstack's role roster win stars with surface area. AIC's research position is that a fixed team is not a default.
@@ -218,7 +220,7 @@ The high-star repositories cluster into a few mechanisms:
 These are consumer-visible gaps, restricted to behavior that can exist inside AIC's boundaries:
 
 - Triggerable procedure skills for planning, debugging, verification, and clean-input review.
-- A held-out scenario pack that pairs a task with the family and topology the contract requires.
+- An automated suite that checks a recommendation against the existing held-out labels and scores it.
 - A durable plan record the host re-reads after compaction, without a hook or a daemon.
 - A review-finding record with a location, an observation, and room for a bounded no-findings result.
 - A security-review procedure that never opens secrets and never runs attack tooling on its own.
@@ -234,7 +236,7 @@ These are consumer-visible gaps, restricted to behavior that can exist inside AI
 - claude-mem's capture-all memory path. Scoped promotion stays the memory model. The Apache-2.0 license does not override that product rule.
 - Fixed swarms and persona catalogs (ruflo, VoltAgent, gstack's role team, ECC's agent directory).
 - Unlicensed text: Karpathy guidelines, travisvn's list, disler's hook guide.
-- hesreallyhim's list or table (CC BY-NC-ND 4.0).
+- hesreallyhim's list or table. CC BY-NC-ND 4.0 does not grant that reuse; the license file invites contact before a modified-form project.
 - Composio skill bodies until each folder's license is read. Shared names with Anthropic skills are a reason to be stricter, not looser.
 - Anthropic example-skill implementations and the skill-creator eval viewer. Sampled skills are Apache-2.0; the repo has no root license, and `THIRD_PARTY_NOTICES.md` includes GPL-3.0 components. AIC already attributes skill-creator as a structural reference.
 - Official plugin source, even under Apache-2.0, unless a later change retains the license and notices and reviews the file. This note recommends original procedures instead.
@@ -246,7 +248,7 @@ These are consumer-visible gaps, restricted to behavior that can exist inside AI
 
 Ranking is a judgment of product-quality value for AIC from this review. It is not a measured bake-off. Effort is change size, not a schedule. Every item is original AIC writing and tests. None of them copy upstream skill text. If a later change does copy MIT or Apache-2.0 material, keep that upstream license notice and add the attribution to `NOTICE`.
 
-1. **Held-out workflow-selection scenario pack.** Add task fixtures with the family, allowed topologies, and the reason a simpler family is insufficient. A deterministic test accepts only a schema-3 recommendation that matches the label. Live model scoring stays outside `./scripts/verify.sh` and, when someone runs it, records the host and model. This is the benchmark gap peers already file under `evals/`. **Effort: medium.** New fixtures, a checker, and a short note in the verification docs. No schema migration.
+1. **Automated scorer for the existing held-out pack.** `tests/fixtures/routing-scenarios.json` already pairs each request with `expected_workflow`, `expected_template`, and `expected_topology`, and its `limits` text withholds those labels from fresh host inputs. `docs/verification.md` already records held-out comparisons. The narrower gap is an automated suite that checks a recommendation against those labels and scores it. `./scripts/verify.sh` stays model-free; a live host run remains a separately recorded receipt, and the fixture must not become a keyword classifier. **Effort: small.** One scorer over the existing fixture. No new scenario pack and no schema migration.
 
 2. **Separately triggered procedure skills.** Add original skills for plan-before-edits, debug-from-the-reported-failure, verify-the-changed-surface, and clean-input review. Keep them in the skills-only plugin, with descriptions specific enough for host skill triggering, and with no `hooks.json`. Names and steps are AIC's; the existence of the split is what superpowers and `addyosmani/agent-skills` demonstrate. **Effort: large.** Several skill trees, package and install coverage, and trigger descriptions that do not bloat the current `SKILL.md`.
 
