@@ -7,6 +7,7 @@
 set -euo pipefail
 
 PLUGIN_SHA="ad1a6032465546883d57299fda5677d6b2a7750d"
+PLUGIN_ID="boom-big-nose-workflow@claude-mods-boombignose"
 PLUGIN_URL="https://github.com/Boom-Vitt/claude-mods-boombignose.git"
 MIN_FREE_KB="${AIC_ORCA_MIN_FREE_KB:-6291456}"
 BREW="/opt/homebrew/bin/brew"
@@ -124,15 +125,50 @@ sync_plugin() {
   git -C "$cache" checkout --detach FETCH_HEAD
 }
 
-link_plugin() {
-  local cache
-  cache="$(plugin_cache)"
-  export PATH="/opt/homebrew/bin:${PATH}"
-  if command -v claude >/dev/null 2>&1 && claude plugin list 2>/dev/null | grep -q 'boom-big-nose-workflow'; then
+claude_bin() {
+  if [ -n "${AIC_ORCA_CLAUDE:-}" ]; then
+    printf '%s' "$AIC_ORCA_CLAUDE"
     return 0
   fi
-  claude plugin marketplace add "$cache"
-  claude plugin install "boom-big-nose-workflow@boombignose-mods"
+  command -v claude
+}
+
+plugin_list_has_pin() {
+  local line token has_id has_sha
+  local -a tokens
+  while IFS= read -r line || [ -n "$line" ]; do
+    has_id=0
+    has_sha=0
+    # shellcheck disable=SC2206
+    tokens=( $line )
+    for token in "${tokens[@]}"; do
+      case "$token" in
+        "$PLUGIN_ID") has_id=1 ;;
+        "$PLUGIN_SHA"|ad1a603) has_sha=1 ;;
+      esac
+    done
+    if [ "$has_id" -eq 1 ] && [ "$has_sha" -eq 1 ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+link_plugin() {
+  local cache binary list
+  cache="$(plugin_cache)"
+  export PATH="/opt/homebrew/bin:${PATH}"
+  binary="$(claude_bin || true)"
+  if [ -z "$binary" ]; then
+    echo "claude is not on PATH" >&2
+    return 1
+  fi
+  list="$("$binary" plugin list 2>/dev/null || true)"
+  if printf '%s\n' "$list" | plugin_list_has_pin; then
+    return 0
+  fi
+  "$binary" plugin marketplace add "$cache"
+  "$binary" plugin install "$PLUGIN_ID"
 }
 
 run_doctor() {
@@ -226,8 +262,10 @@ main() {
     exit 1
   fi
   ensure_formula node
-  if ! command -v python3 >/dev/null 2>&1; then
-    ensure_formula python@3.11
+  if ! command -v python3 >/dev/null 2>&1 && ! command -v python3.11 >/dev/null 2>&1; then
+    if ! "$BREW" list --versions python@3.11 2>/dev/null | grep -q .; then
+      ensure_formula python@3.11
+    fi
   fi
   if ! command -v claude >/dev/null 2>&1; then
     "$BREW" install --cask claude-code

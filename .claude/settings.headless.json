@@ -17,8 +17,6 @@
       "Bash(git merge-tree *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(pytest *)",
-      "Bash(python3 *)",
       "Bash(./scripts/verify.sh)",
       "Bash(./scripts/verify.sh *)",
       "Bash(./gate.sh)",

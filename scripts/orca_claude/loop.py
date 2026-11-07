@@ -10,7 +10,9 @@ import subprocess
 import sys
 
 from orca_claude.plan import PlanError, load_plan, plan_hash, validate_plan
-from orca_claude.policy import RESULT_SCHEMA, PolicyError, build_claude_argv, interpret_claude_result, parse_version
+from orca_claude.policy import (
+    RESULT_SCHEMA, PolicyError, build_claude_argv, interpret_claude_result, parse_version, recorded_effects,
+)
 from orca_claude.review import assess_readiness
 
 
@@ -66,7 +68,10 @@ def select_budget(max_agents: int, max_worktrees: int, available: int | None, *,
         raise LoopError(f'budgets cannot exceed {CEILING_AGENTS} agents and {CEILING_WORKTREES} worktrees.', 3)
     notes: list[str] = []
     agents, trees = max_agents, max_worktrees
-    if available is not None and available < REFUSE_DISK_KB:
+    if available is None:
+        notes.append('free disk is unknown; budget is capped at one stream.')
+        agents, trees = 1, 1
+    elif available < REFUSE_DISK_KB:
         notes.append(f'free disk {available} KiB is below the {REFUSE_DISK_KB} KiB floor.')
         if enforce_floor:
             raise LoopError(notes[0], 3)
@@ -119,7 +124,8 @@ def accept_plan(path: Path) -> dict:
         return plan
     plan['status'] = 'accepted'
     plan['planHash'] = digest
-    plan['acceptedAt'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    moment = datetime.now(timezone.utc)
+    plan['acceptedAt'] = moment.strftime('%Y-%m-%dT%H:%M:%S.') + f'{moment.microsecond // 1000:03d}Z'
     temporary = path.with_name(path.name + '.tmp')
     temporary.write_text(json.dumps(plan, indent=2) + '\n', encoding='utf-8')
     os.replace(temporary, path)
@@ -148,11 +154,54 @@ def _read_json(path: str | None) -> dict | None:
 
 def review_payload(head: str, patch_id: str, gate_path: str | None, review_path: str | None) -> dict:
     decision = assess_readiness(head=head, patch_id=patch_id, gate=_read_json(gate_path), review=_read_json(review_path))
-    return {'ok': decision['ready'], 'mode': 'review-check', 'invoked_claude': False, 'push': False, 'delete': False, **decision}
+    return {'ok': decision['ready'], 'mode': 'review-check', 'invoked_claude': False, **recorded_effects(), **decision}
 
 
-def run_claude(argv: list[str], *, timeout: int, cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(argv, cwd=cwd, check=False, capture_output=True, text=True, timeout=timeout)
+def apply_environment(plan: dict, plan_path: Path, project: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    env['ORCA_HEADLESS'] = '1'
+    env['ORCA_PLAN'] = str(plan_path)
+    streams = [item for item in plan.get('streams', []) if isinstance(item, dict) and isinstance(item.get('slug'), str)]
+    if len(streams) == 1:
+        env['ORCA_ACTIVE_STREAM'] = streams[0]['slug']
+        worktree = _worktree_for(project, streams[0]['slug'])
+        if worktree:
+            env['ORCA_ACTIVE_WORKTREE'] = worktree
+    return env
+
+
+def _worktree_for(project: Path, slug: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ['git', '-C', str(project), 'worktree', 'list', '--porcelain'],
+            check=False, capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    current = None
+    branch = None
+
+    def matched() -> str | None:
+        if current and branch and branch.endswith('/' + slug):
+            return current
+        return None
+
+    for line in result.stdout.splitlines():
+        if line.startswith('worktree '):
+            found = matched()
+            if found:
+                return found
+            current = line[9:]
+            branch = None
+        elif line.startswith('branch '):
+            branch = line[7:]
+    return matched()
+
+
+def run_claude(argv: list[str], *, timeout: int, cwd: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(argv, cwd=cwd, env=env, check=False, capture_output=True, text=True, timeout=timeout)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -207,8 +256,7 @@ def main(argv: list[str] | None = None) -> int:
             'disk_kib': available,
             'fan_out': False,
             'invoked_claude': False,
-            'push': False,
-            'delete': False,
+            **recorded_effects(),
             'plan_status': plan.get('status'),
         }
         if not report.ok:
@@ -242,7 +290,7 @@ def main(argv: list[str] | None = None) -> int:
         if '--bare' in command or '--dangerously-skip-permissions' in command:
             raise LoopError('refusing a bare or permission-bypass invocation.', 3)
         try:
-            completed = run_claude(command, timeout=args.timeout, cwd=project)
+            completed = run_claude(command, timeout=args.timeout, cwd=project, env=apply_environment(plan, plan_path, project))
         except subprocess.TimeoutExpired:
             payload['ok'] = False
             payload['errors'] = [f'claude exceeded the {args.timeout}s wall-clock limit.']

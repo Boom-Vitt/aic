@@ -7,6 +7,7 @@ because the directory is created only for this copy.
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import shutil
 import stat
@@ -35,22 +36,25 @@ def _refuse_symlink(path: Path) -> None:
 def assert_destination(dest: Path) -> Path:
     if not dest.is_absolute():
         raise BootstrapError('project path must be absolute.')
-    current = dest
+    if dest.is_symlink():
+        raise BootstrapError(f'refusing symlink destination: {dest}')
+    resolved = Path(os.path.realpath(dest))
+    current = resolved
     while True:
         if current.is_symlink():
             raise BootstrapError(f'refusing symlinked path component: {current}')
         if current == current.parent:
             break
         current = current.parent
-    if dest.exists():
-        raise BootstrapError(f'refusing existing path: {dest}')
+    if resolved.exists():
+        raise BootstrapError(f'refusing existing path: {resolved}')
     try:
-        relative = dest.resolve().relative_to(REPO.resolve())
+        relative = resolved.relative_to(REPO.resolve())
     except ValueError:
         relative = None
     if relative is not None and not (relative.parts and relative.parts[0] == '.work'):
         raise BootstrapError('refusing to create a project inside this repository.')
-    return dest
+    return resolved
 
 
 def _copy_file(source: Path, target: Path) -> None:
@@ -63,32 +67,46 @@ def _copy_file(source: Path, target: Path) -> None:
     shutil.copy2(source, target, follow_symlinks=False)
 
 
+def _remove_partial(dest: Path) -> None:
+    if dest.is_symlink() or not dest.is_dir():
+        return
+    shutil.rmtree(dest)
+
+
 def copy_template(dest: Path) -> list[str]:
     dest = assert_destination(dest)
     written: list[str] = []
-    dest.mkdir(parents=True, exist_ok=False)
-    for source in sorted(TEMPLATE.rglob('*')):
-        if source.is_dir() and not source.is_symlink():
-            continue
-        relative = source.relative_to(TEMPLATE).as_posix()
-        _copy_file(source, dest / relative)
-        written.append(relative)
-    package = REPO / 'scripts' / 'orca_claude'
-    for source in sorted(package.glob('*.py')):
-        relative = f'scripts/orca_claude/{source.name}'
-        _copy_file(source, dest / relative)
-        written.append(relative)
-    for relative in EXTRA_SCRIPTS:
-        _copy_file(REPO / relative, dest / relative)
-        written.append(relative)
-    gate = dest / 'gate.sh'
-    _copy_file(REPO / 'scripts' / 'orca-gate.sh', gate)
-    written.append('gate.sh')
-    orca_gate = dest / '.orca' / 'gate.sh'
-    _copy_file(REPO / 'scripts' / 'orca-gate.sh', orca_gate)
-    orca_gate.chmod(orca_gate.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    gate.chmod(gate.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    written.append('.orca/gate.sh')
+    created = False
+    try:
+        dest.mkdir(parents=True, exist_ok=False)
+        created = True
+        for source in sorted(TEMPLATE.rglob('*')):
+            if source.is_dir() and not source.is_symlink():
+                continue
+            relative = source.relative_to(TEMPLATE).as_posix()
+            _copy_file(source, dest / relative)
+            written.append(relative)
+        package = REPO / 'scripts' / 'orca_claude'
+        for source in sorted(package.glob('*.py')):
+            relative = f'scripts/orca_claude/{source.name}'
+            _copy_file(source, dest / relative)
+            written.append(relative)
+        for relative in EXTRA_SCRIPTS:
+            _copy_file(REPO / relative, dest / relative)
+            written.append(relative)
+        gate = dest / 'gate.sh'
+        if not gate.exists():
+            _copy_file(REPO / 'scripts' / 'orca-gate.sh', gate)
+            written.append('gate.sh')
+        gate.chmod(gate.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        orca_gate = dest / '.orca' / 'gate.sh'
+        _copy_file(REPO / 'scripts' / 'orca-gate.sh', orca_gate)
+        orca_gate.chmod(orca_gate.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        written.append('.orca/gate.sh')
+    except Exception:
+        if created:
+            _remove_partial(dest)
+        raise
     return written
 
 

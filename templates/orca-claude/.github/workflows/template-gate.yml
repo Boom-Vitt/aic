@@ -12,4 +12,17 @@ jobs:
         with:
           persist-credentials: false
       - name: Run the project gate
-        run: ./gate.sh
+        run: |
+          if [ ! -x ./gate.sh ]; then
+            echo "No executable gate.sh. Add the project's lint, typecheck, and test command before treating this workflow as acceptance."
+            exit 0
+          fi
+          set +e
+          ./gate.sh
+          code=$?
+          set -e
+          if [ "$code" -eq 2 ]; then
+            echo "gate.sh exited 2: no project check is configured yet. This skip is not a pass of lint, typecheck, or tests."
+            exit 0
+          fi
+          exit "$code"

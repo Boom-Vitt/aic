@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import shlex
 
 
 DENY_COMMAND = re.compile(
@@ -101,6 +102,126 @@ def _tool_paths(tool_input: dict) -> list[str]:
     return found
 
 
+def _tokens(segment: str) -> list[str] | None:
+    try:
+        return shlex.split(segment, posix=True)
+    except ValueError:
+        return None
+
+
+def _git_push_or_branch_delete(tokens: list[str]) -> bool:
+    if not tokens or Path(tokens[0]).name != 'git':
+        return False
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token in {'-C', '-c', '--git-dir', '--work-tree', '--namespace', '--super-prefix', '--config-env', '--exec-path'}:
+            index += 2
+            continue
+        if token.startswith(('--git-dir=', '--work-tree=', '--namespace=', '--super-prefix=', '--config-env=', '--exec-path=')):
+            index += 1
+            continue
+        if token.startswith('-c') and token != '-c':
+            index += 1
+            continue
+        if token.startswith('-') and token not in {'-C', '-c'}:
+            index += 1
+            continue
+        if token == 'push':
+            return True
+        if token == 'branch':
+            return any(item in {'-d', '-D', '--delete'} for item in tokens[index + 1:])
+        return False
+    return False
+
+
+def _interpreter_escape(tokens: list[str]) -> bool:
+    if not tokens or Path(tokens[0]).name not in {'python', 'python3', 'node'}:
+        return False
+    for token in tokens[1:]:
+        if token in {'-c', '-e', '--eval'}:
+            return True
+        if token.startswith('-') and not token.startswith('--') and ('c' in token[1:] or 'e' in token[1:]):
+            return True
+    return False
+
+
+def _shell_c(tokens: list[str]) -> str | None:
+    if not tokens or Path(tokens[0]).name not in {'bash', 'sh', 'dash', 'zsh'}:
+        return None
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token == '-c' or (token.startswith('-') and not token.startswith('--') and 'c' in token[1:]):
+            if index + 1 < len(tokens):
+                return tokens[index + 1]
+            return None
+        index += 1
+    return None
+
+
+def _sed_script_dangerous(script: str) -> bool:
+    if re.search(r'(?:^|[;\n{}])\s*e(?:\s|$)', script):
+        return True
+    if re.search(r'(?:^|[;\n{}])\s*w\s*\S', script):
+        return True
+    cursor = 0
+    while True:
+        found = re.search(r's([^\n\\])', script[cursor:])
+        if not found:
+            return False
+        delimiter = re.escape(found.group(1))
+        rest = script[cursor + found.end():]
+        parts = re.match(rf'(.*?)(?<!\\){delimiter}(.*?)(?<!\\){delimiter}([^;\n]*)', rest)
+        if parts and re.search(r'[ew]', parts.group(3)):
+            return True
+        cursor += found.end()
+
+
+def _sed_dangerous(tokens: list[str]) -> bool:
+    if not tokens or Path(tokens[0]).name != 'sed':
+        return False
+    scripts: list[str] = []
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token in {'-e', '--expression'} and index + 1 < len(tokens):
+            scripts.append(tokens[index + 1])
+            index += 2
+            continue
+        if token.startswith('--expression='):
+            scripts.append(token.split('=', 1)[1])
+            index += 1
+            continue
+        if token in {'-f', '--file'} or token.startswith('--file='):
+            return True
+        if token.startswith('-'):
+            index += 1
+            continue
+        scripts.append(token)
+        index += 1
+    return any(_sed_script_dangerous(script) for script in scripts)
+
+
+def command_is_blocked(command: str, *, headless: bool, depth: int = 0) -> bool:
+    if depth > 5:
+        return True
+    if DENY_COMMAND.search(command):
+        return True
+    for segment in _segments(command):
+        tokens = _tokens(segment)
+        if tokens is None:
+            return headless
+        if _git_push_or_branch_delete(tokens):
+            return True
+        if headless and (_interpreter_escape(tokens) or _sed_dangerous(tokens)):
+            return True
+        inner = _shell_c(tokens)
+        if inner and command_is_blocked(inner, headless=headless, depth=depth + 1):
+            return True
+    return False
+
+
 def decide_tool(tool_name: str, tool_input: object, *, headless: bool, active_stream: str | None,
                 active_worktree: str | None, resolved_toplevel: str | None, plan: dict | None) -> tuple[int, str]:
     """Return ``(0, reason)`` to allow or ``(2, reason)`` to block."""
@@ -111,7 +232,7 @@ def decide_tool(tool_name: str, tool_input: object, *, headless: bool, active_st
         command = payload.get('command')
         if not isinstance(command, str) or not command.strip():
             return 2, 'bash command is missing.'
-        if DENY_COMMAND.search(command):
+        if command_is_blocked(command, headless=headless):
             return 2, 'command is denied.'
         if active_worktree and any(marker in command for marker in TEST_MARKERS):
             if not resolved_toplevel or Path(resolved_toplevel).resolve() != Path(active_worktree).resolve():
@@ -219,3 +340,11 @@ def interpret_claude_result(payload: object, stderr: str = '', *, required_mcp: 
             if not name:
                 errors.append('invalid required mcp entry.')
     return errors
+
+
+def recorded_effects() -> dict[str, bool]:
+    """Whether the headless hook would allow a push or a branch delete."""
+    options = dict(headless=True, active_stream=None, active_worktree=None, resolved_toplevel=None, plan=None)
+    push, _message = decide_tool('Bash', {'command': 'git push origin main'}, **options)
+    delete, _message = decide_tool('Bash', {'command': 'git branch -D feature'}, **options)
+    return {'push': push == 0, 'delete': delete == 0}

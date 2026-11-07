@@ -8,6 +8,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -113,6 +114,14 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
         self.assertFalse(validate_plan(escaped).ok)
         self.assertFalse(validate_plan(absolute).ok)
         self.assertFalse(validate_plan(role).ok)
+        for left, right in (('./src/', 'src/app.py'), ('./src/', './src/app.py')):
+            overlap = plan(streams=[
+                {'slug': 'a', 'role': 'claude-code', 'paths': [left], 'acceptance': ['pytest']},
+                {'slug': 'b', 'role': 'claude-code', 'paths': [right], 'acceptance': ['pytest']},
+            ])
+            report = validate_plan(overlap)
+            self.assertFalse(report.ok, (left, right, report.errors))
+            self.assertTrue(any('both own' in item for item in report.errors))
 
     def test_permissions_deny_push_secrets_and_unrecognized_headless_tools(self):
         code, _ = decide_tool('Bash', {'command': 'git push origin main'}, headless=False,
@@ -140,6 +149,24 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
         code, _ = decide_tool('Bash', {'command': 'pytest -q'}, headless=True, active_stream=None,
                               active_worktree='/tmp/feature', resolved_toplevel='/tmp/main', plan=None)
         self.assertEqual(code, 2)
+        denied = (
+            'git -C /tmp/repo push origin main',
+            "python3 -c 'exec(\"git push\")'",
+            'node -e \'require("child_process").execSync("git push")\'',
+            "bash -c 'git push origin main'",
+            "sh -c 'git -C /tmp/repo push origin main'",
+            'git --git-dir=/tmp/repo/.git push',
+            'git branch -D feature',
+            "sed 's/a/b/e'",
+            "sed 'w /tmp/out'",
+        )
+        for command in denied:
+            code, _message = decide_tool('Bash', {'command': command}, headless=True, active_stream=None,
+                                         active_worktree=None, resolved_toplevel=None, plan=None)
+            self.assertEqual(code, 2, command)
+        allowed, _message = decide_tool('Bash', {'command': "sed -e 's/a/b/'"}, headless=True, active_stream=None,
+                                        active_worktree=None, resolved_toplevel=None, plan=None)
+        self.assertEqual(allowed, 0)
 
     def test_hook_blocks_git_push_with_exit_2(self):
         result = subprocess.run(
@@ -217,10 +244,21 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
             copy_template(existing)
         with self.assertRaises(BootstrapError):
             copy_template(Path('relative/new-project'))
-        linked = self.root / 'linked'
-        linked.symlink_to(self.root, target_is_directory=True)
+        real = self.root / 'private-tmp'
+        real.mkdir()
+        alias = self.root / 'tmp-alias'
+        alias.symlink_to(real, target_is_directory=True)
+        copy_template(alias / 'proj')
+        self.assertTrue((real / 'proj' / 'gate.sh').is_file())
+        as_link = self.root / 'as-link'
+        as_link.symlink_to(self.root / 'missing-target')
         with self.assertRaises(BootstrapError):
-            copy_template(linked / 'child')
+            copy_template(as_link)
+        partial = self.root / 'partial'
+        with patch('orca_claude.bootstrap._copy_file', side_effect=BootstrapError('stop')):
+            with self.assertRaises(BootstrapError):
+                copy_template(partial)
+        self.assertFalse(partial.exists())
         inside = ROOT / 'not-a-real-child'
         with self.assertRaises(BootstrapError):
             copy_template(inside)
@@ -285,6 +323,10 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
         self.assertNotIn('--bare', recorded)
         self.assertFalse(any('dangerously-skip-permissions' in item for item in recorded))
         self.assertIn('dontAsk', recorded)
+        recorded_env = (self.root / 'claude-env').read_text(encoding='utf-8')
+        self.assertIn('ORCA_HEADLESS=1', recorded_env)
+        self.assertIn('ORCA_PLAN=', recorded_env)
+        self.assertIn('ORCA_ACTIVE_STREAM=docs', recorded_env)
 
     def test_accept_is_idempotent_until_the_plan_changes(self):
         path = self.root / 'plan.json'
@@ -292,6 +334,7 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
         first = accept_plan(path)
         second = accept_plan(path)
         self.assertEqual(first['planHash'], second['planHash'])
+        self.assertRegex(first['acceptedAt'], r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$')
         changed = json.loads(path.read_text(encoding='utf-8'))
         changed['goal'] = 'A different goal.'
         path.write_text(json.dumps(changed), encoding='utf-8')
@@ -306,6 +349,9 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
             select_budget(4, 6, 1024, enforce_floor=True)
         with self.assertRaises(LoopError):
             select_budget(5, 1, None, enforce_floor=False)
+        unknown, trees, notes = select_budget(4, 6, None, enforce_floor=False)
+        self.assertEqual((unknown, trees), (1, 1))
+        self.assertTrue(notes)
 
     def test_repository_harness_stays_free_of_bypass_and_plugin_hooks(self):
         for relative in ('.claude/settings.json', '.claude/settings.headless.json'):
@@ -314,6 +360,15 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
             self.assertNotIn('dangerously-skip-permissions', text)
             self.assertNotIn('--bare', text)
             self.assertEqual(text, (ROOT / 'templates' / 'orca-claude' / relative).read_text(encoding='utf-8'))
+            self.assertNotIn('Bash(python3 *)', text)
+            self.assertNotIn('Bash(pytest *)', text)
+        def tree(root):
+            return {path.relative_to(root).as_posix(): path.read_bytes()
+                    for path in root.rglob('*') if path.is_file() and '__pycache__' not in path.parts}
+
+        root_claude = tree(ROOT / '.claude')
+        template_claude = tree(ROOT / 'templates' / 'orca-claude' / '.claude')
+        self.assertEqual(root_claude, template_claude)
         plugin = json.loads((ROOT / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))
         marketplace = json.loads((ROOT / '.claude-plugin' / 'marketplace.json').read_text(encoding='utf-8'))
         self.assertNotIn('hooks', plugin)
@@ -341,6 +396,43 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
         applied = self.run_setup(['--apply'], env)
         self.assertEqual(applied.returncode, 3)
         self.assertIn('refusing --apply', applied.stdout)
+
+    def test_link_plugin_requires_the_pinned_marketplace_id_and_sha(self):
+        stub = self.root / 'claude'
+        log = self.root / 'claude.log'
+        script = ROOT / 'scripts' / 'macos-setup-orca.sh'
+        stub.write_text(textwrap.dedent(f'''\
+            #!/bin/sh
+            printf '%s\\n' "$*" >> "{log}"
+            if [ "$1" = "plugin" ] && [ "$2" = "list" ]; then
+              printf '%s\\n' "$CLAUDE_PLUGIN_LIST"
+              exit 0
+            fi
+            exit 0
+            '''), encoding='utf-8')
+        stub.chmod(0o755)
+
+        def invoke(listing):
+            log.write_text('', encoding='utf-8')
+            env = os.environ.copy()
+            env['AIC_ORCA_CLAUDE'] = str(stub)
+            env['CLAUDE_PLUGIN_LIST'] = listing
+            env['HOME'] = str(self.root)
+            result = subprocess.run(
+                ['bash', '-c', f'source "{script}"; link_plugin'],
+                capture_output=True, text=True, check=False, env=env,
+            )
+            return result, log.read_text(encoding='utf-8')
+
+        pinned = 'boom-big-nose-workflow@claude-mods-boombignose ad1a6032465546883d57299fda5677d6b2a7750d'
+        ready, ready_log = invoke(pinned)
+        self.assertEqual(ready.returncode, 0, ready.stderr)
+        self.assertNotIn('plugin install', ready_log)
+        wrong_name, wrong_log = invoke('boom-big-nose-workflow enabled')
+        self.assertEqual(wrong_name.returncode, 0, wrong_name.stderr)
+        self.assertIn('plugin install boom-big-nose-workflow@claude-mods-boombignose', wrong_log)
+        other_market, other_log = invoke('boom-big-nose-workflow@boombignose-mods ad1a6032465546883d57299fda5677d6b2a7750d')
+        self.assertIn('plugin install boom-big-nose-workflow@claude-mods-boombignose', other_log)
 
     def test_macos_helpers_compare_versions_and_plugin_cache_state(self):
         script = str(ROOT / 'scripts' / 'macos-setup-orca.sh')
@@ -420,6 +512,9 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
                 #!/bin/sh
                 if [ "$1" = "--version" ]; then echo "2.1.310 (Claude Code)"; exit 0; fi
                 printf '%s\\n' "$@" > "{args}"
+                printf 'ORCA_HEADLESS=%s\\n' "${{ORCA_HEADLESS-}}" > "{self.root / 'claude-env'}"
+                printf 'ORCA_PLAN=%s\\n' "${{ORCA_PLAN-}}" >> "{self.root / 'claude-env'}"
+                printf 'ORCA_ACTIVE_STREAM=%s\\n' "${{ORCA_ACTIVE_STREAM-}}" >> "{self.root / 'claude-env'}"
                 touch "{called}"
                 cat <<'EOF'
                 {{"type":"result","subtype":"success","is_error":false,"result":"ok","structured_output":{{"status":"passed","streams":[],"evidence":["verify"],"push_performed":false,"delete_performed":false}},"permission_denials":[]}}

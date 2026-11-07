@@ -45,7 +45,8 @@ def plan_hash(plan: dict) -> str:
 
 
 def _norm(path: str) -> str:
-    return path[2:] if path.startswith('./') else path.rstrip('/')
+    text = path[2:] if path.startswith('./') else path
+    return text.rstrip('/')
 
 
 def _overlaps(left: str, right: str) -> bool:

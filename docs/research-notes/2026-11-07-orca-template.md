@@ -1,6 +1,6 @@
 # Research evidence — 2026-11-07
 
-Manual note recorded with the Orca project template. This is not a maintainer source packet and it does not change the workflow catalog. Upstream material is reference-only.
+Manual note for the Orca project template. This file is outside `skills/aic/references/research-updates/` so it does not occupy the maintainer's `YYYY-MM-DD.md` daily record path. It is not a maintainer source packet and it does not change the workflow catalog. Upstream material is reference-only.
 
 The checkout's `RESEARCH.md` cites the sources used to shape the Orca v0.4.0 plus Claude Code template:
 
