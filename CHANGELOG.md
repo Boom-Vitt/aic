@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.0.3 — 2026-11-08 (unreleased)
+- Add an Orca v0.4.0 plus Claude Code project template: plan checks, a dry-run headless loop, a non-clobbering project bootstrap, a Mac mini setup script, safe project permissions, and CI lint/tests. The native plugin stays skills-only. The setup script does not handle secrets or call a model.
 - Filter public issue/comment markers by approved-author provenance before uniqueness and reconciliation; retain owner ambiguity, assignment checks and uncertain-effect non-replay.
 - Bound recommendation JSON, aggregate paths, path geometry and overlap work before project I/O across MCP, internal validation and approved handoff consumers. Preserve schema 3, detached unchanged values and physical isolation.
 - Enforce end-to-end source deadlines with cancellable/reaped spawn-isolated transport, bounded non-executable IPC and parent-owned arXiv spacing.

@@ -43,6 +43,10 @@ Use Python 3.11 or newer in an isolated environment. Install `.[mcp]` into that 
 
 For plugin changes, run the actual Claude Code native validator and install/list/remove in a task-private HOME/config; never use real user plugin settings or infer discovery/model invocation from a manifest check. For MCP changes, exercise the official client over real stdio from both source and an installed wheel, including malformed inputs, project boundaries and recovery. Read-only annotations supplement enforcement; they are not a sandbox or permission grant.
 
+## Orca and Claude Code template
+
+The repository template under `templates/orca-claude/`, `.claude/`, and `scripts/orca-headless.sh` is project harness guidance for Boom Big Nose Workflow v0.4.0. It does not add a workflow family, a plugin hook, or a model client. Keep the native plugin skills-only. Shell changes need a consumer-visible test and `shellcheck` in CI. Do not put secrets, `--bare`, or permission bypasses into the harness. Cite new research in `RESEARCH.md` with primary URLs and the limits in the skill research ledger; do not vendor paper text.
+
 ## Implement and verify
 
 Write regressions for plausible consumer failures: traversal, unauthorized effects, modified/unmanaged preservation, evidence freshness, semantic interface overlap and uncertain launch replay. Do not pin prose, incidental implementation or mocked success as live behavior.
