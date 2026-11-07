@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.0.3 — 2026-11-08 (unreleased)
+- Publish MCP input bounds that match server checks: `max_files` is 1..10000, `max_depth` is 0..32, and `section` is the declared guidance name with that longest name as `maxLength`. Every object in a tool input schema sets `additionalProperties` to false. Out-of-range values still fail with the existing fixed tool errors and those errors do not echo the rejected input. The recommendation `plan` value stays opaque JSON; its resource limits remain the validator's checks.
 - Add a benchmark harness skeleton that records a local smoke command and refuses to score SWE-bench, Terminal-Bench, Aider polyglot, or real-task suites. No public score is included.
 - Add an Orca v0.4.0 plus Claude Code project template: plan checks, a dry-run headless loop, a non-clobbering project bootstrap, a Mac mini setup script, safe project permissions, and CI lint/tests. The native plugin stays skills-only. The setup script does not handle secrets or call a model.
 - Filter public issue/comment markers by approved-author provenance before uniqueness and reconciliation; retain owner ambiguity, assignment checks and uncertain-effect non-replay.
