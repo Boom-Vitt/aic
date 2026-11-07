@@ -5,6 +5,8 @@ tokens, reported cost, and measured wall time. Without ANTHROPIC_API_KEY it
 exits 3 and does not start a model. Cost is copied from Claude Code's
 `total_cost_usd` field; this module does not apply a price table. A report is
 official only when the agent ran under ``--sandbox container``.
+``--pipeline-smoke`` runs the offline stub in ``stub/`` and does not start a model.
+That stub is a pipeline smoke test, not a model result.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ import sys
 import tempfile
 import time
 
-from . import SCHEMA_VERSION
+from . import SCHEMA_VERSION, UNOFFICIAL_WARNING
 from .catalog import CatalogError, Task, load_catalog
 from .grading import (
     GradeError,
@@ -35,15 +37,12 @@ from .grading import (
     verified_bytes,
 )
 from .metrics import cost_from_payload, cost_text, mean, pass_at_k, sum_cost, sum_usage, usage_from_payload
+from .pipeline_smoke import SmokeError, run_pipeline_smoke
+from .sandbox import container_command, sandbox_runtime
 
 EXIT_USAGE = 2
 EXIT_NO_KEY = 3
 ARMS = ("baseline", "claude_code_plus_aic")
-UNOFFICIAL_WARNING = (
-    "NOT AN OFFICIAL RESULT. This run did not use --sandbox container. "
-    "The agent could read reference/ on disk. Do not publish these numbers. "
-    "Only a completed --sandbox container run can be marked official."
-)
 APPROVAL = (
     "This task is already approved. Change only files inside the current workspace. "
     "Do not search outside it for tests, answers, or graders. "
@@ -104,6 +103,15 @@ def _parser() -> argparse.ArgumentParser:
         "--require-official",
         type=Path,
         help="Check a saved report and exit. Does not start a model. Unofficial reports are refused.",
+    )
+    parser.add_argument(
+        "--pipeline-smoke",
+        action="store_true",
+        help=(
+            "Run benchmarks/aicbench/stub/agent.py inside the selected sandbox. "
+            "This is an offline pipeline smoke test, not a model result, and it is not a results-table row. "
+            "The report is official only with --sandbox container."
+        ),
     )
     return parser
 
@@ -188,74 +196,6 @@ def _child_env(parent: dict[str, str], *, key: str, home: Path, config: Path, tm
     return env
 
 
-def _sandbox_runtime() -> str:
-    found = shutil.which("bwrap")
-    if not found:
-        raise RunnerError(
-            "Container sandbox requires bubblewrap (bwrap) on PATH. "
-            "Without it, aicbench cannot hide the checkout from the agent filesystem."
-        )
-    return found
-
-
-def _outside_repo(path: Path, repo: Path) -> bool:
-    try:
-        resolved = path.resolve()
-    except OSError as exc:
-        raise GradeError(f"Cannot resolve sandbox path: {path}") from exc
-    return resolved != repo and repo not in resolved.parents
-
-
-def container_command(
-    inner: list[str],
-    *,
-    workspace: Path,
-    skill_root: Path | None,
-    home: Path,
-    config: Path,
-    binary: Path,
-    repo: Path,
-) -> list[str]:
-    """Bubblewrap argv that mounts the workspace and skill, not the repository."""
-    repo_resolved = repo.resolve()
-    for label, path in (("binary", binary), ("workspace", workspace), ("home", home), ("config", config)):
-        if not _outside_repo(path, repo_resolved):
-            raise GradeError(f"Refusing to mount a repository path into the sandbox ({label}).")
-    if skill_root is not None and not _outside_repo(skill_root, repo_resolved):
-        raise GradeError("Refusing to mount a repository path into the sandbox (skill).")
-    command = [
-        "bwrap",
-        "--die-with-parent",
-        "--unshare-user",
-        "--unshare-pid",
-        "--unshare-ipc",
-        "--unshare-uts",
-    ]
-    for directory in ("/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc/ssl", "/etc/pki", "/etc/ca-certificates"):
-        candidate = Path(directory)
-        if candidate.is_dir() and _outside_repo(candidate, repo_resolved):
-            command.extend(["--ro-bind", directory, directory])
-    resolv = Path("/etc/resolv.conf")
-    if resolv.is_file() and _outside_repo(resolv, repo_resolved):
-        command.extend(["--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf"])
-    command.extend(["--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"])
-    for path in (workspace, home, config):
-        text = str(path.resolve())
-        command.extend(["--bind", text, text])
-    if skill_root is not None:
-        text = str(skill_root.resolve())
-        command.extend(["--ro-bind", text, text])
-    binary_text = str(binary.resolve())
-    system_prefixes = ("/usr/", "/lib/", "/lib64/", "/bin/", "/sbin/")
-    if not binary_text.startswith(system_prefixes):
-        command.extend(["--ro-bind", binary_text, binary_text])
-    command.extend(["--chdir", str(workspace.resolve()), "--"])
-    command.extend(inner)
-    if str(repo_resolved) in command:
-        raise GradeError("Sandbox command included the repository path.")
-    return command
-
-
 def _parse_claude(stdout: str) -> dict:
     text = stdout.strip()
     if not text:
@@ -331,7 +271,7 @@ def _run_trial(
                     binary=Path(command[0]),
                     repo=Path(__file__).resolve().parents[2],
                 )
-                command[0] = _sandbox_runtime()
+                command[0] = sandbox_runtime()
         except (GradeError, RunnerError) as exc:
             elapsed = round(time.perf_counter() - started, 6)
             return Trial(False, False, False, None, elapsed, None, None, None, str(exc), "")
@@ -495,7 +435,11 @@ def build_report(
 
 
 def require_official(report: dict) -> None:
-    """Refuse to treat a report as a published result unless it is a container run."""
+    """Refuse to treat a report as official unless it is a container run.
+
+    A pipeline smoke report can be official only in that sandbox sense. It is
+    still not a model result, and a smoke report that claims a measurement is refused.
+    """
     if not isinstance(report, dict):
         raise RunnerError("A report object is required.")
     if report.get("sandbox") != "container" or report.get("official") is not True or report.get("publication_warning"):
@@ -503,6 +447,12 @@ def require_official(report: dict) -> None:
             "Refusing to mark this report official. "
             "Published aicbench results require a completed --sandbox container run."
         )
+    if report.get("kind") == "pipeline-smoke" and (
+        report.get("model_result") is not False
+        or report.get("measured") is not False
+        or report.get("invokes_model") is not False
+    ):
+        raise RunnerError("Refusing to treat this pipeline smoke test as a model result.")
 
 
 def run_comparison(args: argparse.Namespace, environ: dict[str, str]) -> dict:
@@ -517,7 +467,7 @@ def run_comparison(args: argparse.Namespace, environ: dict[str, str]) -> dict:
         raise SystemExit(EXIT_NO_KEY)
     binary = _prompt_binary(args.claude_bin)
     if args.sandbox == "container":
-        _sandbox_runtime()
+        sandbox_runtime()
     catalog = load_catalog()
     selected = _select(catalog, args.tasks)
     arms = tuple(args.arms) if args.arms else ARMS
@@ -567,8 +517,50 @@ def _check_saved_report(path: Path) -> int:
         print(UNOFFICIAL_WARNING, file=sys.stderr)
         print(f"aicbench: {exc}", file=sys.stderr)
         return EXIT_USAGE
-    print("aicbench: report is an official container run.", file=sys.stderr)
+    if report.get("kind") == "pipeline-smoke":
+        print("aicbench: report is an official container pipeline smoke test, not a model result.", file=sys.stderr)
+    else:
+        print("aicbench: report is an official container run.", file=sys.stderr)
     return 0
+
+
+def _emit_report(report: dict, output: Path | None) -> None:
+    if report.get("official") is not True:
+        print(UNOFFICIAL_WARNING, file=sys.stderr)
+    text = json.dumps(report, indent=2) + "\n"
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(text, encoding="utf-8")
+        print(f"aicbench: wrote {output}", file=sys.stderr)
+    else:
+        print(text, end="")
+
+
+def _pipeline_smoke_cli(args: argparse.Namespace, parent: dict[str, str]) -> int:
+    if args.official:
+        print(
+            "aicbench: refusing to start. --official requests a published model result. "
+            "The pipeline smoke test is not a model result.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+    try:
+        report = run_pipeline_smoke(args.sandbox, parent)
+    except (SmokeError, RunnerError, CatalogError, GradeError, OSError) as exc:
+        print(f"aicbench: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    _emit_report(report, args.output)
+    checks = report.get("checks") if isinstance(report.get("checks"), dict) else {}
+    print(
+        "aicbench: pipeline smoke test, not a model result; "
+        f"sandbox={report.get('sandbox')}; official={report.get('official')}; "
+        f"reference_unreadable={checks.get('reference_unreadable')}; "
+        f"oracle_unreadable={checks.get('oracle_unreadable')}; "
+        f"tamper_detected={checks.get('tamper_detected')}; "
+        f"grading_works={checks.get('grading_works')}",
+        file=sys.stderr,
+    )
+    return 0 if report.get("ok") is True else 1
 
 
 def main(argv: list[str] | None = None, environ: dict[str, str] | None = None) -> int:
@@ -581,6 +573,8 @@ def main(argv: list[str] | None = None, environ: dict[str, str] | None = None) -
     if args.require_official is not None:
         return _check_saved_report(args.require_official)
     parent = os.environ if environ is None else environ
+    if args.pipeline_smoke:
+        return _pipeline_smoke_cli(args, parent)
     try:
         if _api_key(parent) is None:
             print("aicbench: ANTHROPIC_API_KEY is missing. No model was started.", file=sys.stderr)
@@ -598,13 +592,5 @@ def main(argv: list[str] | None = None, environ: dict[str, str] | None = None) -
     except (RunnerError, CatalogError, GradeError, OSError) as exc:
         print(f"aicbench: {exc}", file=sys.stderr)
         return EXIT_USAGE
-    if report.get("official") is not True:
-        print(UNOFFICIAL_WARNING, file=sys.stderr)
-    text = json.dumps(report, indent=2) + "\n"
-    if args.output is not None:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(text, encoding="utf-8")
-        print(f"aicbench: wrote {args.output}", file=sys.stderr)
-    else:
-        print(text, end="")
+    _emit_report(report, args.output)
     return 0

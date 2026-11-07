@@ -12,7 +12,9 @@ pass@1 uses the unbiased estimator described by Mark Chen and coauthors in
 included. The citation is not an endorsement.
 
 The comparison runner starts the Claude Code executable. Claude Code is a
-product name, not an AIC component. Its command-line contract was checked
+product name, not an AIC component. The pipeline smoke stub in stub/agent.py
+is an offline harness check. It is not a model, and running it is not a
+published score. The Claude Code command-line contract was checked
 against Anthropic's headless documentation on 2026-11-07:
 https://code.claude.com/docs/en/headless
 That documentation was not copied. AIC does not relicense Claude Code.

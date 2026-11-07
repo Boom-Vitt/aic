@@ -21,7 +21,7 @@
       "select_when": "Work is bounded or coupled and delegation would mostly repeat context.",
       "avoid_when": "Independent substantial work or consequential acceptance gaps justify another structure.",
       "reference": "references/templates.md#direct",
-      "research": ["google-2026", "concurrency-2026", "anthropic-agents-2024"]
+      "research": ["google-2026", "concurrency-2026", "anthropic-agents-2024", "swe-agent-2024", "agentless-2024", "autocoderover-2024"]
     },
     {
       "id": "explore-build",
