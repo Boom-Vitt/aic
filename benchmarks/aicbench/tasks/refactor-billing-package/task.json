@@ -1,0 +1,10 @@
+{
+  "id": "refactor-billing-package",
+  "title": "Split the billing module into a package",
+  "category": "refactor",
+  "timeout_seconds": 30,
+  "remove": [
+    "billing.py"
+  ],
+  "license": "Apache-2.0"
+}

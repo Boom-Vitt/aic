@@ -1,0 +1,133 @@
+"""Copy a task workspace and grade it with its hidden oracle.
+
+The oracle process has no API key and no model client. A nonzero oracle exit,
+including a timeout, is a failed grade.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+from .catalog import Task
+
+
+class GradeError(RuntimeError):
+    """The workspace could not be prepared or graded safely."""
+
+
+@dataclass(frozen=True)
+class GradeResult:
+    passed: bool
+    timed_out: bool
+    returncode: int | None
+    detail: str
+
+
+def _copy_tree(source: Path, dest: Path) -> None:
+    if source.is_symlink() or not source.is_dir():
+        raise GradeError("A task tree must be a real directory.")
+    dest.mkdir(parents=True, exist_ok=True)
+    for path in sorted(source.rglob("*")):
+        relative = path.relative_to(source)
+        if any(part in {"__pycache__", ".git"} or part.startswith(".") for part in relative.parts):
+            continue
+        target = dest.joinpath(*relative.parts)
+        if path.is_symlink():
+            raise GradeError("Refusing to copy a symlink from a task tree.")
+        if path.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        if not path.is_file():
+            raise GradeError("A task tree contains an unsupported file type.")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(path.read_bytes())
+
+
+def _contained(dest: Path, relative: str) -> Path:
+    root = dest.resolve()
+    candidate = root.joinpath(*relative.split("/")).resolve()
+    if candidate != root and root not in candidate.parents:
+        raise GradeError("A reference removal escapes the workspace.")
+    return candidate
+
+
+def prepare_workspace(task: Task, dest: Path, *, solution: bool) -> None:
+    """Write the public starting tree, optionally overlaid with the reference solution."""
+    if dest.exists():
+        raise GradeError("Refusing to prepare a workspace that already exists.")
+    _copy_tree(task.workspace, dest)
+    if solution:
+        overlay_reference(task, dest)
+
+
+def overlay_reference(task: Task, dest: Path) -> None:
+    """Replace workspace files with the reference solution. `dest` must already exist."""
+    if dest.is_symlink() or not dest.is_dir():
+        raise GradeError("The reference overlay needs an existing workspace directory.")
+    _copy_tree(task.reference, dest)
+    for relative in task.remove:
+        target = _contained(dest, relative)
+        if target.is_dir() and not target.is_symlink():
+            for child in sorted(target.rglob("*"), reverse=True):
+                if child.is_file() or child.is_symlink():
+                    child.unlink()
+                elif child.is_dir():
+                    child.rmdir()
+            target.rmdir()
+        elif target.is_file() and not target.is_symlink():
+            target.unlink()
+        else:
+            raise GradeError(f"The reference removal is missing: {relative}")
+
+
+def grade_env(workspace: Path) -> dict[str, str]:
+    """Environment for an oracle. Model credentials are not forwarded."""
+    return {
+        "PATH": os.environ.get("PATH", ""),
+        "PYTHONPATH": str(workspace),
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "AICBENCH_WORKSPACE": str(workspace),
+        "LANG": "C",
+        "LC_ALL": "C",
+    }
+
+
+def _tail(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    text = value.decode("utf-8", "replace") if isinstance(value, bytes) else value
+    return text[-4000:]
+
+
+def grade(task: Task, workspace: Path) -> GradeResult:
+    """Run the hidden oracle against `workspace` without importing the oracle here."""
+    if workspace.is_symlink() or not workspace.is_dir():
+        raise GradeError("The graded workspace must be a real directory.")
+    if not task.oracle.is_file() or task.oracle.is_symlink():
+        raise GradeError("The hidden oracle is missing.")
+    command = [
+        sys.executable,
+        "-B",
+        "-c",
+        "import runpy, sys; runpy.run_path(sys.argv[1], run_name='__main__')",
+        str(task.oracle),
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=workspace,
+            env=grade_env(workspace),
+            capture_output=True,
+            text=True,
+            timeout=task.timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return GradeResult(False, True, None, _tail(exc.stdout) + _tail(exc.stderr))
+    detail = _tail(completed.stdout) + _tail(completed.stderr)
+    return GradeResult(completed.returncode == 0, False, completed.returncode, detail)
