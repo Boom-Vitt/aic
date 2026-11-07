@@ -8,21 +8,68 @@ permissions:
 jobs:
   security:
     uses: ./.github/workflows/security.yml
-  offline-contracts:
+  contract-matrix:
     needs: security
     if: always()
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # pyproject requires-python is >=3.11. 3.11 is the oldest stable
+        # match; 3.15 is the newest stable match (3.16 is still a pre-release).
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.11', '3.12', '3.13', '3.14', '3.15']
     steps:
       - name: Require successful security checks
         env:
           SECURITY_RESULT: ${{ needs.security.result }}
         run: test "$SECURITY_RESULT" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
       - name: Install declared MCP integration dependencies
         run: python -m pip install ".[mcp]"
+      # Official aicbench results require bubblewrap. This job does not run that comparison.
+      # Ubuntu setup: sudo apt-get update && sudo apt-get install -y bubblewrap
+      # The executable is bwrap. See benchmarks/aicbench/RESULTS.md.
       - name: Verify package and isolated contracts
         run: ./scripts/verify.sh
+      - name: Lint template shell scripts
+        shell: bash
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            case "$(uname -s)" in
+              Linux)
+                sudo apt-get update
+                sudo apt-get install -y shellcheck
+                ;;
+              Darwin)
+                export NONINTERACTIVE=1 HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
+                brew install shellcheck
+                ;;
+              *)
+                echo "shellcheck is unavailable on $(uname -s)" >&2
+                exit 1
+                ;;
+            esac
+          fi
+          shellcheck -s sh scripts/orca-headless.sh scripts/bootstrap-orca-project.sh scripts/orca-gate.sh scripts/benchmark-run.sh tests/orca_claude_smoke.sh
+          shellcheck -s bash scripts/macos-setup-orca.sh
+  offline-contracts:
+    name: offline-contracts
+    needs: [security, contract-matrix]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require successful security checks and contract matrix
+        env:
+          SECURITY_RESULT: ${{ needs.security.result }}
+          MATRIX_RESULT: ${{ needs.contract-matrix.result }}
+        run: |
+          test "$SECURITY_RESULT" = success
+          test "$MATRIX_RESULT" = success

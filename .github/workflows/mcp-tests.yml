@@ -1,0 +1,108 @@
+name: MCP contract tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: mcp-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  mcp-contracts:
+    name: MCP ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.11', '3.12']
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+      PIP_NO_INPUT: '1'
+      PIP_ONLY_BINARY: ':all:'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install the optional MCP extra and coverage
+        # coverage.py 7.17.2 is Apache-2.0 (https://github.com/coveragepy/coveragepy).
+        # It produces this job's report only. It is not an AIC runtime dependency and its code is not vendored.
+        run: "python -m pip install --only-binary=:all: '.[mcp]' 'coverage==7.17.2'"
+      - name: Run MCP tests and write a coverage report
+        shell: bash
+        env:
+          MCP_OS: ${{ matrix.os }}
+          MCP_PYTHON: ${{ matrix.python-version }}
+        run: |
+          set -euo pipefail
+          mkdir -p coverage
+          cat > "$RUNNER_TEMP/coverage.ini" <<'EOF'
+          [run]
+          branch = true
+          parallel = true
+          include = */aiclib/mcp_server.py
+          EOF
+          # Stdio servers are child processes. Forward this config so their executed lines are counted.
+          export COVERAGE_PROCESS_START="$RUNNER_TEMP/coverage.ini"
+          export COVERAGE_FILE="$RUNNER_TEMP/mcp.coverage"
+          python -m coverage run --rcfile="$RUNNER_TEMP/coverage.ini" \
+            -m unittest discover -s tests -p 'test_mcp*.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/mcp-tests.log"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import sys
+
+          log = Path(os.environ["RUNNER_TEMP"], "mcp-tests.log").read_text(encoding="utf-8")
+          match = re.search(r"^Ran (\d+) tests in [0-9.]+s$\n\n(OK|FAILED)(.*)$", log, re.M)
+          if match is None:
+              sys.exit("MCP unittest summary missing")
+          count, status, detail = int(match.group(1)), match.group(2), match.group(3)
+          if status != "OK" or "skipped" in detail:
+              sys.exit(f"MCP tests did not all run ({status}{detail}); install the mcp extra in this interpreter")
+          if count < 16:
+              sys.exit(f"Expected the MCP suite to run at least 16 tests, ran {count}")
+          PY
+          python -m coverage combine --rcfile="$RUNNER_TEMP/coverage.ini"
+          python -m coverage report --rcfile="$RUNNER_TEMP/coverage.ini" --show-missing | tee coverage/mcp-coverage.txt
+          python -m coverage json --rcfile="$RUNNER_TEMP/coverage.ini" -o coverage/mcp-coverage.json
+          python -m coverage xml --rcfile="$RUNNER_TEMP/coverage.ini" -o coverage/mcp-coverage.xml
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path("coverage/mcp-coverage.json").read_text(encoding="utf-8"))
+          files = report.get("files") or {}
+          if len(files) != 1:
+              raise SystemExit(f"Expected coverage for mcp_server.py only, found {sorted(files)}")
+          summary = report["totals"]
+          covered = summary.get("percent_covered_display") or summary.get("percent_covered")
+          statements = summary.get("percent_statements_covered_display") or summary.get("percent_statements_covered")
+          branches = summary.get("percent_branches_covered_display") or summary.get("percent_branches_covered")
+          if float(summary.get("percent_covered") or 0) <= 0:
+              raise SystemExit("MCP coverage is empty")
+          line = (
+              f"MCP coverage for mcp_server.py on {os.environ['MCP_OS']} / Python {os.environ['MCP_PYTHON']}: "
+              f"{covered}% ({statements}% statements, {branches}% branches)"
+          )
+          print(line)
+          destination = os.environ.get("GITHUB_STEP_SUMMARY")
+          if destination:
+              with open(destination, "a", encoding="utf-8") as handle:
+                  handle.write(f"{line}\n")
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mcp-coverage-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: coverage/
+          if-no-files-found: error

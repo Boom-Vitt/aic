@@ -1,0 +1,8 @@
+{
+  "id": "refactor-shared-email",
+  "title": "Share one email normalizer between users and orders",
+  "category": "refactor",
+  "timeout_seconds": 30,
+  "remove": [],
+  "license": "Apache-2.0"
+}

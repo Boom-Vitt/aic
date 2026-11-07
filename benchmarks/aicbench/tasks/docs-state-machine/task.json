@@ -1,0 +1,8 @@
+{
+  "id": "docs-state-machine",
+  "title": "Document every legal workflow transition",
+  "category": "docs",
+  "timeout_seconds": 30,
+  "remove": [],
+  "license": "Apache-2.0"
+}

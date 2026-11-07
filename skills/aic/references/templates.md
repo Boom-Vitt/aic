@@ -44,14 +44,14 @@ The owner receives the common contract, the user's original request, relevant sa
 1. Inspect the relevant evidence and identify the smallest change or answer that satisfies all acceptance, not a smaller replacement task. For a reported failure, retain the report as ground truth and distinguish any local reproduction limitations.
 2. Resolve material ambiguity from accessible sources. If a necessary user choice remains unavailable, identify it rather than guessing.
 3. Produce the answer/design or implement the approved change, including affected callers and requested documentation. Do not turn a design-only request into implementation.
-4. Run only authorized acceptance and regression checks. Inspect the actual changed behavior, not only syntax or a plausible narrative.
+4. Run only authorized acceptance and regression checks. For an approved edit or a reported failure, follow [editing and checking](editing.md): a capped search, a bounded view of the file, a reproduction check that is not a hidden suite, and an undo when the edit adds a diagnostic. Inspect the actual changed behavior, not only syntax or a plausible narrative.
 5. Deliver the complete artifact or supported answer, acceptance-to-evidence mapping, remaining uncertainty and outcome.
 
 ### Acceptance evidence and stop boundaries
 
 A passed answer has traceable support; a passed change has the required behavior and relevant checks on its integrated version. A design identifies tradeoffs and the chosen constraints without claiming execution. Missing sources, failed regressions or unexercised required behavior mean partial; unavailable access, a material unresolved decision or unapproved effects mean blocked. Finish safe independent work but never suppress an error to reach a passed label. Stop once the original acceptance is met.
 
-**Sources:** [anthropic-agents-2024](research.md#anthropic-agents-2024) on simple composable patterns; [google-2026](research.md#google-2026) on task-dependent coordination and strong solo baselines; [mast-2025](research.md#mast-2025) on verification failures. These support a selection rationale, not guaranteed solo superiority.
+**Sources:** [anthropic-agents-2024](research.md#anthropic-agents-2024) on simple composable patterns; [google-2026](research.md#google-2026) on task-dependent coordination and strong solo baselines; [mast-2025](research.md#mast-2025) on verification failures; [swe-agent-2024](research.md#swe-agent-2024), [agentless-2024](research.md#agentless-2024) and [autocoderover-2024](research.md#autocoderover-2024) on the editing procedure. These support a selection rationale, not guaranteed solo superiority and not an AIC benchmark result.
 
 ## explore-build
 
@@ -125,7 +125,7 @@ The lead preserves the original requirements and defines the evaluation rubric, 
 
 1. Before generation, identify required outcomes, failure examples and checks. Translate subjective criteria into observable properties tied to the user's preferences; do not invent product requirements.
 2. The generator completes the approved artifact and identifies its version. The lead provides the evaluator clean inputs and confirms actual permissions and data recipients.
-3. The evaluator independently inspects/exercises every assigned criterion. Return concrete findings with locations or reproduction evidence, severity/impact relative to acceptance, and checks not run. No findings means only the bounded examined surface, not universal correctness.
+3. The evaluator independently inspects/exercises every assigned criterion. Return each finding with the artifact version, the criterion, a location or reproduction, the observation, and the impact on acceptance, plus the checks not run. No findings names the examined surface and the surfaces not examined. It does not mean the unexamined product is correct. Omit the generator's argument for its own change.
 4. The lead resolves evidence-backed disagreements against the original contract. The generator repairs actual defects within scope; do not negotiate away acceptance or let evaluator preferences expand scope.
 5. Recheck affected findings and required regressions on the repaired artifact. Preserve review independence when practical; use the agreed bounds, not an endless satisfaction loop.
 6. The decision owner delivers the evidence mapping, resolved/open findings and outcome. User approval remains necessary at protected boundaries regardless of evaluator approval.

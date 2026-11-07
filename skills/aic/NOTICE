@@ -10,8 +10,18 @@ Apache-2.0 authoring reference:
 Anthropic skills/skill-creator, Copyright 2026 Anthropic, PBC.
 https://github.com/anthropics/skills/tree/ca45fc496a3436251f191354091d557da31c15b5/skills/skill-creator
 Its license is retained in LICENSE and in the installed skill's LICENSE.txt.
-The basic template/SKILL.md is a structural reference; no document-generation
-skills or other separately licensed Anthropic implementations are redistributed.
+Checked 2026-11-07: those two files are byte-for-byte that pinned LICENSE.txt,
+SHA-256 bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362.
+The appendix line "Copyright 2026 Anthropic, PBC" is part of the retained
+file. It is not a statement that Anthropic owns or endorses AIC-original
+material. AIC-original copyright is the notice at the top of this file.
+The basic template/SKILL.md is a structural reference. At that same revision,
+the docx, pdf, pptx and xlsx skills are all-rights-reserved and prohibit
+extraction, copying, derivative works and redistribution. That revision's
+THIRD_PARTY_NOTICES.md attributes GPL-3.0, BSD-2-Clause, HPND and SIL Open
+Font License components, including FFmpeg 7.0.2. None of those skills,
+notices or components are included. GPL-3.0 code cannot be relicensed as
+Apache-2.0 only.
 
 Agent Skills specification reference, Apache-2.0:
 https://github.com/agentskills/agentskills/tree/83021e2be457a9b6679148719c1f6074f0ad975e
@@ -36,6 +46,16 @@ Han Li, HanHaoNing Li, Ziqian Jiang and Yiling Lou;
 the credited Anthropic engineering/security authors and OpenAI's Ryan Lopopolo;
 Yuxin Wang and coauthors (Dartmouth, Microsoft and an independent researcher);
 and the credited OpenAI Cookbook memory/compaction contributors.
+Orca template notes also credit John Yang and coauthors (SWE-agent),
+Chunqiu Steven Xia and coauthors (Agentless), Dong Chen and coauthors (CodeR),
+and Daman Arora and coauthors (MASAI), plus Claude Code product documentation.
+The editing procedure also cites those SWE-agent and Agentless papers and
+the AutoCodeRover paper by Yuntong Zhang, Haifeng Ruan, Zhiyu Fan
+and Abhik Roychoudhury. The SWE-agent
+and Agentless implementation repositories named in the ledger are MIT. The
+AutoCodeRover repository named there is source-available and is not a grant
+to copy that code. No paper text or implementation source from those projects
+is included. Those sources stay reference-only.
 Additional capability references: DeepSeek-AI/DeepSeek Harness contributors,
 and the tmux project and its contributing authors. Their runtime code,
 documentation and software are not included. The optional tmux profile is
@@ -53,14 +73,24 @@ cited material. Original AIC templates/summaries are not upstream endorsements.
 
 Names of harnesses and model providers identify compatibility targets only.
 No endorsement, certification or universal interoperability is implied.
+No reviewed license grants trademark rights, and no third-party logo is
+included. Anthropic's consumer terms, read 2026-11-07, say that users of
+those services may not use Anthropic's name, logos or other trademarks,
+without prior written permission, in connection with other products or
+services or in a way that implies affiliation, endorsement or sponsorship.
+Naming a compatibility target or a cited source is not that permission.
 
 Optional protocol/runtime and build dependencies:
 The local MCP adapter uses the official Model Context Protocol Python SDK
 (mcp and mcp-types 2.3.0), MIT, Copyright (c) 2024 Anthropic, PBC.
 https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.3.0
 https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/v2.3.0/LICENSE
+Checked 2026-11-07: the mcp 2.3.0 and mcp-types 2.3.0 wheels each include
+that MIT text. PyPI metadata names the author as "Model Context Protocol a
+Series of LF Projects, LLC." The license file's copyright line remains
+Anthropic, PBC.
 The build backend is Hatchling 1.29.0, MIT,
-Copyright (c) 2021-present Ofek Lev.
+Copyright (c) 2021-present Ofek Lev <oss@ofek.dev>.
 https://github.com/pypa/hatch
 These packages are external dependencies with their own distributed licenses,
 not vendored into AIC or relicensed under AIC's Apache-2.0 grant.
@@ -72,7 +102,11 @@ Repository-only security tooling (external, not bundled runtime dependencies):
 Gitleaks 8.30.1, MIT, Copyright (c) 2019 Zachary Rice.
 https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1
 https://github.com/gitleaks/gitleaks/blob/v8.30.1/LICENSE
-pip-audit 2.10.1, Apache-2.0, Python Packaging Authority contributors.
+pip-audit 2.10.1, Apache-2.0. Its wheel LICENSE is the Apache-2.0 terms
+and adds no separate copyright line. The 2.10.1 metadata names Alex Cameron,
+Dustin Ingram and William Woodruff. The project says it is maintained in
+part by Trail of Bits with support from Google, and that it is not an
+official Google or Trail of Bits product.
 https://github.com/pypa/pip-audit
 https://pypi.org/project/pip-audit/2.10.1/
 CI downloads/installs these tools separately with pinned versions and verifies
