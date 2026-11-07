@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "checked": "2026-11-07",
+  "suites": [
+    {
+      "id": "smoke",
+      "executable": true,
+      "invokes_model": false,
+      "public_benchmark": false,
+      "path": "benchmarks/smoke/suite.json"
+    },
+    {
+      "id": "swe-bench-lite",
+      "executable": false,
+      "invokes_model": true,
+      "public_benchmark": true,
+      "url": "https://github.com/SWE-bench/SWE-bench",
+      "revision_observed": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
+      "license_observed": "MIT on the SWE-bench software repository via the GitHub license API. Dataset rows and SWE-bench Verified are not included here and need their own terms check before use.",
+      "blocked": "Not run. A scale run needs a local checkout at one pinned revision, the suite's own evaluator, Docker where the suite requires it, and the operator's model CLI under one shared model, budget, and seed."
+    },
+    {
+      "id": "swe-bench-verified",
+      "executable": false,
+      "invokes_model": true,
+      "public_benchmark": true,
+      "url": "https://www.swebench.com/",
+      "revision_observed": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
+      "license_observed": "The SWE-bench software repository at that revision reports MIT. This catalog does not treat that grant as a license for the Verified subset or its dataset card.",
+      "blocked": "Not run. Pin the subset revision and confirm its distribution terms before any task is copied or scored."
+    },
+    {
+      "id": "terminal-bench",
+      "executable": false,
+      "invokes_model": true,
+      "public_benchmark": true,
+      "url": "https://github.com/laude-institute/terminal-bench",
+      "revision_observed": "d28711d0da2675d0bb1d56de45ae5df6082438a3",
+      "license_observed": "Apache-2.0 on laude-institute/terminal-bench via the GitHub license API at that revision. Individual tasks can carry extra notices. None are vendored here.",
+      "blocked": "Not run. A scale run needs that pinned checkout, its evaluator, and the same model, budget, and seed as the other arms."
+    },
+    {
+      "id": "aider-polyglot",
+      "executable": false,
+      "invokes_model": true,
+      "public_benchmark": true,
+      "url": "https://github.com/Aider-AI/polyglot-benchmark",
+      "revision_observed": "7e0611e77b54e2dea774cdc0aa00cf9f7ed6144f",
+      "license_observed": "GitHub reports no SPDX license on Aider-AI/polyglot-benchmark. The README says the exercises are copyright Exercism. Aider's own repository is Apache-2.0 at 5dc9490bb35f9729ef2c95d00a19ccd30c26339c and that grant does not license these exercises.",
+      "blocked": "Not run. Do not copy exercises into this repository until each track's Exercism terms are reviewed. The harness may point at a local checkout the operator already has rights to use."
+    },
+    {
+      "id": "real-task",
+      "executable": false,
+      "invokes_model": true,
+      "public_benchmark": false,
+      "blocked": "Not run. A real-task comparison uses operator-owned repositories, the same model, budget, and seed on every arm, and records commands and exit codes. This repository does not include those tasks."
+    }
+  ]
+}

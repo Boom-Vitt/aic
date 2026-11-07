@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "title": "Fix one reproduced bug",
+  "status": "draft",
+  "goal": "Make the named bug reproduction pass without weakening the existing suite.",
+  "nonGoals": ["No unrelated refactor."],
+  "base": "main",
+  "streams": [
+    {
+      "slug": "fix-bug",
+      "role": "claude-code",
+      "summary": "Reproduce the bug on the baseline, then fix it inside the owned path.",
+      "paths": ["src/"],
+      "dependsOn": [],
+      "acceptance": [
+        "On the baseline commit the reproduction command exits non-zero for the expected reason, and the failure is not an import error or a missing dependency.",
+        "The same reproduction command exits 0 on the candidate commit.",
+        "The existing regression command exits 0 on the candidate commit."
+      ]
+    }
+  ]
+}
