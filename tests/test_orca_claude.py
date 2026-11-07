@@ -200,6 +200,39 @@ class OrcaClaudeTemplateTests(unittest.TestCase):
                                          active_stream=None, active_worktree=None, resolved_toplevel=None, plan=None)
             self.assertEqual(code, 2, wrapper)
 
+    def test_headless_git_arguments_cannot_smuggle_commands_config_or_symlinks(self):
+        repo = self.root / 'repo'
+        repo.mkdir()
+        outside = self.root / 'outside'
+        outside.write_text('outside\n', encoding='utf-8')
+        link = repo / 'link'
+        link.symlink_to(outside)
+        (repo / 'readme.txt').write_text('inside\n', encoding='utf-8')
+        options = dict(headless=True, active_stream=None, active_worktree=None,
+                       resolved_toplevel=str(repo), cwd=str(repo))
+
+        def code(command, plan=None):
+            return decide_tool('Bash', {'command': command}, plan=plan, **options)[0]
+
+        self.assertEqual(code('git commit -m "$(echo hi)"'), 2)
+        self.assertEqual(code('git status `id`'), 2)
+        self.assertEqual(code('git diff --stat <<<hello'), 2)
+        self.assertEqual(code('git diff --stat <(echo hi)'), 2)
+        self.assertEqual(code('git status $(git diff --stat)'), 2)
+        self.assertEqual(code('git -c core.hooksPath=/tmp/evil status'), 2)
+        self.assertEqual(code('git --config-env=core.hooksPath=/tmp/evil status'), 2)
+        self.assertEqual(code('git -ccore.hooksPath=/tmp/evil status'), 2)
+        owned_scripts = {'status': 'accepted', 'streams': [{'slug': 'tooling', 'paths': ['scripts']}]}
+        owned_gate = {'status': 'accepted', 'streams': [{'slug': 'tooling', 'paths': ['.orca']}]}
+        other = {'status': 'accepted', 'streams': [{'slug': 'docs', 'paths': ['docs']}]}
+        self.assertEqual(code('./scripts/verify.sh', plan=owned_scripts), 2)
+        self.assertEqual(code('./.orca/gate.sh', plan=owned_gate), 2)
+        self.assertEqual(code('./gate.sh', plan=other), 0)
+        self.assertEqual(code('./scripts/verify.sh', plan=other), 0)
+        self.assertEqual(code('git add link'), 2)
+        self.assertEqual(code('git add readme.txt'), 0)
+        self.assertEqual(code('git status'), 0)
+
     def test_hook_blocks_git_push_with_exit_2(self):
         result = subprocess.run(
             [sys.executable, str(ROOT / '.claude' / 'hooks' / 'guard.py')],

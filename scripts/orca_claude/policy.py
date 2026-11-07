@@ -245,8 +245,71 @@ def _looks_like_path(token: str) -> bool:
     return token.startswith(('/', '~', '.')) or '/' in token or (':' in token and '://' not in token)
 
 
+def _contains_denied_expansion(text: str, depth: int = 0) -> bool:
+    """Deny command substitution, backticks, here-strings, and process substitution.
+
+    The inner text is scanned again so a nested ``$(...)`` is not missed when the
+    outer command would otherwise be an allowed git read.
+    """
+    if depth > 6 or '<<<' in text or '>(' in text:
+        return True
+    for opener, closer in (('$(', ')'), ('<(', ')'), ('`', '`')):
+        start = 0
+        while True:
+            found = text.find(opener, start)
+            if found == -1:
+                break
+            begin = found + len(opener)
+            end = text.find(closer, begin)
+            inner = text[begin:end] if end != -1 else text[begin:]
+            if _contains_denied_expansion(inner, depth + 1) or inner.strip() or end != -1:
+                return True
+            start = begin
+    return False
+
+
+def _git_config_injection(tokens: list[str]) -> bool:
+    index = 1
+    while index < len(tokens):
+        token = tokens[index]
+        if token == '-c' or (token.startswith('-c') and not token.startswith('-C')):
+            return True
+        if token == '--config-env' or token.startswith('--config-env='):
+            return True
+        if token in {'-C', '--git-dir', '--work-tree', '--namespace', '--super-prefix', '--exec-path'}:
+            index += 2
+            continue
+        if token.startswith(('--git-dir=', '--work-tree=', '--namespace=', '--super-prefix=', '--exec-path=')):
+            index += 1
+            continue
+        if token.startswith('-'):
+            index += 1
+            continue
+        return False
+    return False
+
+
+def _plan_owns_script(plan: dict | None, script: str) -> bool:
+    if not isinstance(plan, dict) or plan.get('status') != 'accepted':
+        return False
+    relative = script[2:] if script.startswith('./') else script
+    parent = Path(relative).parent.as_posix()
+    targets = [relative]
+    targets.append('.' if parent in {'', '.'} else parent)
+    for stream in plan.get('streams') or []:
+        if not isinstance(stream, dict):
+            continue
+        owned = [item for item in stream.get('paths') or [] if isinstance(item, str)]
+        for item in owned:
+            if _norm(item) in {'', '.'}:
+                return True
+        if any(path_owned(owned, target) for target in targets):
+            return True
+    return False
+
+
 def _safe_git(tokens: list[str], worktree: Path | None, cwd: Path | None) -> bool:
-    if '--no-index' in tokens:
+    if '--no-index' in tokens or _git_config_injection(tokens):
         return False
     parts = _git_parts(tokens)
     if parts is None:
@@ -272,14 +335,15 @@ def _safe_git(tokens: list[str], worktree: Path | None, cwd: Path | None) -> boo
                 continue
             index += 1
             continue
-        if _looks_like_path(token) or (':' in token and '://' not in token):
+        if subcommand == 'add' or _looks_like_path(token) or (':' in token and '://' not in token):
             if _path_is_outside_or_sensitive(token, worktree, cwd):
                 return False
         index += 1
     return True
 
 
-def _headless_segment_allowed(segment: str, worktree: Path | None, cwd: Path | None) -> bool:
+def _headless_segment_allowed(segment: str, worktree: Path | None, cwd: Path | None,
+                              plan: dict | None) -> bool:
     tokens = _tokens(segment)
     if not tokens:
         return False
@@ -287,11 +351,13 @@ def _headless_segment_allowed(segment: str, worktree: Path | None, cwd: Path | N
     if not unwrapped:
         return False
     if len(unwrapped) == 1 and unwrapped[0] in EXACT_HEADLESS:
-        return True
+        return not _plan_owns_script(plan, unwrapped[0])
     names = {_program(unwrapped[0]), _program(tokens[0])}
     if names & INTERPRETERS or 'sed' in names:
         return False
     if _program(unwrapped[0]) == 'git':
+        if _contains_denied_expansion(segment) or any(_contains_denied_expansion(token) for token in unwrapped):
+            return False
         return _safe_git(unwrapped, worktree, cwd)
     return False
 
@@ -333,7 +399,7 @@ def decide_tool(tool_name: str, tool_input: object, *, headless: bool, active_st
         if headless:
             root = Path(resolved_toplevel) if resolved_toplevel else (Path(active_worktree) if active_worktree else None)
             base = Path(cwd) if cwd else root
-            if not all(_headless_segment_allowed(segment, root, base) for segment in _segments(command)):
+            if not all(_headless_segment_allowed(segment, root, base, plan) for segment in _segments(command)):
                 return 2, 'command is not on the headless allowlist.'
         return 0, 'bash allowed.'
     paths = _tool_paths(payload)
