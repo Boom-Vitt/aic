@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "smoke",
+  "executable": true,
+  "invokes_model": false,
+  "public_benchmark": false,
+  "benchmark_revision": "local-smoke-1",
+  "model": "none",
+  "seed": 0,
+  "budget": {
+    "max_turns": 0,
+    "timeout_sec": 10,
+    "max_usd": 0
+  },
+  "arms": ["plain-claude-code", "aic"],
+  "tasks": [
+    {
+      "id": "exit-zero",
+      "cwd": "tasks/exit-zero",
+      "argv": ["python3", "check.py"]
+    }
+  ]
+}
