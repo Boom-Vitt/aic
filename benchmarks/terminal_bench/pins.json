@@ -1,0 +1,20 @@
+{
+  "checked": "2026-11-07",
+  "terminal_bench": {
+    "repository": "https://github.com/harbor-framework/terminal-bench",
+    "commit": "cfc7b6c66f2c731e4b70d92ee71ee5d6d3b55b64",
+    "license": "Apache-2.0",
+    "license_file": "LICENSE",
+    "license_url": "https://github.com/harbor-framework/terminal-bench/blob/cfc7b6c66f2c731e4b70d92ee71ee5d6d3b55b64/LICENSE",
+    "tasks_path": "tasks",
+    "committed": "2026-11-06"
+  },
+  "harbor": {
+    "repository": "https://github.com/harbor-framework/harbor",
+    "commit": "2bc1a23bd961de0bec8742940f35ac9070c67815",
+    "license": "Apache-2.0",
+    "license_file": "LICENSE",
+    "license_url": "https://github.com/harbor-framework/harbor/blob/2bc1a23bd961de0bec8742940f35ac9070c67815/LICENSE",
+    "committed": "2026-11-07"
+  }
+}
