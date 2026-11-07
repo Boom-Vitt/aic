@@ -521,7 +521,9 @@ def run_comparison(args: argparse.Namespace, environ: dict[str, str]) -> dict:
     catalog = load_catalog()
     selected = _select(catalog, args.tasks)
     arms = tuple(args.arms) if args.arms else ARMS
-    with tempfile.TemporaryDirectory(prefix="aicbench-run-") as temporary:
+    # macOS exposes /tmp and /var as symlinks. The managed installer refuses
+    # any symlink component, so the run directory uses the resolved temp root.
+    with tempfile.TemporaryDirectory(prefix="aicbench-run-", dir=outside_repository_temp()) as temporary:
         root = Path(temporary)
         home = root / "home"
         config = root / "claude-config"

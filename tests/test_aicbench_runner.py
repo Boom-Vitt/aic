@@ -9,6 +9,7 @@ import stat
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -159,6 +160,22 @@ class RunnerTests(unittest.TestCase):
             self.assertNotIn('oracle', cwd.parts)
             for directory in line['add_dirs']:
                 self.assertFalse(Path(directory).resolve().is_relative_to(ROOT.resolve()))
+
+    def test_symlinked_process_temp_does_not_block_the_managed_install(self):
+        real = self.base / 'real-temp'
+        real.mkdir()
+        link = self.base / 'link-temp'
+        link.symlink_to(real, target_is_directory=True)
+        stub = self._stub()
+        output = self.base / 'linked-temp.json'
+        errors = io.StringIO()
+        with patch('benchmarks.aicbench.runner.tempfile.tempdir', str(link)), redirect_stderr(errors):
+            code = main(
+                ['--claude-bin', str(stub), '--tasks', 'bugfix-ledger-signs', '--output', str(output)],
+                self._environ('sk-ant-present'),
+            )
+        self.assertEqual(code, 0, errors.getvalue() or 'no diagnostic')
+        self.assertTrue(output.is_file())
 
     def test_tampered_oracle_marks_the_run_invalid(self):
         task = next(item for item in load_catalog() if item.id == 'bugfix-ledger-signs')
