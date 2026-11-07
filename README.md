@@ -168,6 +168,8 @@ Start with one stream. Four agents and six worktrees are ceilings. On a machine 
 
 Benchmark comparisons are specified in [docs/BENCHMARKS.md](docs/BENCHMARKS.md). No public benchmark score is claimed.
 
+Routing guidance is tuned only on the dev pack `tests/fixtures/routing-scenarios.json`. The release pack `benchmarks/routing/heldout-v2.json` is scored once per release. Pack version 1 SHA-256: `bb0a6a4788b02911d827beed0a47f46bf66f9822a97bc55bea2a77cb02c13ec4` for the pack and `10aab94fa5c4bce424cff792f39c2d642aa7beb10ff8c23133fcb0e7add3b6ba` for `benchmarks/routing/heldout-v2-answers.json`.
+
 ## For contributors and maintainers
 
 **Development version: `0.0.3`.** Versions follow the owner's `0.0.N` policy; recommendation/catalog schema **3** is independently versioned. AIC is a normal public GitHub repository, not a GitHub Template Repository. Workflow families are approaches to work, not repository scaffolds.

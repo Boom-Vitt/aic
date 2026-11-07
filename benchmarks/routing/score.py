@@ -1,8 +1,10 @@
-"""Score routing decisions against the held-out pack.
+"""Score routing decisions against a routing pack.
 
-Decisions come from a JSONL file written by an agent or harness, or from
-``benchmarks.routing.router.route_scenario`` when that function exists.
-This module does not infer a workflow from request text.
+The default pack is the dev fixture ``tests/fixtures/routing-scenarios.json``.
+``--pack`` selects another schema-3 pack, including the release pack
+``benchmarks/routing/heldout-v2.json``. Decisions come from a JSONL file written
+by an agent or harness, or from ``benchmarks.routing.router.route_scenario``
+when that function exists. This module does not infer a workflow from request text.
 """
 from __future__ import annotations
 
@@ -36,7 +38,7 @@ NO_ROUTER = (
     "Pass a JSONL decision file. No labels were inferred."
 )
 NOTES = (
-    "Counts come only from the decision file and the held-out fixture.",
+    "Counts come only from the decision file and the selected routing pack.",
     "A missing prediction is incorrect. It is not counted as a precision trial.",
     "Precision, recall, and accuracy are micro-averaged over one gold label per item.",
     "When every item has a prediction, those three proportions are equal.",
@@ -111,7 +113,36 @@ def repo_root() -> Path:
 
 
 def default_scenarios_path() -> Path:
+    """Dev pack. Release scoring selects benchmarks/routing/heldout-v2.json with --pack."""
     return repo_root() / "tests" / "fixtures" / "routing-scenarios.json"
+
+
+def selected_pack_path(scenarios: Path | None, pack: Path | None) -> Path:
+    """Choose the pack file. --pack and --scenarios name the same kind of file."""
+    if scenarios is not None and pack is not None:
+        raise ScoreError("Pass only one of --scenarios and --pack.")
+    if pack is not None:
+        return pack
+    if scenarios is not None:
+        return scenarios
+    return default_scenarios_path()
+
+
+def add_pack_arguments(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--scenarios",
+        type=Path,
+        help="Routing pack JSON. Defaults to the dev pack tests/fixtures/routing-scenarios.json.",
+    )
+    group.add_argument(
+        "--pack",
+        type=Path,
+        help=(
+            "Routing pack JSON. Same choice as --scenarios. "
+            "The release pack is benchmarks/routing/heldout-v2.json."
+        ),
+    )
 
 
 def binomial_summary(successes: int, trials: int) -> dict[str, object]:
@@ -602,7 +633,7 @@ def render_report(report: dict[str, object]) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="benchmarks.routing.score",
-        description="Score a JSONL routing decision file against the held-out pack. No model is called.",
+        description="Score a JSONL routing decision file against a routing pack. No model is called.",
     )
     parser.add_argument("--decisions", type=Path, help="JSONL decisions, one object per line.")
     parser.add_argument(
@@ -610,7 +641,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Score benchmarks.routing.router when that module exists. It does not in this repository.",
     )
-    parser.add_argument("--scenarios", type=Path, help="Routing pack JSON. Defaults to the held-out fixture.")
+    add_pack_arguments(parser)
     parser.add_argument("--output", type=Path, help="Write the JSON report here. Refuses to overwrite.")
     return parser
 
@@ -621,7 +652,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.from_router == (args.decisions is not None):
         parser.error("Pass either --decisions FILE or --from-router.")
     try:
-        pack = load_pack(args.scenarios if args.scenarios is not None else default_scenarios_path())
+        pack = load_pack(selected_pack_path(args.scenarios, args.pack))
         if args.from_router:
             route = load_router()
             if route is None:
