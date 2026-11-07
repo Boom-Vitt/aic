@@ -18,6 +18,13 @@ The maintainer is bound to `Boom-Vitt/aic` and its owner. It is not a general pu
 
 An agent's role, a label, an issue, a schema-valid result or a positive self-grade is not authorization. The controller keeps GitHub authority; the research and review processes receive public source packets, not GitHub credentials or arbitrary repository instructions. The provider's existing plan and usage limits still apply. The CLI's estimated cost stop is not a hard invoice ceiling; an in-flight request can finish beyond an estimate.
 
+Each role gets a private `HOME` and its own empty `.omp` project anchor, so ambient home/project plugin registries are not its startup context. A read-only `omp config path --json` probe resolves the existing default CLI agent directory; only the child's `PI_CODING_AGENT_DIR` points there for existing authentication. The adapter does not copy credentials, edit global settings/plugins or create a different login. The original tool/discovery/fallback restrictions remain in force.
+
+The runtime binding is hashed in `runtime.json` alongside the packet, CLI isolation overlay and capture logs, under receipt format `aic-no-tool-agent-v2`. Older receipts stay preserved as historical evidence but are not silently reused under the new isolation contract.
+
+These path semantics were checked against [OMP v18.16.0's environment documentation](https://github.com/can1357/oh-my-pi/blob/650f3a108229ee11bf68ba3377f4e8c3391cd424/docs/environment-variables.md) and [startup/discovery implementation](https://github.com/can1357/oh-my-pi/blob/650f3a108229ee11bf68ba3377f4e8c3391cd424/packages/coding-agent/src/discovery/helpers.ts). In particular, `--plugin-dir` **merges** ambient roots; it is not an isolation switch. The referenced runtime is [MIT-licensed](https://github.com/can1357/oh-my-pi/blob/650f3a108229ee11bf68ba3377f4e8c3391cd424/LICENSE), credited there to Mario Zechner, Can Bölük and Stencil Labs. AIC uses its public CLI/path contract; no runtime source is vendored.
+
+
 ## Source and quality policy
 
 - Discover from documented primary publication/metadata services and official research/engineering pages. An index hit is a candidate, not verified science.

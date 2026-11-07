@@ -72,9 +72,12 @@ class ControlledCLI:
         self.after_start = None
 
     def __call__(self, argv, **kwargs):
+        references = None
         if '--help' in argv:
             self.probes += 1
             code = 'import sys; sys.stdout.write(' + repr(self.help_text) + ')'
+        elif argv[1:] == ['config', 'path', '--json']:
+            code = 'from pathlib import Path; print(Path.home() / ".omp" / "agent")'
         else:
             self.starts += 1
             if self.before_start:
@@ -91,7 +94,7 @@ class ControlledCLI:
                                      + repr(compressed) + '))')
         process = subprocess.Popen([sys.executable, '-c', code], **kwargs)
         self.processes.append(process)
-        if '--help' not in argv and self.after_start:
+        if references and self.after_start:
             self.after_start(Path(references[0]))
         return process
 
@@ -326,7 +329,7 @@ class NoToolAgentTests(unittest.TestCase):
                 'research', PACKET, result, now=NOW, job_key='job-one')
         self.assertIsNone(self.state.run_result('job-one', 'research'))
 
-    def test_environment_retains_oauth_home_but_no_credential_or_provider_overrides(self):
+    def test_credential_and_provider_overrides_never_reach_the_agent(self):
         forbidden = {'GH_TOKEN': 'fake-gh', 'GITHUB_TOKEN': 'fake-github', 'GIT_CONFIG_COUNT': '1',
                      'OPENAI_API_KEY': 'fake-openai', 'ANTHROPIC_OAUTH_TOKEN': 'fake-anthropic',
                      'OMP_PROFILE': 'foreign', 'PI_CODING_AGENT_DIR': '/foreign',
@@ -337,11 +340,39 @@ class NoToolAgentTests(unittest.TestCase):
             cli = ControlledCLI()
             self.run_agent(cli)
         env = cli.environments[0]
-        self.assertEqual(env['HOME'], os.environ['HOME'])
-        self.assertEqual(env['PATH'], os.environ['PATH'])
-        self.assertFalse(set(forbidden) & set(env))
+        self.assertFalse((set(forbidden) - {'PI_CODING_AGENT_DIR'}) & set(env))
+        self.assertNotEqual(env.get('PI_CODING_AGENT_DIR'), forbidden['PI_CODING_AGENT_DIR'])
         self.assertLessEqual(set(env), {'HOME', 'PATH', 'TMPDIR', 'TMP', 'TEMP', 'LANG', 'LC_ALL',
-                                      'LC_CTYPE', 'LC_MESSAGES', 'TZ'})
+                                      'LC_CTYPE', 'LC_MESSAGES', 'TZ', 'PI_CODING_AGENT_DIR'})
+
+    def test_ambient_startup_hooks_are_isolated_while_existing_login_is_available(self):
+        ambient = Path(self.temp.name) / 'ambient-home'
+        registry = ambient / '.omp'
+        auth = registry / 'agent'
+        auth.mkdir(parents=True, mode=0o700)
+        (auth / 'existing-login').write_text('synthetic-subscription')
+        (registry / 'ambient-hook').write_text('unrelated startup code')
+        compressed = zlib.compress(jsonl(events()).encode())
+        code = textwrap.dedent(f'''\
+            import os, sys, zlib
+            from pathlib import Path
+            roots = [Path.home() / '.omp']
+            for parent in (Path.cwd(), *Path.cwd().parents):
+                if (parent / '.omp').is_dir():
+                    roots.append(parent / '.omp')
+                    break
+            for root in roots:
+                if (root / 'ambient-hook').exists():
+                    (root / 'executed').write_text('started')
+                    raise SystemExit(17)
+            auth = Path(os.environ.get('PI_CODING_AGENT_DIR', '/missing')) / 'existing-login'
+            if not auth.is_file() or auth.read_text() != 'synthetic-subscription':
+                raise SystemExit(18)
+            sys.stdout.buffer.write(zlib.decompress({compressed!r}))
+        ''')
+        with patch.dict(os.environ, {'HOME': str(ambient)}):
+            self.run_agent(ControlledCLI(code=code), directory=ambient / 'workspace' / 'agents')
+        self.assertFalse((registry / 'executed').exists())
 
     def test_linked_or_public_directory_is_preserved_before_model_start(self):
         target = Path(self.temp.name) / 'unmanaged'

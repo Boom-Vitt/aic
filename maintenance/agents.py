@@ -27,7 +27,7 @@ MAX_TRACE_BYTES = 8 * 1024 * 1024
 MAX_RESULT_BYTES = 256 * 1024
 MAX_STDERR_BYTES = 64 * 1024
 MAX_RECEIPT_BYTES = 64 * 1024
-OWNER = 'aic-no-tool-agent-v1'
+OWNER = 'aic-no-tool-agent-v2'
 SYSTEM = (
     'You are an isolated AIC research assessor with no tools. The single JSON '
     'packet is the entire task context. Its controller-supplied purpose and '
@@ -213,7 +213,7 @@ def _stop(process):
         raise AgentError('Agent process group did not terminate; owner inspection is required.') from None
 
 
-def _capture(runner, argv, *, cwd, timeout, stdout, stderr, output_limit, error_limit):
+def _capture(runner, argv, *, cwd, timeout, stdout, stderr, output_limit, error_limit, environment=None):
     """Drain separate pipes with finite disk/memory bounds and a group deadline."""
     if threading.current_thread() is not threading.main_thread():
         raise AgentError('Owned agent capture requires the main thread for signal-safe shutdown.')
@@ -237,7 +237,7 @@ def _capture(runner, argv, *, cwd, timeout, stdout, stderr, output_limit, error_
         for signum in (signal.SIGTERM, signal.SIGINT):
             previous_handlers[signum] = signal.getsignal(signum)
             signal.signal(signum, interrupt)
-        process = runner(argv, cwd=str(cwd), env=_environment(), stdin=subprocess.DEVNULL,
+        process = runner(argv, cwd=str(cwd), env=_environment() if environment is None else environment, stdin=subprocess.DEVNULL,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                          start_new_session=True, close_fds=True)
         if pending_signal is not None:
@@ -427,6 +427,17 @@ class NoToolAgents:
         if code != 0 or any(not re.search(r'(?<![\w-])--' + re.escape(flag) + r'(?=[\s=,]|$)', help_text)
                             for flag in REQUIRED_FLAGS):
             raise AgentError('Installed CLI does not advertise every required isolation control.')
+        output, errors = io.BytesIO(), io.BytesIO()
+        try:
+            code = _capture(self.runner, [self.binary, 'config', 'path', '--json'], cwd=policy.ROOT,
+                            timeout=15, stdout=output, stderr=errors,
+                            output_limit=MAX_RECEIPT_BYTES, error_limit=MAX_STDERR_BYTES)
+            auth_path = output.getvalue().decode('utf-8').strip()
+        except (OSError, ValueError, UnicodeError):
+            raise AgentError('Unable to resolve the existing CLI authentication directory.') from None
+        if code != 0 or not auth_path or any(ord(char) < 32 for char in auth_path) or not Path(auth_path).is_absolute():
+            raise AgentError('The existing CLI authentication directory must be an absolute path.')
+        return Path(auth_path)
 
     def _folder(self, directory, role, job_key):
         return directory / (role + '-' + policy.digest(job_key)[:32])
@@ -446,7 +457,8 @@ class NoToolAgents:
                 or receipt.get('result_digest') != policy.digest(result)):
             raise AgentError('Private agent receipt does not bind the exact packet and result.')
         limits = {'packet.json': MAX_PACKET_BYTES, 'trace.jsonl': MAX_TRACE_BYTES,
-                  'stderr.log': MAX_STDERR_BYTES, 'isolation.json': MAX_RECEIPT_BYTES}
+                  'stderr.log': MAX_STDERR_BYTES, 'isolation.json': MAX_RECEIPT_BYTES,
+                  'runtime.json': MAX_RECEIPT_BYTES}
         if not isinstance(receipt.get('artifacts'), dict) or set(receipt['artifacts']) != set(limits):
             raise AgentError('Private agent artifact receipt is malformed; artifacts are preserved.')
         for name, maximum in limits.items():
@@ -465,6 +477,19 @@ class NoToolAgents:
                     raise AgentError('Private trace does not match the accepted result.')
             elif name == 'isolation.json' and data != _encoded(ISOLATION_CONFIG, MAX_RECEIPT_BYTES, 'Isolation config'):
                 raise AgentError('Private isolation configuration was modified; artifacts are preserved.')
+            elif name == 'runtime.json':
+                try:
+                    runtime = _json(data.decode('utf-8'))
+                    if (not isinstance(runtime, dict) or set(runtime) != {'home', 'agent_dir'}
+                            or runtime['home'] != str(folder / 'home')
+                            or not isinstance(runtime['agent_dir'], str)
+                            or not Path(runtime['agent_dir']).is_absolute()
+                            or any(ord(char) < 32 for char in runtime['agent_dir'])):
+                        raise ValueError('Invalid private runtime binding')
+                except (ValueError, UnicodeError, RecursionError, TypeError):
+                    raise AgentError('Private runtime binding was modified; artifacts are preserved.') from None
+                _directory(folder / 'home', create=False, root=self.artifact_root)
+                _directory(folder / '.omp', create=False, root=self.artifact_root)
         return receipt
 
     def _accepted_result(self, role, job_key, packet_digest, directory, cached):
@@ -496,7 +521,7 @@ class NoToolAgents:
             return self._accepted_result(role, job_key, packet_digest, directory, cached)
         if folder.exists() or folder.is_symlink():
             raise AgentError('Prior unaccepted agent artifacts are preserved; no implicit retry.')
-        self._probe()
+        auth_directory = self._probe()
         if self.clock is not None and policy.day_key(self.clock()) != day:
             raise AgentError('UTC day changed during preflight; no model run was reserved. Start a fresh cycle.')
         try:
@@ -509,6 +534,13 @@ class NoToolAgents:
             packet_stamp = _save(folder / 'packet.json', packet_data)
             config_data = _encoded(ISOLATION_CONFIG, MAX_RECEIPT_BYTES, 'Isolation config')
             config_stamp = _save(folder / 'isolation.json', config_data)
+            # Isolate ambient plugin discovery without copying or changing OAuth credentials.
+            home = _directory(folder / 'home', create=True, root=self.artifact_root)
+            _directory(folder / '.omp', create=True, root=self.artifact_root)
+            runtime_data = _encoded({'home': str(home), 'agent_dir': str(auth_directory)},
+                                    MAX_RECEIPT_BYTES, 'Runtime binding')
+            runtime_stamp = _save(folder / 'runtime.json', runtime_data)
+            environment = {**_environment(), 'HOME': str(home), 'PI_CODING_AGENT_DIR': str(auth_directory)}
             argv = [self.binary, '--model', MODEL, '--system-prompt', SYSTEM,
                     '--mode', 'json', '--print', '--no-session', '--no-title',
                     '--no-tools', '--no-extensions', '--no-skills', '--no-context-files',
@@ -520,7 +552,7 @@ class NoToolAgents:
                 output_stamps = {}
                 code = _capture(self.runner, argv, cwd=folder, timeout=MAX_AGENT_SECONDS,
                                 stdout=trace, stderr=errors,
-                                output_limit=MAX_TRACE_BYTES, error_limit=MAX_STDERR_BYTES)
+                                output_limit=MAX_TRACE_BYTES, error_limit=MAX_STDERR_BYTES, environment=environment)
                 for name, stream in (('trace.jsonl', trace), ('stderr.log', errors)):
                     stream.flush()
                     os.fsync(stream.fileno())
@@ -533,6 +565,8 @@ class NoToolAgents:
                 raise AgentError('Private packet was modified; artifacts are preserved.')
             if _read(folder / 'isolation.json', MAX_RECEIPT_BYTES, expected=config_stamp) != config_data:
                 raise AgentError('Private isolation configuration was modified; artifacts are preserved.')
+            if _read(folder / 'runtime.json', MAX_RECEIPT_BYTES, expected=runtime_stamp) != runtime_data:
+                raise AgentError('Private runtime binding was modified; artifacts are preserved.')
             trace_data = _read(folder / 'trace.jsonl', MAX_TRACE_BYTES,
                                expected=output_stamps['trace.jsonl'])
             _read(folder / 'stderr.log', MAX_STDERR_BYTES, expected=output_stamps['stderr.log'])
@@ -541,7 +575,8 @@ class NoToolAgents:
                        'packet_digest': packet_digest, 'result_digest': policy.digest(result),
                        'metadata': metadata, 'artifacts': {}}
             for name, maximum in (('packet.json', MAX_PACKET_BYTES), ('trace.jsonl', MAX_TRACE_BYTES),
-                                  ('stderr.log', MAX_STDERR_BYTES), ('isolation.json', MAX_RECEIPT_BYTES)):
+                                  ('stderr.log', MAX_STDERR_BYTES), ('isolation.json', MAX_RECEIPT_BYTES),
+                                  ('runtime.json', MAX_RECEIPT_BYTES)):
                 receipt['artifacts'][name] = hashlib.sha256(_read(folder / name, maximum)).hexdigest()
             receipt_data = _encoded(receipt, MAX_RECEIPT_BYTES, 'Agent receipt')
             _save(folder / 'receipt.json', receipt_data)
