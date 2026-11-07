@@ -16,10 +16,11 @@ dependencies = []
 mcp = ["mcp==2.3.0"]
 
 [project.scripts]
+aic = "aic_quickstart.cli:main"
 aic-mcp = "aic.scripts.aiclib.mcp_server:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["skills/aic"]
+packages = ["skills/aic", "src/aic_quickstart"]
 
 [project.urls]
 Repository = "https://github.com/Boom-Vitt/aic"
