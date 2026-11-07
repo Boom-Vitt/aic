@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.0.0 — 2026-11-07 (unreleased)
+- Consolidate the active catalog into five original task-adaptive workflow families: `direct`, `explore-build`, `coordinated-delivery`, `independent-review` and `adaptive-controller`. Select and compose by evidence, dependencies, risk and cost, not a universal winner, permanent team or keyword classifier.
+- Require recommendation/catalog schema 3. Reject schema-1/2 recommendations and retired IDs without aliases or silent migration; independently versioned installation, memory, handoff and maintenance formats remain unchanged.
+- Combine accepted-artifact ordered handoffs and ready isolated branches under coordinated delivery. Keep controller durable delivery separate from explicitly authorized, correctness-gated measured optimization; ordinary continuity needs no benchmark.
+- Extend task/project guidance and evaluation scenarios across all six task categories, with original acceptance, ownership, readiness, context, permission, resource and stop boundaries preserved.
+- Update primary-source credit, publication versions, evidence limits and rights records, including final COLM CAID, ICLR BOAD, Nature Co-Scientist, first-party research/orchestration documentation and tmux. Cited content remains reference-only; no research code, prompts or figures are bundled.
+- Add an original optional tmux 3.8 profile and supervision guide: private socket/config, role/title borders, retained exit/signal states, native navigation, scoped cleanup and verified OMP Agent Hub controls. Process visibility never establishes task acceptance or launch/spend authority.
+- Clarify that AIC is a normal public GitHub repository, not a GitHub template repository. Keep the owner-focused README and separate required legal/source credits.
+- Source publication does not automatically refresh installed skills or upgrade the immutable maintainer service. This change creates no release tag or service activation; actual checks and limits are recorded in [verification](docs/verification.md).
+
 ## 2.0.2 — 2026-11-07
 - Read only service-level launchd lifecycle fields. Nested resource-coalition states and PIDs no longer block owned removal or get mistaken for the controller; missing or ambiguous controller evidence still fails closed.
 - Make the lifecycle fixture reflect the actual Mac mini response and retain explicit wrong-PID, unknown-running-state and ownership-preservation coverage.

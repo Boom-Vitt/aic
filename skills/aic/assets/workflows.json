@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "workflows": [
     {"id": "answer", "purpose": "Answer a bounded question using authoritative evidence."},
     {"id": "research", "purpose": "Investigate unknowns and reconcile source-backed findings."},
@@ -26,26 +26,18 @@
     {
       "id": "explore-build",
       "topologies": ["parallel"],
-      "select_when": "Independent discovery questions are the bottleneck before a capable owner builds.",
-      "avoid_when": "Questions are dependent or the specification is already clear.",
+      "select_when": "Substantial independent discovery questions are the bottleneck before one owner synthesizes findings or builds.",
+      "avoid_when": "Questions depend on each other's artifacts, have coupled acceptance, or cost less to answer directly than to delegate.",
       "reference": "references/templates.md#explore-build",
-      "research": ["cohere-2026", "openai-harness-2026"]
+      "research": ["cohere-2026", "openai-harness-2026", "anthropic-research-2025", "co-scientist-2026"]
     },
     {
-      "id": "ordered-handoff",
-      "topologies": ["sequential"],
-      "select_when": "Useful delegated units depend on confirmed upstream artifacts or share mutation boundaries.",
-      "avoid_when": "One owner can finish the small coupled task without a meaningful handoff.",
-      "reference": "references/templates.md#ordered-handoff",
-      "research": ["cooperbench-2026", "caid-2026"]
-    },
-    {
-      "id": "isolated-build",
-      "topologies": ["parallel"],
-      "select_when": "Substantial implementation units have agreed interfaces and independent acceptance.",
-      "avoid_when": "Shared invariants or unresolved interfaces require simultaneous overlapping writers.",
-      "reference": "references/templates.md#isolated-build",
-      "research": ["caid-2026", "cooperbench-2026"]
+      "id": "coordinated-delivery",
+      "topologies": ["sequential", "parallel"],
+      "select_when": "Substantial delivery units need accepted-artifact ordered handoffs, or are ready for concurrent work with agreed interfaces, non-overlapping scopes and independent checks; one owner integrates.",
+      "avoid_when": "Delegation mostly repeats context; separate files alone do not establish independence, and unresolved producer-consumer dependencies must not be run concurrently.",
+      "reference": "references/templates.md#coordinated-delivery",
+      "research": ["cooperbench-2026", "caid-2026", "boad-2026"]
     },
     {
       "id": "independent-review",
@@ -56,21 +48,13 @@
       "research": ["anthropic-harness-2026", "mast-2025", "containment-2026"]
     },
     {
-      "id": "durable-controller",
+      "id": "adaptive-controller",
       "topologies": ["solo", "sequential", "parallel", "generator-evaluator"],
-      "select_when": "Long-running work needs compact state, artifact dependencies and explicit recovery ownership.",
-      "avoid_when": "A short task does not need a separate control or continuity layer.",
-      "reference": "references/templates.md#durable-controller",
-      "research": ["meta-control-2026", "openai-harness-2026", "containment-2026"]
-    },
-    {
-      "id": "adaptive-optimization",
-      "topologies": ["solo", "sequential", "parallel", "generator-evaluator"],
-      "select_when": "A correct measured baseline has a diagnosed optimization plateau and approved experiment limits.",
-      "avoid_when": "The task lacks an executable correctness gate or reliable objective.",
-      "reference": "references/templates.md#adaptive-optimization",
-      "research": ["eat-2026"]
+      "select_when": "Durable delivery needs explicit state, artifact dependencies, recovery ownership and evidence-driven stage reselection; or explicitly authorized optimization has a correct baseline/oracle, representative comparable measurements and bounded resources.",
+      "avoid_when": "A short task needs no continuity layer, or proposed optimization lacks explicit authorization, correctness evidence or reliable measurements. Ordinary delivery continuity does not require a performance benchmark.",
+      "reference": "references/templates.md#adaptive-controller",
+      "research": ["meta-control-2026", "openai-harness-2026", "containment-2026", "eat-2026", "co-scientist-2026"]
     }
   ],
-  "inference": "The host AI selects task category, template and current-stage topology from evidence; this catalog is not a keyword classifier, scheduler or universal runtime/model ranking."
+  "inference": "The host AI selects the task category, one of five workflow families and the current-stage topology from task evidence, dependencies, risk and cost; it can reselect when evidence changes without changing original acceptance or authority. This catalog is not a keyword classifier, executable scheduler, runtime integration or universal optimum."
 }

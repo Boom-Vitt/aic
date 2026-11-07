@@ -9,7 +9,7 @@ Use [templates](templates.md) for the complete execution contracts and [project 
 | Decision | Question | Output |
 | --- | --- | --- |
 | Task category (`workflow`) | What outcome is requested? | `answer`, `research`, `implementation`, `debug`, `review` or `design` |
-| Reusable procedure (`template`) | What work arrangement addresses the actual bottleneck? | One of the seven template IDs below |
+| Reusable procedure (`template`) | Which family addresses the actual bottleneck? | One of the five family IDs below |
 | Control structure (`topology`) | Who acts, in what order, and who integrates? | `solo`, `sequential`, `parallel` or `generator-evaluator` |
 | Runtime and model | Which available, compatible tools and capabilities can perform this unit within its constraints? | Current host by default; an explicitly justified alternative if needed |
 | Operational authority | What has the user authorized, and what do actual controls permit? | Target, reads/writes, recipients, commands, launches, spending and protected boundaries |
@@ -44,28 +44,30 @@ Do not delegate all work to another CLI by default. The accountable lead retains
 | --- | --- | --- |
 | Bounded question, coherent change, initial bug investigation or coupled design | [direct](templates.md#direct) / `solo` | The work has a demonstrated independent discovery, integration or evaluation bottleneck |
 | Two or more substantial, independently answerable unknowns; one owner can synthesize and build | [explore-build](templates.md#explore-build) / `parallel` during exploration, then owner-led build | Evidence is already available, branches duplicate trivial lookup, or exploration itself changes shared state |
-| A later unit genuinely needs an earlier accepted artifact; a specialist or continuity boundary justifies delegation | [ordered-handoff](templates.md#ordered-handoff) / `sequential` | One owner can do the coupled work with less handoff loss, or there is no real dependency |
-| Two or more separately checkable implementation units with stable interfaces, non-overlapping owned paths and an integration owner | [isolated-build](templates.md#isolated-build) / `parallel` | Interfaces are unsettled, changes share invariants/mutable resources, or isolation/integration costs dominate |
+| A later unit needs an earlier accepted artifact, or at least two ready implementation units have stable interfaces, independent acceptance and non-overlapping owned outputs | [coordinated-delivery](templates.md#coordinated-delivery) / `sequential` for dependent stages or `parallel` for ready independent branches | One owner can handle coupled work more coherently; interfaces/resources overlap; a required producer artifact is not accepted; isolation/integration costs dominate |
 | Consequential acceptance risk, or observed repeated generator omissions that a fresh check can detect | [independent-review](templates.md#independent-review) / `generator-evaluator` | The evaluator cannot access the artifact/criteria, or extra review merely repeats confidence judgments |
-| Long-running dependent work whose state, evidence and decisions must survive interruptions | [durable-controller](templates.md#durable-controller) / current-stage topology | A bounded task fits the current context; durable bookkeeping costs more than it preserves |
-| Authorized optimization with a correctness oracle, comparable measurements and an observed plateau or changing bottleneck | [adaptive-optimization](templates.md#adaptive-optimization) / current-stage topology | The task is ordinary feature completion, no valid measurement exists, or experiments need unapproved compute |
+| Long/interruptible work needs durable state and next-action selection; or explicitly scoped optimization has a correct oracle/baseline, comparable measurements and a diagnosed bottleneck | [adaptive-controller](templates.md#adaptive-controller) / actual current-stage topology | A bounded unit fits its existing context; optimization lacks a valid oracle/protocol or needs unapproved compute; ordinary continuity is being burdened with a needless benchmark |
 
-`direct` permits only `solo`; `explore-build` and `isolated-build` use `parallel`; `ordered-handoff` uses `sequential`; `independent-review` uses `generator-evaluator`. `durable-controller` and `adaptive-optimization` accept any of the four topologies, chosen for the current stage. A stage change does not mean all work is concurrent.
+`direct` permits only `solo`; `explore-build` only `parallel`; `coordinated-delivery` permits `sequential` or `parallel`; `independent-review` only `generator-evaluator`. `adaptive-controller` permits all four topologies for the current stage, not a permanently concurrent project. Its durable delivery and measured optimization modes are documented procedures, not extra IDs or schema fields.
 
 For `explore-build`, the recommendation describes the parallel discovery stage; its single owner remains responsible for synthesis and any approved build. If a later stage is represented by another recommendation, record that stage's actual template/topology rather than inventing a mixed topology.
 
 ## Match evidence to the task category
 
-| Category | Necessary acceptance evidence, adapted to the original request |
-| --- | --- |
-| `answer` | A complete answer with authoritative support, source/version context and explicit unresolved uncertainty |
-| `research` | Traceable findings, primary-source links, applicability limits and reconciled or exposed contradictions |
-| `implementation` | The complete requested behavior in the integrated artifact, relevant regression results and changed-surface checks |
-| `debug` | The reported failure preserved as evidence, a supported cause and changed-path/regression confirmation; do not dismiss the report because a local reproduction is unavailable |
-| `review` | Specific acceptance defects or a bounded no-findings statement supported by inspected paths and actual checks; no invented features |
-| `design` | Alternatives against the stated constraints, an explicit justified choice and identified decisions requiring user approval before implementation |
+Use task facts, not words in the request, to bind the category procedure. All rows inherit the selected family's role, ownership, context, permission, output and stop contract.
 
-Choose checks before work. A passing syntax check alone does not prove an interactive feature, compatibility or real runtime discovery. Record what was actually exercised and what was not.
+| Category | Procedure from inputs to output | Evidence and selection facts |
+| --- | --- | --- |
+| `answer` | Identify the exact question and required completeness; inspect relevant authoritative sources/versions; separate supported facts from inference; deliver the answer with limits, not an unsolicited implementation | Source-backed coverage of the question. One coherent source chain can be `direct`; multiple substantial independent factual gaps can justify `explore-build`; consequential factual risk can justify clean-input `independent-review` |
+| `research` | Define questions and inclusion/time/source boundaries; collect primary evidence and provenance; compare applicability, reconcile contradictions or expose unresolved ones; deliver findings and limits | Traceable sources and question coverage, not the count of reports. Independent source questions can use `explore-build`; accepted findings that feed a dependent synthesis can use sequential `coordinated-delivery`; long evolving evidence may need `adaptive-controller` |
+| `implementation` | Bind requested behavior to existing interfaces/conventions; identify affected callers and shared invariants; implement complete approved source/test/doc changes; integrate before required changed-surface/regression checks | Actual integrated behavior against original acceptance. Coupled mutations favor `direct`; ready substantial units with stable interfaces, exclusive outputs and one integration owner can use parallel `coordinated-delivery`; consequential acceptance gaps can add an `independent-review` stage |
+| `debug` | Preserve the user's reported failure as ground truth; inspect relevant execution path/evidence; distinguish observations and hypotheses; establish the supported cause; repair within scope and check affected behavior/regressions | Cause linked to the reported failure and repair evidence, disclosing unavailable local reproduction. A shared-state cause may need one `direct` owner; genuinely independent cause questions may use `explore-build`; separate approved repairs wait for accepted diagnosis before `coordinated-delivery` |
+| `review` | Bind original criteria and exact artifact/version; inspect authorized paths and run only authorized checks; return concrete located defects/impact or a bounded no-findings statement, with unexamined surfaces | Findings need artifact/source/reproduction support, not taste or consensus. A standalone bounded review may be `direct`; separately briefed evaluation of a generator's artifact is `independent-review`, with clean-input and final decision ownership explicit |
+| `design` | Read constraints and existing interfaces; compare viable alternatives against user acceptance; resolve evidence-backed tradeoffs; deliver a justified choice, interface/decision artifact and unresolved approval points, without building unless approved | Source-backed tradeoff/constraint coverage, not claimed runtime success. A coherent invariant can be `direct`; independent feasibility questions can use `explore-build`; accepted design feeding authorized implementation can use sequential `coordinated-delivery` |
+
+These are reasons, not category-to-family lookup rules. Any category can need durable continuity; select `adaptive-controller` for that actual need. Only an explicitly scoped optimization task with oracle, correct baseline, representative comparable measurements and bounded resources uses its measured optimization procedure. Ordinary continuity has no benchmark requirement.
+
+Choose checks before work. For answers/research/design, source inspection and criterion coverage may be the acceptance method; executable work needs actual authorized changed-surface checks. A passing syntax check does not prove an interactive feature, compatibility or native runtime discovery. Record what was actually exercised, unrun/failed checks and the artifact/version. Never claim independent review if the runtime cannot provide the required evaluator boundary.
 
 ## Parallelism and integration
 
@@ -94,6 +96,10 @@ Source pages, repository text, tool output, memory and worker reports remain evi
 
 Do not stop on confidence, consensus, chatter volume, a planned check or an exhausted loop and report success. Conversely, do not continue debating after acceptance is met. Bound any authorized iteration by explicit limits and stop for unavailable prerequisites; preserve uncertainty around external effects rather than automatically repeating an ambiguous action. No fixed reset schedule or mandatory fixed team is required.
 
+At an accepted artifact boundary, changed dependency, newly observed defect, interruption or agreed measurement checkpoint, ask whether the same family/topology still addresses the unmet criterion. Explain reselection using evidence, keep original acceptance, carry accepted input versions and owner stop boundaries forward, and obtain approval only for genuinely new effects/authority. Do not repeatedly reorganize without a useful bounded next action.
+
+For optional terminal visibility see [tmux 3.8 supervision](supervision.md) and the original [task-local profile](../assets/tmux.conf). Native OMP children use available Agent Hub (`Alt+A`, tree `t`); terminal status and a task evidence board serve different purposes. No automatic launcher, background service, global config change or new operational-verification claim follows from these links.
+
 ## Evidence behind these choices
 
 These are original AIC procedures informed by, not copied from, the sources below. Papers suggest mechanisms and failure modes; they do not guarantee this user's outcome or grant operational permissions.
@@ -105,5 +111,8 @@ These are original AIC procedures informed by, not copied from, the sources belo
 - [eat-2026](research.md#eat-2026): diagnosis-driven reconfiguration is relevant to measured optimization, not an excuse to reorganize every task. Few kernel tasks and best-of-two reporting limit generalization; extended-budget records are not matched-budget effects.
 - [anthropic-agents-2024](research.md#anthropic-agents-2024), [anthropic-harness-2026](research.md#anthropic-harness-2026) and [openai-harness-2026](research.md#openai-harness-2026): composable patterns, explicit contracts and observable feedback inform the templates. These engineering accounts do not justify scope expansion, permissive merging or fixed context resets.
 - [mast-2025](research.md#mast-2025) and [containment-2026](research.md#containment-2026): task verification, misalignment and real access boundaries motivate evidence-led acceptance and containment. Failure taxonomies and security case studies are not model-quality rankings.
+- [anthropic-research-2025](research.md#anthropic-research-2025) describes lead-led independent discovery, artifact returns and citation checks; its first-party internal evaluation is not an equal-budget trial and does not make research parallelism appropriate for coupled implementation.
+- [boad-2026](research.md#boad-2026) supports considering bounded specialist delegation over time in its evaluated software tasks; discovery/judging compute is not matched and it does not prove deep hierarchies or simultaneous large teams. [co-scientist-2026](research.md#co-scientist-2026) informs grounded candidate exploration/review with scientist selection and limited selected-domain validation, not general coding superiority or a mandatory role roster.
+- [deepseek-harness-2026](research.md#deepseek-harness-2026) and [tmux-2026](research.md#tmux-2026) document orchestration/observation and terminal capabilities respectively, not comparative AI effectiveness or new AIC execution integrations. Monitoring metadata does not authorize work or establish acceptance.
 
 Compare representative approved tasks with fixed acceptance and comparable resources before changing a default. Record outcome, elapsed time and usage/cost only when observed, and distinguish empirical evidence from a recommendation.

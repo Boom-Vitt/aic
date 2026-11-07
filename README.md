@@ -6,9 +6,11 @@ Created and maintained by **[Boom-Vitt](https://github.com/Boom-Vitt)**.
 
 **Choose the workflow before the agent starts changing things.**
 
-AIC helps your AI agent turn a task or project plan into the right workflow: inspect relevant context read-only, identify dependencies and risks, select a reusable template, and define ownership and acceptance before execution.
+AIC helps your AI agent turn a task or project plan into the right workflow: inspect relevant context read-only, identify dependencies and risks, select a reusable workflow pattern, and define ownership and acceptance before execution.
 
 Your existing host supplies the reasoning. AIC provides portable instructions and deterministic local helpers—not a bundled model, an automatic intent classifier, or a reason to add more agents to every task.
+
+AIC is a normal **public GitHub repository**, not a GitHub template repository. Its workflow families are approaches to doing work, not repository scaffolds.
 
 ## Install
 
@@ -34,7 +36,7 @@ Updates are explicit: fetch and review the desired revision, then rerun the same
 
 Restart/reload skill discovery as your host requires, then ask:
 
-> Use AIC to inspect this project read-only and recommend how to approach this task or project plan. Select a workflow template from the evidence, explain the topology, scope, ownership, risks and acceptance checks, and obtain any required approval before changing files or launching agents.
+> Use AIC to inspect this project read-only and recommend how to approach this task or project plan. Select a workflow family from the evidence, explain the topology, scope, ownership, risks and acceptance checks, and obtain any required approval before changing files or launching agents.
 
 ```mermaid
 flowchart LR
@@ -46,23 +48,21 @@ flowchart LR
 
 ## What gets selected?
 
-Task category, workflow template, topology and runtime/model are separate decisions. The host AI makes them using the actual goal, dependencies, risks and available tools.
+Task category, workflow family (`template` in JSON), current-stage topology and runtime/model are separate decisions. The host AI uses actual acceptance, dependencies, unknowns, risks and available capabilities—not hardcoded request keywords or a universal solo/team default.
 
-| Template | Select when |
-| --- | --- |
-| `direct` | Work is small/coupled and one owner can implement and verify it |
-| `explore-build` | Substantial independent discovery is the bottleneck before implementation |
-| `ordered-handoff` | Delegated units depend on confirmed upstream artifacts or share mutation boundaries |
-| `isolated-build` | Substantial implementation units have agreed interfaces and independent acceptance |
-| `independent-review` | Consequential acceptance gaps justify a separately briefed evaluator |
-| `durable-controller` | Long-running work needs compact state, artifact dependencies and explicit recovery ownership |
-| `adaptive-optimization` | A measured optimization task has a diagnosed plateau and approved experiment limits |
+| Workflow family | Select when | Topology |
+| --- | --- | --- |
+| `direct` | One owner can carry coherent, coupled work through acceptance | `solo` |
+| `explore-build` | Two or more substantial independent unknowns need evidence before synthesis and any approved build | `parallel` exploration |
+| `coordinated-delivery` | Downstream work needs accepted upstream artifacts, or ready implementation branches have independent contracts and one integration owner | `sequential` or `parallel` |
+| `independent-review` | Consequential acceptance risk justifies a separately briefed evaluator of the actual artifact | `generator-evaluator` |
+| `adaptive-controller` | Long work needs durable state/next-action selection, or explicitly approved optimization needs measured adaptation | Any supported current-stage topology |
 
-Read the [selection guide](skills/aic/references/workflows.md), [complete templates](skills/aic/references/templates.md), and [project-plan guide](skills/aic/references/project-plans.md). Choose per milestone; do not force every project through all seven templates or confuse template choice with model choice.
+Read the [selection guide](skills/aic/references/workflows.md), [complete family contracts](skills/aic/references/templates.md), and [project-plan guide](skills/aic/references/project-plans.md). Compose stages as needed and reselect when evidence or dependencies change, preserving original project acceptance and authority. Ordinary continuity does not require a benchmark; measured optimization requires a correct baseline/oracle, comparable workloads and bounded resources. No project must use all five families.
 
 ## Evidence and rights
 
-The [evidence ledger](skills/aic/references/research.md) records exact source versions, evidence quality, applicability limits, license status and checked dates. Summaries and workflow templates are original AIC material; cited publications are reference-only. No paper PDFs, figures, prompts or research implementations are bundled. Detailed source attribution and required notices remain in the reference files and [NOTICE](NOTICE).
+The [evidence ledger](skills/aic/references/research.md) records exact source versions, evidence quality, applicability limits, license status and checked dates. Summaries and workflow patterns are original AIC material; cited publications are reference-only. No paper PDFs, figures, prompts or research implementations are bundled. Detailed source attribution and required notices remain in the reference files and [NOTICE](NOTICE).
 
 ## Local helpers
 
@@ -75,11 +75,17 @@ python3 scripts/aic.py memory-read --project /path/to/project
 
 `inspect` returns a bounded metadata inventory, not a source-code dump. `check-plan` validates recommendation structure and scope, not semantic truth or consent. Learn more about [routing](skills/aic/references/routing.md), [scoped memory](skills/aic/references/memory.md), and [approved handoffs](skills/aic/references/handoffs.md).
 
-Recommendation schema 2 requires an explicit `template` and checks compatibility with the selected topology, including ordered `sequential` work. Version-1 recommendations are rejected rather than silently assigned a workflow. Regenerate older recommendations from their real task, dependencies and current authorization; see the [migration and full contract](skills/aic/references/routing.md). Validation cannot prove semantic task selection, interface independence or human consent.
+Recommendation schema 3 requires an explicit `template` and checks its topology compatibility. Schema-1/2 recommendations and retired template IDs are rejected, without aliases or silent migration. Reassess older recommendations from the real task, current dependencies and authorization; see the [full contract](skills/aic/references/routing.md). Installer, memory, maintenance and outer handoff formats retain their separately documented versions. Validation cannot prove semantic selection, interface independence or human consent.
 
 Inspection has finite entry and directory budgets, including excluded entries. Returned selected items are sorted, but a truncated subset follows filesystem enumeration order rather than claiming a globally sorted scan of an arbitrarily wide directory.
 
 The rule is **recommend first, approve once, then execute within scope**. Existing explicit task approval is sufficient; do not ask again for every routine step. New spending, credentials, deployment or materially expanded scope still require their own authorization. A skill and a digest flag are not a security sandbox or proof of human identity.
+
+## Optional supervision
+
+For approved local terminal supervision, see the [tmux 3.8 guide](skills/aic/references/supervision.md) and original [task-local profile](skills/aic/assets/tmux.conf). Use an explicit task-owned socket, trusted per-run config and scoped sessions/panes; never repurpose an existing server or modify global settings. Native OMP children are normally clearer in Agent Hub (`Alt+A`, tree `t`) when available, not one pane per child.
+
+Track owner, dependencies, blockers, evidence and next action in existing task artifacts. A running process, dead pane or zero exit status does not establish acceptance; unknown usage/cost remains unknown. Detach/reattach is not host-shutdown recovery or authorization for unattended model work. This is an optional supervision procedure, not a new AIC launcher, monitoring service or cross-CLI adapter.
 
 ## Research maintenance
 

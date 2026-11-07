@@ -37,7 +37,7 @@ These are documented planning fields, not additional keys for the strict [recomm
 - Start only ready work. Independent research may run while an implementation dependency is blocked, but it must not rely on the missing answer as a fact.
 - Reserve explicit acceptance work for the integrated result. Branch passes, completed subtasks and a clean merge do not imply that the user's end-to-end goal passes.
 
-Choose the smallest sufficient template per milestone, not all seven for every project. For example, use `direct` for a coupled core; `explore-build` for substantial independent unknowns; `ordered-handoff` for a real accepted-artifact sequence; `isolated-build` for ready separable implementation; `independent-review` for consequential verification; `durable-controller` when continuity is a real need; and `adaptive-optimization` only for measurable authorized optimization. Durable/adaptive units record their actual current-stage topology, not a permanently parallel project label.
+Choose the smallest sufficient family per milestone, not all five for every project: `direct` for coherent owner-held work; `explore-build` for substantial independent unknowns; `coordinated-delivery` for accepted-artifact dependent stages (`sequential`) or ready isolated implementation branches (`parallel`); `independent-review` for consequential evaluation; and `adaptive-controller` for durable next-action selection or explicitly scoped measured optimization. The controller records its actual current-stage topology, not a permanently parallel project label. Durable delivery alone needs no performance benchmark.
 
 ## Execution, continuity and changes
 
@@ -51,7 +51,11 @@ The practical action boundary is the intersection of governing instructions, use
 
 For long work, retain compact current state and links to detailed evidence, not all transcripts in every worker context. Record decisions, artifact versions, rejected hypotheses, unresolved defects and uncertain external actions. Revalidate stale facts as needed. No fixed context-reset schedule or background service is required.
 
-When evidence changes the plan, update only the affected dependency/arrangement within the original approval. Keep an explanation tied to an unmet original criterion. New requirements, weaker acceptance, new spending or broader authority require user approval; do not approve them through agent consensus.
+When evidence changes the plan, update only the affected dependency/arrangement within original approval. At accepted-artifact, dependency, defect, interruption or agreed measurement boundaries, explain the current bottleneck, old/new family/topology, input version, owner and bounded next action tied to unmet original acceptance. Carry accepted decisions/evidence forward; do not blindly rerun completed stages or repeat uncertain external effects. New requirements, weaker acceptance, new spending or broader authority require user approval, not agent consensus. Reselection never silently changes the project's original acceptance.
+
+For explicitly authorized measured optimization under `adaptive-controller`, add a correct baseline/oracle, representative workloads, comparable measurement/environment protocol, target/regression tolerances and bounded experiment/resource allowance before search. Keep a correct candidate available and stop at target, allowance, unavailable prerequisite or lack of a justified next experiment; a below-target correct artifact is partial. Do not impose this apparatus on ordinary continuity or automatically start compute, models or services.
+
+Optional [tmux 3.8 supervision](supervision.md) with the original [task-local profile](../assets/tmux.conf) can expose approved terminal process state; native OMP children use Agent Hub (`Alt+A`, tree `t`) when available. Keep the task/owner/dependency/blocker/evidence/next-action board in existing artifacts. Process exit and detach/reattach do not prove acceptance or authorize unattended model work.
 
 ## Acceptance ledger and delivery
 
@@ -97,7 +101,7 @@ The local contract uses CSV line 1 as the header and reports the CSV reader's ph
 | M2 | Implement aggregation/error handling and tests; update usage for A1, A2, A4 | Accepted M1 contract and known safe owned paths | Host is generator and sole mutation/integration owner | `direct` / `solo`, category `implementation`; parsing, error atomicity and output share an invariant | Complete source/test/doc artifact plus authorized local check evidence; an implementation without checks remains partial |
 | M3 | Check the integrated command and relevant regressions for A1–A4 | M2 artifact/version is available; approved check environment is usable | Evaluator reviews; host owns repairs/integration and final acceptance | `independent-review` / `generator-evaluator`, category `review`; malformed-input atomicity merits clean-input scrutiny | Criterion-by-criterion actual CLI results, regression results, resolved findings on the final version and honest review-independence limits |
 
-Dependency graph: `M1 → M2 → M3`; any repair returns to the M2 owner and rechecks the affected M3 criteria. There are no independent implementation branches: the aggregate and reject-without-partial-output behavior are coupled. `isolated-build` would add an unjustified integration boundary. The task is not an optimization experiment, so `adaptive-optimization` is not selected. If continuation becomes necessary, preserve the same milestone contracts rather than creating new product scope.
+Dependency graph: `M1 → M2 → M3`; any repair returns to the M2 owner and rechecks affected M3 criteria. There are no independent implementation branches: aggregation and reject-without-partial-output behavior are coupled. Parallel `coordinated-delivery` would add an unjustified integration boundary. Sequential `coordinated-delivery` would be justified only if real delegated producer-consumer ownership were needed, not merely because milestones have an order. This task has no optimization target, so measured optimization is not selected. If interruption makes continuity a real bottleneck, `adaptive-controller` can preserve the same A1–A4 contracts and choose the next bounded stage without inventing a benchmark or broader product scope.
 
 ### Owned scope, context and control
 
@@ -128,6 +132,20 @@ No item above is marked passed merely because its procedure is written down. The
 - **Partial:** implementation/docs exist but required tests were not run, a fixture fails, a regression remains or review coverage is incomplete. Name the precise failed/unverified IDs and preserve the useful artifact without calling the task done.
 - **Blocked:** the approved checkout, required local runtime, accepted input/error decision or permission necessary for a required action is unavailable. Record the exact obstacle and evidence, complete any safe independent work, and identify the person/action needed to unblock it. Do not upload inputs, install globally or weaken A2 to bypass the obstacle.
 - **Continuation:** preserve goal/non-goals, M1 decisions, current artifact/version, actual checks, unverified criteria, blockers and the exact safe next action. There are no external submissions to retry in this local-only example; if an unexpected uncertain effect occurs, record it instead of repeating it automatically.
+
+## Composition across a mixed project
+
+This second example is also **planned, not run**, and illustrates conditional selection rather than a mandatory sequence. Suppose an approved local product change must accept a legacy input format, expose the result through an existing CLI and document it. Original acceptance IDs remain compatibility, correct CLI behavior, preserved regressions and accurate documentation throughout.
+
+| Stage facts | Family / topology and ownership | Output/readiness and reselection boundary |
+| --- | --- | --- |
+| Format semantics and CLI extension constraints are two substantial independently answerable unknowns | `explore-build` / `parallel`; read-only explorers return evidence, lead owns synthesis and any build | Source/version-backed findings and reconciled interface decision; do not start a dependent parser on an unaccepted format assumption |
+| One shared parser invariant must be stabilized before consumers can use it | `direct` / `solo` if one owner holds the coupled change; sequential `coordinated-delivery` only when a justified successor needs that accepted artifact | Accepted parser contract/artifact and exit evidence are the consumer entry gate, not a promise or “done” message |
+| After that gate, CLI wiring and documentation have independently checkable contracts and exclusive outputs | `coordinated-delivery` / `parallel` only if inspection confirms real semantic independence and approved isolation; one lead owns shared exports/integration | Two complete ready branch artifacts; if documentation depends on unobserved CLI behavior, that publication waits for accepted CLI output rather than pretending the dependency vanished |
+| Integrated compatibility/error behavior has consequential acceptance risk | `independent-review` / `generator-evaluator`; evaluator gets original criteria/artifact/check scope, not self-grade; lead owns repairs and final evidence | Concrete findings or bounded no-findings report; repaired integrated version still needs all original acceptance |
+| Interruption or long dependencies make state retention necessary at any point | `adaptive-controller` in durable delivery mode, with the actual next-stage topology and one accountable owner | Compact owner/dependency/artifact/evidence/next-action state; resume only ready units and preserve every original criterion, with no optimization benchmark required |
+
+If the user separately requests measured performance improvement, bind that explicit scope and protocol before using the controller's measured optimization procedure; it is not a hidden final phase of this project. If inspection finds coupled CLI/docs outputs, retain one owner or serialize the actual dependency instead of forcing the parallel row. Not every project needs every row or family; stage facts and authority decide.
 
 ## Research basis and limits
 

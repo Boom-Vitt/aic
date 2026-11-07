@@ -14,7 +14,7 @@ from aiclib.safety import AICError
 
 def recommendation():
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "task": "Review the migration and propose an owner-approved implementation.",
         "workflow": "review",
         "template": "direct",
@@ -77,14 +77,37 @@ class RoutingTests(unittest.TestCase):
         result["evidence"][0]["observation"] = "Changed returned data only."
         self.assertEqual(plan, before)
 
-    def test_every_workflow_and_generator_evaluator_is_preserved(self):
+    def test_every_category_accepts_all_supported_host_selected_family_topologies(self):
+        supported = {
+            "direct": ("solo",),
+            "explore-build": ("parallel",),
+            "coordinated-delivery": ("sequential", "parallel"),
+            "independent-review": ("generator-evaluator",),
+            "adaptive-controller": ("solo", "sequential", "parallel", "generator-evaluator"),
+        }
         for workflow in ("answer", "research", "implementation", "debug", "review", "design"):
-            with self.subTest(workflow=workflow):
-                plan = recommendation()
-                plan["workflow"] = workflow
-                plan["topology"] = "generator-evaluator"
-                plan["template"] = "independent-review"
-                self.assertEqual(validate_plan(plan, project=self.project), plan)
+            for template, topologies in supported.items():
+                for topology in topologies:
+                    with self.subTest(workflow=workflow, template=template, topology=topology):
+                        plan = parallel_recommendation() if topology == "parallel" else recommendation()
+                        plan.update(workflow=workflow, template=template, topology=topology)
+                        before = copy.deepcopy(plan)
+                        self.assertEqual(validate_plan(plan, project=self.project), before)
+                        self.assertEqual(plan, before)
+
+    def test_all_parallel_families_keep_lexical_and_physical_isolation_guards(self):
+        try:
+            (self.project / "tests/alias.py").hardlink_to(self.project / "src/app.py")
+        except OSError as exc:
+            self.skipTest(f"This filesystem does not support fixture hard links: {exc.__class__.__name__}.")
+        for template in ("explore-build", "coordinated-delivery", "adaptive-controller"):
+            for first, second in (("src", "src/app.py"), ("src/app.py", "tests/alias.py")):
+                with self.subTest(template=template, first=first, second=second):
+                    plan = parallel_recommendation()
+                    plan["template"] = template
+                    plan["independent_subtasks"][0]["allowed_paths"] = [first]
+                    plan["independent_subtasks"][1]["allowed_paths"] = [second]
+                    self.assert_rejected(plan)
 
     def test_parallel_branches_have_independent_acceptance_and_disjoint_paths(self):
         plan = parallel_recommendation()
@@ -200,7 +223,7 @@ class RoutingTests(unittest.TestCase):
 
     def test_malformed_schema_and_types_are_rejected(self):
         invalid_values = {
-            "schema_version": (True, 2.0, "2", 0, 1, 3),
+            "schema_version": (True, 3.0, "3", 0, 1, 2, 4),
             "task": (None, "", " \n", 1, []),
             "workflow": ("auto", True, [], {}),
             "topology": ("swarm", None, {}),

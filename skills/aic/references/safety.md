@@ -9,7 +9,7 @@ A skill is instructions and supporting files, not a sandbox or permission system
 - All helper commands are local and use no inference API. A host agent or approved new session may consume its existing provider quota or paid tokens; installation does not grant billing permission.
 - Read-only recommendation is separate from approved execution. Approval covers only the described task/target and does not grant new spending, credential changes or deployment.
 - The generic Agent Skills format does not standardize discovery paths, permissions, invocation commands, model support or cloud synchronization. Check the published compatibility matrix and current official docs.
-- DeepSeek is a model/provider usable through compatible hosts, not a standalone discovery-directory adapter. AIC does not select or host it automatically.
+- A model/provider named DeepSeek is not a discovery-directory adapter. The separate official DeepSeek Harness has [documented orchestration capabilities](research.md#deepseek-harness-2026), but AIC has no verified native adapter for it and does not select, host or execute it automatically.
 - Documented compatibility, isolated installation tests, explicit installed-file consumption, native auto-discovery and real operational launches are different evidence levels. Never relabel one as another.
 
 Report a concrete vulnerability privately using the repository's SECURITY.md guidance. Do not put secrets, customer data or exploit payloads containing real credentials into a public issue.
