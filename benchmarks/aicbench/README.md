@@ -70,16 +70,28 @@ Only a finished `--sandbox container` run is an official result. The methodology
 
 Before any agent starts, the runner stores a SHA-256 manifest of that task's `oracle/` file and `reference/` tree. The agent cwd is a copy of `workspace/` in a temp directory outside this repository. `reference/` and `oracle/` are not copied there and are not passed as `--add-dir`. The child environment does not include `PYTHONPATH` or the repository path. After the agent exits, the manifest is checked again. A mismatch marks that trial `invalid`, does not count as a pass, and does not execute the altered oracle. Grading copies the verified oracle bytes into a new temp directory and runs them with `python -I`. The workspace is not placed on `sys.path`. A top-level module whose name matches the standard library or `unittest` is not used; the real standard-library module is.
 
-`--sandbox container` runs the agent under bubblewrap (`bwrap`) with the workspace and the installed skill mounted, plus the usual system library directories. It does not mount this repository. If `bwrap` is missing, the runner exits 2 and does not start Claude Code. This mode needs working user namespaces. `./scripts/verify.sh` does not run it.
+`--sandbox container` runs the agent under bubblewrap (`bwrap`) with the workspace and the installed skill mounted, plus the usual system library directories. It does not mount this repository. If `bwrap` is missing, the runner exits 2 and does not start Claude Code. This mode needs working user namespaces.
 
-Install bubblewrap before an official run. On the Ubuntu image used by CI:
+Install bubblewrap before an official model run. On Ubuntu:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y bubblewrap
 bwrap --version
 ```
 
-The package name is `bubblewrap`. The executable is `bwrap`. See the comment on the verify job in `.github/workflows/verify.yml`.
+The package name is `bubblewrap`. The executable is `bwrap`. `.github/workflows/verify.yml` records that command and does not install bubblewrap, because `./scripts/verify.sh` does not call a model. `.github/workflows/aicbench-sandbox.yml` installs bubblewrap and runs the pipeline smoke below.
+
+## Pipeline smoke
+
+The stub at [stub/agent.py](stub/agent.py) is a deterministic pipeline smoke test. It is not a model and not a Claude Code result. Do not add it to a results table.
+
+```bash
+python3 -m benchmarks.aicbench --pipeline-smoke --sandbox container --output container.json
+python3 -m benchmarks.aicbench --pipeline-smoke --sandbox none --output unsandboxed.json
+python3 -m benchmarks.aicbench --require-official container.json
+```
+
+Inside the container the stub cannot read `reference/` or `oracle/`. Without the container it can, and that report has `"official": false`. Both runs detect an oracle rewrite and then restore the file, and both grade the ledger task: the starting tree fails and the reference passes. `--official` cannot turn this smoke into a published model result. `./scripts/verify.sh` runs it without an API key. The container probe runs when `bwrap` is on PATH. See [RESULTS.md](RESULTS.md).
 
 Without that sandbox, a shell can still read any path the operating system allows, including `reference/` in this checkout if the process discovers it. That was reproduced. The manifest detects writes to the oracle and the reference. It does not detect a read. Those runs are saved only as unofficial debugging output.
 

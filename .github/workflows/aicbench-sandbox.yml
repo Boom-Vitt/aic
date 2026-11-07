@@ -1,0 +1,81 @@
+name: aicbench sandbox
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  pipeline-smoke:
+    name: Container sandbox pipeline smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11"
+      - name: Install bubblewrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          command -v bwrap
+          bwrap --version
+          probe() {
+            cmd=(bwrap --die-with-parent --unshare-user --unshare-pid --unshare-ipc --unshare-uts)
+            for dir in /usr /lib /lib64 /bin; do
+              if [ -d "$dir" ]; then
+                cmd+=(--ro-bind "$dir" "$dir")
+              fi
+            done
+            cmd+=(--proc /proc --dev /dev --tmpfs /tmp -- /bin/true)
+            "${cmd[@]}"
+          }
+          if ! probe; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+            probe
+          fi
+      - name: Run the offline stub inside the container
+        run: python3 -m benchmarks.aicbench --pipeline-smoke --sandbox container --output "$RUNNER_TEMP/container.json"
+      - name: Run the same stub without the container
+        run: python3 -m benchmarks.aicbench --pipeline-smoke --sandbox none --output "$RUNNER_TEMP/none.json"
+      - name: Require the container report, and only that report, to be official
+        run: |
+          if python3 -m benchmarks.aicbench --require-official "$RUNNER_TEMP/none.json"; then
+            echo "unsandboxed pipeline smoke was accepted as official" >&2
+            exit 1
+          fi
+          python3 -m benchmarks.aicbench --require-official "$RUNNER_TEMP/container.json"
+          python3 - "$RUNNER_TEMP/none.json" "$RUNNER_TEMP/container.json" <<'PY'
+          import json
+          import sys
+
+          plain = json.loads(open(sys.argv[1], encoding="utf-8").read())
+          container = json.loads(open(sys.argv[2], encoding="utf-8").read())
+          for report in (plain, container):
+              if report.get("kind") != "pipeline-smoke" or report.get("label") != "pipeline smoke test":
+                  sys.exit("pipeline smoke was not labeled as a pipeline smoke test")
+              if report.get("measured") is not False or report.get("invokes_model") is not False or report.get("model_result") is not False:
+                  sys.exit("pipeline smoke was presented as a model result")
+              if report.get("ok") is not True:
+                  sys.exit("pipeline smoke checks failed")
+              for key in ("pass_at_1", "tokens", "cost_usd", "arms", "usage", "total_cost_usd"):
+                  if key in report:
+                      sys.exit(f"pipeline smoke report includes {key}")
+          if plain.get("sandbox") != "none" or plain.get("official") is not False:
+              sys.exit("unsandboxed report must not be official")
+          if plain["checks"]["reference_unreadable"] is not False or plain["checks"]["oracle_unreadable"] is not False:
+              sys.exit("unsandboxed stub could not read the hidden files")
+          if container.get("sandbox") != "container" or container.get("official") is not True or container.get("publication_warning") is not None:
+              sys.exit("container report is not official")
+          if container["checks"]["reference_unreadable"] is not True or container["checks"]["oracle_unreadable"] is not True:
+              sys.exit("container stub could read reference or oracle")
+          if container["checks"]["tamper_detected"] is not True or plain["checks"]["tamper_detected"] is not True:
+              sys.exit("tamper was not detected")
+          if container["checks"]["grading_works"] is not True or plain["checks"]["grading_works"] is not True:
+              sys.exit("grading did not accept the reference and reject the start")
+          PY
