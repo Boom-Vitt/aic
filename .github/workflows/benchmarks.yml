@@ -1,0 +1,57 @@
+name: Benchmarks
+on:
+  workflow_dispatch:
+    inputs:
+      terminal_bench:
+        description: Include the pinned Terminal-Bench subset
+        type: boolean
+        default: false
+      swe_bench_lite:
+        description: Include the pinned SWE-bench Lite subset
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: benchmarks
+  cancel-in-progress: false
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+      - name: Install bubblewrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+      - name: Run the pinned comparison
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BENCH_TERMINAL: ${{ inputs.terminal_bench }}
+          BENCH_SWE: ${{ inputs.swe_bench_lite }}
+        run: |
+          set -eu
+          set -- ./scripts/run-benchmarks.sh
+          if [ "$BENCH_TERMINAL" = "true" ]; then
+            set -- "$@" --terminal-bench
+          fi
+          if [ "$BENCH_SWE" = "true" ]; then
+            set -- "$@" --swe-bench-lite
+          fi
+          "$@"
+      - name: Upload the results bundle
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: benchmark-results
+          path: results/
+          if-no-files-found: ignore

@@ -1,4 +1,5 @@
 .work/
+results/
 .orca/
 .env.worktree
 .venv/

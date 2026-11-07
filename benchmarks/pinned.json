@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "model": "claude-sonnet-5-5",
+  "seed": 0,
+  "seed_sent_to_provider": false,
+  "max_tokens": 1024,
+  "max_tokens_limit": 4096,
+  "temperature": null,
+  "pricing": {
+    "checked": "2026-11-07",
+    "url": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "model_label": "Claude Sonnet 5.5",
+    "input_usd_per_million": 2,
+    "output_usd_per_million": 10,
+    "note": "Base input and output rates. Cache writes, cache reads, and batch discounts are not applied."
+  },
+  "arms": ["plain-claude-code", "aic"],
+  "aic_context": [
+    "skills/aic/SKILL.md",
+    "skills/aic/references/routing.md"
+  ],
+  "routing_cases": "tests/fixtures/routing-scenarios.json",
+  "sandbox": "container",
+  "probe_timeout_sec": 30,
+  "anthropic_version": "2023-06-01",
+  "anthropic_url": "https://api.anthropic.com/v1/messages",
+  "terminal_bench": {
+    "revision": "d28711d0da2675d0bb1d56de45ae5df6082438a3",
+    "dataset": "terminal-bench-core==0.1.1",
+    "dataset_commit_in_registry": "91e10457b5410f16c44364da1a34cb6de8c488a5",
+    "agent": "claude-code",
+    "n_tasks": 1,
+    "n_attempts": 1,
+    "wall_clock_sec": 7200,
+    "token_budget": null,
+    "aic_treatment": false
+  },
+  "swe_bench_lite": {
+    "revision": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
+    "dataset_name": "SWE-bench/SWE-bench_Lite",
+    "split": "test",
+    "max_predictions": 5,
+    "max_workers": 1,
+    "harness_timeout_sec": 1800,
+    "wall_clock_sec": 7200,
+    "token_budget": null,
+    "aic_treatment": false
+  }
+}

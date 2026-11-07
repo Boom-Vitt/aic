@@ -39,7 +39,7 @@ The smoke receipt sets `public_benchmark_scores` to null, `invokes_model` to fal
 ## What a scale run still needs
 
 - A local checkout of the suite at one revision, after the license check above.
-- The suite's own evaluator. SWE-bench and Terminal-Bench need their containers and credentials for private tests. This repository does not start those.
+- The suite's own evaluator. SWE-bench and Terminal-Bench need their containers and credentials for private tests. The default command below does not start those. The optional flags do, only for a checkout at the pinned revision, and they still publish no score.
 - The operator's Claude Code CLI, signed in by the operator. One model id for every arm.
 - The same `max_turns`, wall-clock timeout, and spend cap for every arm. The spend cap is a stop rule, not a prediction of cost.
 - One shared seed, passed the same way to every arm.
@@ -47,3 +47,41 @@ The smoke receipt sets `public_benchmark_scores` to null, `invokes_model` to fal
 - A result file produced by the run. Exit codes, commands, revision, model, budget, and seed are the evidence. A missing file is not a score.
 
 Comparable open-source workflow repositories can be extra arms later, under the same four conditions, and only when their licenses allow the run. None are wired or scored here.
+
+## Pinned AIC-versus-baseline command
+
+`./scripts/run-benchmarks.sh` is the comparison to run once `ANTHROPIC_API_KEY` is set in the environment. If that variable is missing, empty, or contains whitespace, the command exits 3 and does not call a model. The key is not an argument and it is not written into the bundle.
+
+The command runs two pinned pieces, using `benchmarks/pinned.json`:
+
+1. `benchmarks.routing.compare` reads the held-out requests in `tests/fixtures/routing-scenarios.json`. Expected labels stay out of the prompt. The plain arm receives only the shared output schema. The AIC arm also receives `skills/aic/SKILL.md` and `skills/aic/references/routing.md`. Both arms use the pinned model id and the same output-token cap. The project case in that fixture is not part of this comparison.
+2. `python3 -m aicbench --sandbox container --official` runs `benchmarks/official/probe.py` inside bubblewrap. The plain arm does not see the skill directory. The AIC arm sees it read-only at `/opt/aic`. The probe records whether that mount is visible. It does not call a model. The sandbox process starts with a cleared environment, so the API key is not inside it.
+
+`--dry-run` prints the budget cost ceiling and exits. It does not call a model, does not start bubblewrap, and does not create `results/`.
+
+The ceiling uses the pinned Claude Sonnet 5.5 base prices checked 2026-11-07: 2 USD per million input tokens and 10 USD per million output tokens. The pricing page is the `url` in `benchmarks/pinned.json`. Input is not counted with Anthropic's tokenizer. The ceiling uses one token per UTF-8 byte of the system text and the user text that would be sent. Output uses the pinned `max_tokens` cap on every routing call. Cache discounts are not applied. The printed figure is a ceiling, not an invoice. The model id sent to the provider is `claude-sonnet-5-5`. The pinned seed is recorded and is not sent, because this command does not claim the Messages API accepts a seed.
+
+A real run writes `results/<UTC date>-<full git SHA>/`:
+
+| File | What it records |
+| --- | --- |
+| `provenance.json` | Git SHA, whether the worktree was dirty, model id, date, and the pinned settings |
+| `estimate.json` | The ceiling printed before any model call |
+| `receipts/` | Routing, the bubblewrap probe, and any optional suite that ran |
+| `raw/` | Model text and harness stdout/stderr |
+
+The command refuses to overwrite an existing bundle. `public_benchmark_scores` stays null. A routing receipt may count label matches for that bundle. This document does not publish those counts. Raw text is redacted if it contains the API key.
+
+Terminal-Bench and SWE-bench Lite stay out unless you pass a flag.
+
+```sh
+./scripts/run-benchmarks.sh --dry-run
+./scripts/run-benchmarks.sh
+./scripts/run-benchmarks.sh --terminal-bench --terminal-bench-checkout /absolute/pinned/terminal-bench
+./scripts/run-benchmarks.sh --swe-bench-lite --swe-bench-lite-checkout /absolute/pinned/SWE-bench --swe-bench-lite-predictions /absolute/predictions.jsonl
+```
+
+`--terminal-bench` runs one task of `terminal-bench-core==0.1.1` through the checkout's `terminal_bench` CLI at revision `d28711d0da2675d0bb1d56de45ae5df6082438a3`. `--swe-bench-lite` runs the pinned SWE-bench harness at revision `02e7a74ffd0b707aab73d203fe87bdc7c76afc8e` on a JSONL predictions file of at most 5 rows. Both CLIs have no token budget, so the estimate lists them as unpriced instead of inventing a dollar amount. Their receipts keep `public_benchmark_scores` null and `aic_treatment` false: this command does not claim the skill was loaded inside those harnesses. A missing checkout, the wrong revision, or a missing predictions file exits 3 before any routing call.
+
+GitHub Actions starts this only from a manual `workflow_dispatch` on `.github/workflows/benchmarks.yml`. Pull requests and pushes do not start it. The workflow installs the `bubblewrap` package, passes `secrets.ANTHROPIC_API_KEY` only into the run step, checks out with `persist-credentials: false`, and uploads `results/` as an artifact. Action revisions are pinned SHAs. The workflow token has `contents: read` plus `actions: write` so the artifact upload can store the bundle without permission to change repository contents.
+

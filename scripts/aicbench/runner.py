@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 
+from aicbench.official import run_official
 from aicbench.protocol import BenchError, catalog_entry, load_json, validate_suite
 
 
@@ -112,16 +113,27 @@ def run_smoke(catalog: dict, suite_id: str) -> dict:
     return execute_suite(suite, parent)
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog='benchmark-run')
-    parser.add_argument('command', choices=('plan', 'run'))
-    parser.add_argument('--suite', required=True)
+def main(argv: list[str] | None = None, sandbox_runner=None) -> int:
+    parser = argparse.ArgumentParser(prog='aicbench')
+    parser.add_argument('command', nargs='?', choices=('plan', 'run'))
+    parser.add_argument('--suite')
     parser.add_argument('--catalog', default=str(ROOT / 'benchmarks' / 'catalog.json'))
     parser.add_argument('--output')
+    parser.add_argument('--sandbox', choices=('container',))
+    parser.add_argument('--official', action='store_true')
     args = parser.parse_args(argv)
     try:
-        catalog = load_json(Path(args.catalog))
-        payload = plan(catalog, args.suite) if args.command == 'plan' else run_smoke(catalog, args.suite)
+        if args.official or args.sandbox:
+            if args.command is not None or args.suite is not None:
+                raise BenchError('official container mode does not take a suite command.', 2)
+            if args.sandbox != 'container' or not args.official:
+                raise BenchError('the official run requires --sandbox container --official.', 2)
+            payload = run_official(ROOT, sandbox_runner=sandbox_runner)
+        else:
+            if args.command is None or not args.suite:
+                raise BenchError('plan or run requires --suite.', 2)
+            catalog = load_json(Path(args.catalog))
+            payload = plan(catalog, args.suite) if args.command == 'plan' else run_smoke(catalog, args.suite)
     except BenchError as exc:
         print(str(exc), file=sys.stderr)
         return exc.code
