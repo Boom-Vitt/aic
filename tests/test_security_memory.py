@@ -96,6 +96,14 @@ class SecurityMemoryTests(unittest.TestCase):
         self.assertEqual(self._snapshot(), before)
         self._assert_complete_local_references([self.root / legitimate['path']])
 
+    def test_overlong_or_deep_scope_path_is_rejected_quickly_without_mutation(self):
+        before = self._snapshot()
+        for scope in ('a/' * 32 + 'b', 'a' * 1025):
+            candidate = dict(self._candidate('deep'), scope=[scope])
+            with self.assertRaises(AICError):
+                memory.promote(self.root, candidate, approved=True)
+        self.assertEqual(self._snapshot(), before)
+
     def test_maximum_size_note_roundtrips_idempotently_and_retains_source_authority(self):
         candidate = self._sized_candidate(NOTE_BYTES, 'maximum', fill='é')
         first = memory.promote(self.root, candidate, approved=True)
