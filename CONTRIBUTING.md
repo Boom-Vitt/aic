@@ -1,10 +1,10 @@
 # Contributing to AIC
 
-Use English for authored documentation, skill instructions, examples and CLI messages. Keep the package self-contained, standard-library-only and compatible with the declared Python versions.
+Use English for authored documentation, skill instructions, examples and helper messages. Keep the portable skill self-contained and its deterministic core standard-library-only. The optional MCP adapter uses the declared official SDK; it must not become a prerequisite for standalone skill/plugin use.
 
 ## Development versioning
 
-Use **`0.0.1`, `0.0.2`, `0.0.3`, and onward** for AIC development versions. Increment the final component for subsequent versions; stay in `0.0.N` until the owner explicitly changes this policy. Keep `pyproject.toml`, `skills/aic/scripts/aiclib/__init__.py` and `skills/aic/SKILL.md` metadata synchronized.
+Use **`0.0.1`, `0.0.2`, `0.0.3`, and onward** for AIC development versions. Increment the final component for subsequent versions; stay in `0.0.N` until the owner explicitly changes this policy. Keep `pyproject.toml`, `skills/aic/scripts/aiclib/__init__.py`, `skills/aic/SKILL.md` metadata and the native plugin manifest synchronized.
 
 Package versions do not derive from workflow counts, features or schema numbers. Recommendation/catalog, installer, memory, handoff and maintenance formats retain their independent versions and compatibility rules. Renumbering the package must not reset schemas, accept retired contracts or imply a compatibility migration.
 
@@ -34,6 +34,14 @@ The optional repository maintainer may propose original factual records and assi
 
 Keep dated records data-only and self-contained under `skills/aic/references/research-updates/`. Changes to the collector, model capabilities, GitHub authority, schemas or scheduler are manual security-sensitive changes with runnable boundary checks and independent review. Do not execute an untrusted PR on a private host.
 
+
+## Integration development
+
+The public product is the [portable skill, native skills plugin and optional MCP](skills/aic/references/integrations.md), not a standalone AIC CLI. Existing `scripts/aic.py` installer, recommendation, memory and handoff helpers remain optional developer/operator interfaces; scheduled-maintainer commands remain scoped operations, not customer onboarding.
+
+Use Python 3.11 or newer in an isolated environment. Install `.[mcp]` into that environment to exercise protocol tests; without the extra those tests explicitly skip, which is not MCP verification. The wheel keeps the existing skill tree as the `aic` package, including guides, examples, catalog, LICENSE.txt and NOTICE. Its root package anchor prevents the source launcher's sibling `aic.py` from shadowing it. `aic-mcp` is a host-invoked stdio transport entry point, not an interactive workflow runner.
+
+For plugin changes, run the actual Claude Code native validator and install/list/remove in a task-private HOME/config; never use real user plugin settings or infer discovery/model invocation from a manifest check. For MCP changes, exercise the official client over real stdio from both source and an installed wheel, including malformed inputs, project boundaries and recovery. Read-only annotations supplement enforcement; they are not a sandbox or permission grant.
 
 ## Implement and verify
 

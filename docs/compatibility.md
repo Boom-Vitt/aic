@@ -1,10 +1,12 @@
 # Compatibility
 
-AIC follows the Agent Skills format; that standard does not define universal discovery directories, permissions, slash commands or cloud synchronization. Each registry entry records an official source. The installer supports the documented default paths below; custom profiles/state roots need `generic --destination` and the host's own configuration/trust process.
+AIC has three distinct integration channels: a self-contained Agent Skill, a native **skills-only Claude Code plugin**, and an explicitly configured local read-only MCP adapter. Ask the existing host agent to use AIC; a manual AIC CLI, Python or extra model key is not a prerequisite for the skill/plugin. The portable [integration guide](../skills/aic/references/integrations.md) contains host prompts, native UI/in-session setup and the separate host-run MCP configuration.
 
-All paths are skill roots: installation creates `<root>/aic/SKILL.md`. User paths are relative to the explicitly selected home, or the invoking user's home. Project paths are relative to `--project`.
+AIC follows the Agent Skills format; that standard does not define universal discovery directories, permissions, slash commands or cloud synchronization. The paths below are documented standalone-skill destinations, not universal native plugin support. Each registry entry records an official source. The optional internal managed-copy installer supports these documented defaults; custom profiles/state roots need its explicit `generic --destination` interface and the host's own configuration/trust process.
 
-Managed file mutations require POSIX directory-descriptor/no-follow primitives on macOS/Linux. The installer refuses unsupported platforms, including Windows, rather than falling back to pathname-recursive deletion. A host's own supported manual skill installation is separate from AIC's managed installer; it is not verified by this adapter matrix.
+All paths below are standalone skill roots: the complete skill lives at `<root>/aic/SKILL.md`, with its references, assets, scripts and rights notices intact. Use the host's documented skill import/copy interface; the internal installer is optional agent/operator tooling. For that helper, user paths are relative to the explicitly selected home or invoking user's home, and project paths are relative to `--project`.
+
+The optional managed-copy helper requires Python 3.11 or newer and POSIX directory-descriptor/no-follow primitives on macOS/Linux. It refuses unsupported platforms, including Windows, rather than falling back to pathname-recursive deletion. A host's own supported skill installation is separate and is not verified by the managed-copy adapter matrix.
 
 | Adapter | Project root | User root | Primary evidence |
 | --- | --- | --- | --- |
@@ -21,6 +23,19 @@ Managed file mutations require POSIX directory-descriptor/no-follow primitives o
 | `generic` | Explicit `--destination` only | Explicit `--destination` only | Your host's documented Agent Skills interface |
 
 Sources checked November 6, 2026. Rolling docs and installed versions may differ; the registry does not certify live discovery.
+
+## Native plugin and local MCP are separate
+
+| Channel | Native surface | Setup and boundaries |
+| --- | --- | --- |
+| Claude Code plugin | `aic@aic-marketplace`, skill `/aic:aic` | Register the reviewed checkout's marketplace in the host, open AIC's details and deliberately choose local/project/user scope. The plugin carries the same `skills/aic` directory through default discovery and declares no hooks, settings, duplicate scan paths or automatic MCP process. |
+| Local MCP | Host-started stdio process `aic-mcp` | Configure `uvx --from /absolute/path/to/reviewed/aic --with mcp==2.3.0 aic-mcp --project /absolute/approved/project` as executable plus arguments, not an interactive user command. Requires the reviewed checkout, Python 3.11+, existing `uvx` and pinned official SDK. No PyPI publication or remote service is claimed. |
+
+The plugin/marketplace manifests target current official Claude Code [manifest](https://code.claude.com/docs/en/plugins-reference), [marketplace](https://code.claude.com/docs/en/plugins/marketplace-reference.md) and [installation](https://code.claude.com/docs/en/plugins/install.md) interfaces, checked November 7, 2026. The marketplace points to its root with `source: "./"`; the plugin version is declared only in `plugin.json`, independently of the marketplace manifest version. Neither a JSON/schema check nor plugin listing establishes actual skill consumption.
+
+MCP exposes exactly `aic_get_workflow_catalog`, `aic_get_guidance`, `aic_inspect_project` and `aic_validate_recommendation`, plus fixed packaged resources. It binds one existing absolute approved project; no source-content reads, root-rebinding tools, shell execution, file writes, memory promotion, agent launches or HTTP listener are supplied. See the portable guide for exact argument arrays, guidance sections, resource URIs and client-specific configuration cautions. The host still reasons, obtains approval and enforces its own permissions.
+
+Claude Code plugin support is not a claim about claude.ai chat, Cowork, browser/cloud sessions or every editor's plugin system. Other hosts use their documented standalone-skill path or an explicitly configured MCP client. There is no official-directory listing, universal plugin discovery or automatic cross-host synchronization claim.
 
 ## Important differences
 
@@ -43,9 +58,31 @@ Sources checked November 6, 2026. Rolling docs and installed versions may differ
 
 Do not promote a lower level to a higher one. Current delivery evidence and unexercised integrations are stated in [verification.md](verification.md). Initial OS checks cover only the actually recorded environments, not every platform.
 
+### Current 0.0.2 functional observations
+
+The [dated receipt](verification.md) records actual native strict manifest validation and task-private local-scope installation/listing of `aic@aic-marketplace` 0.0.2. It does **not** claim current native skill invocation or an official directory listing.
+
+Actual official-SDK stdio clients exercised the source launcher, installed wheel and exact documented host-run `uvx` configuration. Each exposed four read-only tools and twelve concrete resources, refused unsafe inputs and recovered without changing the synthetic project. The core-only installed wheel also worked without the SDK; missing-extra MCP startup failed cleanly. The complete Mac mini entrypoint ran 276 tests: 275 passed, one filesystem-specific skip. These observations do not certify every MCP host, protocol version, OS or model.
+
+### Recorded integration coverage
+
+The following summarizes dated records in [verification.md](verification.md), not new `0.0.2` execution receipts:
+
+| Surface | Actual recorded coverage | Untested or not established |
+| --- | --- | --- |
+| All ten named standalone path adapters | Isolated project/user install, preservation, idempotency, installed-helper and uninstall contracts | Live discovery/model use in every host; Windows managed-copy behavior |
+| Claude Code 2.1.318, `claude-opus-5-5` | Four synthetic installed-file-consumption recommendations matched and validated; restricted trace read installed files | Native discovery in that probe; current native plugin invocation |
+| Codex CLI 0.166.0, `gpt-6.1-sol` | Four synthetic installed-file-consumption recommendations matched and validated | Separately verified native discovery |
+| omp 18.16.0, `gpt-6.1-sol` | Four synthetic cases with native isolated skill reads; later five-family installed-file consumption separately recorded | Native discovery of every later revision; universal quality or performance |
+| Pi, Hermes, OpenClaw, Cursor, Gemini CLI, OpenCode, Copilot CLI | Official path documentation and isolated managed-copy contracts | Live discovery or model-consumption smoke |
+| Skills-only Claude Code plugin/marketplace; local SDK-backed MCP | Current setup/interfaces documented in the [integration guide](../skills/aic/references/integrations.md) | Historical skill tests do not establish native plugin validation/install/invocation, SDK stdio transport or installed-wheel behavior; candidate checks are recorded separately |
+| Optional Orca/omp handoff | Preview, approval and isolated subprocess contract checks | A real project/agent launch from this setup, task completion or a general cross-runtime backend |
+
+Small routing smokes are functional observations, not statistical benchmarks. Keep recorded host/model versions and historical package labels intact. Source review is not an operational receipt; consult this candidate's actual verification record before claiming a current channel passed.
+
 ## Workflow and recommendation compatibility
 
-AIC 0.0.1 uses recommendation/catalog schema 3 and exactly five workflow families: `direct` (`solo`), `explore-build` (`parallel`), `coordinated-delivery` (`sequential` or `parallel`), `independent-review` (`generator-evaluator`) and `adaptive-controller` (any supported current-stage topology). Schema-1/2 recommendations and retired template IDs are rejected without aliases or silent migration. Reassess real task properties and authorization before regenerating; installer, memory, maintenance and outer handoff formats keep their independent versions.
+AIC 0.0.2 uses recommendation/catalog schema 3 and exactly five workflow families: `direct` (`solo`), `explore-build` (`parallel`), `coordinated-delivery` (`sequential` or `parallel`), `independent-review` (`generator-evaluator`) and `adaptive-controller` (any supported current-stage topology). Schema-1/2 recommendations and retired template IDs are rejected without aliases or silent migration. Reassess real task properties and authorization before regenerating; installer, memory, maintenance and outer handoff formats keep their independent versions.
 
 The `0.0.N` development-package sequence is not a schema sequence or a rollback. Renumbering does not make old recommendations valid or change current format versions; see [development versioning](../CONTRIBUTING.md#development-versioning).
 

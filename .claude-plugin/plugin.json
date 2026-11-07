@@ -1,0 +1,12 @@
+{
+  "name": "aic",
+  "displayName": "AIC",
+  "version": "0.0.2",
+  "description": "Skills-first workflow selection, scoped memory and approved handoff guidance for your existing agent.",
+  "author": {
+    "name": "Boom-Vitt"
+  },
+  "homepage": "https://github.com/Boom-Vitt/aic#readme",
+  "repository": "https://github.com/Boom-Vitt/aic",
+  "license": "Apache-2.0"
+}

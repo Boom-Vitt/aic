@@ -1,10 +1,25 @@
+[build-system]
+requires = ["hatchling==1.29.0"]
+build-backend = "hatchling.build"
+
 [project]
 name = "aiculture-skills"
-version = "0.0.1"
-description = "Portable, evidence-backed Agent Skills for task routing and scoped handoffs"
+version = "0.0.2"
+description = "Skills-first, evidence-backed AI workflow guidance with native plugin and optional read-only MCP"
+readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp==2.3.0"]
+
+[project.scripts]
+aic-mcp = "aic.scripts.aiclib.mcp_server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["skills/aic"]
 
 [project.urls]
 Repository = "https://github.com/Boom-Vitt/aic"

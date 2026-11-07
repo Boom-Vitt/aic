@@ -10,6 +10,16 @@ AIC uses the self-contained `skills/<name>/SKILL.md` layout and progressive-disc
 
 All substantive AIC instructions, workflow templates, research summaries, local helper implementations, fixtures and tests are newly authored. No proprietary personal skills, customer data, private transcripts, API credentials or separately licensed upstream document tools are included. Apache-2.0 applies to AIC-authored material and the retained Apache reference license, not to cited third-party publications or websites. Compatibility and research references do not imply third-party endorsement.
 
+## Integration formats and dependencies
+
+Checked November 7, 2026. The native Claude Code plugin/marketplace manifests and local MCP adapter are original AIC implementations of documented interfaces, not copied upstream plugins or server examples.
+
+- **MCP Python SDK 2.3.0:** [official pinned release](https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.3.0), [pinned MIT license](https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/v2.3.0/LICENSE), Copyright (c) 2024 Anthropic, PBC. Both installed `mcp` and `mcp-types` 2.3.0 distributions were checked for their actual MIT license files and matching upstream repository metadata. This is an optional separately installed protocol dependency, not a bundled model, inference provider or part of AIC's Apache grant. [Official SDK documentation](https://py.sdk.modelcontextprotocol.io/) establishes protocol/API capability, not workflow effectiveness.
+- **Hatchling 1.29.0:** build-only dependency from the [PyPA Hatch project](https://github.com/pypa/hatch). Its installed distribution's `LICENSE.txt` and `License-Expression: MIT` were checked; copyright (c) 2021-present Ofek Lev. No build-backend code is vendored.
+- **Claude Code formats:** [plugin reference](https://code.claude.com/docs/en/plugins-reference), [marketplace reference](https://code.claude.com/docs/en/plugins/marketplace-reference.md), [installation documentation](https://code.claude.com/docs/en/plugins/install.md). These are mutable first-party capability references checked on the date above, not an experiment or a documentation-reuse grant. The client and its documentation retain their own terms; neither is redistributed. Native validation, isolated installation and any actual model invocation must be reported as different evidence.
+
+Optional dependencies and their transitive distributions retain their own license notices. Checking these named direct dependency grants is not blanket legal clearance for all future dependencies, versions, host clients or cited research.
+
 ## Research and memory references
 
 The portable [research evidence and rights ledger](research.md) records primary-source authors/research teams, publication dates and exact versions, evidence tiers, applicability limits, license evidence and checked dates. It covers the workflow sources and the existing references in [memory.md](memory.md): the Dartmouth/Microsoft/independent-researcher conversational-memory study, Anthropic's context-engineering and containment articles, and OpenAI's memory/compaction example.
