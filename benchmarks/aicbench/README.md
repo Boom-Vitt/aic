@@ -58,17 +58,30 @@ The report records, per arm and per task:
 - **cost** — the sum of Claude Code's `total_cost_usd` values, as a decimal string. AIC does not multiply tokens by a price. If any sample omits the field, the aggregate cost is null.
 - **wall time** — `time.perf_counter` around each Claude Code process, in seconds, summed for the arm.
 
-`total_cost_usd` is Claude Code's own client-side estimate. It can differ from an invoice. This repository does not ship a measured pass rate: publishing a number requires an actual run with a key.
+`total_cost_usd` is Claude Code's own client-side estimate. It can differ from an invoice. This repository does not ship a measured pass rate.
 
 Useful limits: `--tasks id,id`, `--samples` from 1 to 10, `--max-turns`, `--agent-timeout`, `--model`, `--arm`, and `--sandbox`.
+
+## Published results
+
+Only a finished `--sandbox container` run is an official result. The methodology is [RESULTS.md](RESULTS.md). A report written without that sandbox has `"official": false` and `publication_warning` set, and the runner prints that warning. `--official` without `--sandbox container` exits 2 and does not start Claude Code. `require_official` and `--require-official REPORT.json` refuse to mark any other report official, including one whose `official` field was edited by hand.
 
 ## Isolation
 
 Before any agent starts, the runner stores a SHA-256 manifest of that task's `oracle/` file and `reference/` tree. The agent cwd is a copy of `workspace/` in a temp directory outside this repository. `reference/` and `oracle/` are not copied there and are not passed as `--add-dir`. The child environment does not include `PYTHONPATH` or the repository path. After the agent exits, the manifest is checked again. A mismatch marks that trial `invalid`, does not count as a pass, and does not execute the altered oracle. Grading copies the verified oracle bytes into a new temp directory and runs them with `python -I`. The workspace is not placed on `sys.path`. A top-level module whose name matches the standard library or `unittest` is not used; the real standard-library module is.
 
-`--sandbox container` runs the agent under bubblewrap (`bwrap`) with the workspace and the installed skill mounted, plus the usual system library directories. It does not mount this repository. If `bwrap` is missing, the runner exits 2 and does not start Claude Code. This mode needs working user namespaces. It is not run by `./scripts/verify.sh`.
+`--sandbox container` runs the agent under bubblewrap (`bwrap`) with the workspace and the installed skill mounted, plus the usual system library directories. It does not mount this repository. If `bwrap` is missing, the runner exits 2 and does not start Claude Code. This mode needs working user namespaces. `./scripts/verify.sh` does not run it.
 
-Without that sandbox, a shell can still read any path the operating system allows, including this checkout if the process discovers it. The manifest detects writes to the oracle and the reference. It does not detect a read. That residual exposure is why the container option exists.
+Install bubblewrap before an official run. On the Ubuntu image used by CI:
+
+```bash
+sudo apt-get update && sudo apt-get install -y bubblewrap
+bwrap --version
+```
+
+The package name is `bubblewrap`. The executable is `bwrap`. See the comment on the verify job in `.github/workflows/verify.yml`.
+
+Without that sandbox, a shell can still read any path the operating system allows, including `reference/` in this checkout if the process discovers it. That was reproduced. The manifest detects writes to the oracle and the reference. It does not detect a read. Those runs are saved only as unofficial debugging output.
 
 ## Limits
 

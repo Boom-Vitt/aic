@@ -24,5 +24,8 @@ jobs:
           python-version: '3.11'
       - name: Install declared MCP integration dependencies
         run: python -m pip install ".[mcp]"
+      # Official aicbench results require bubblewrap. This job does not run that comparison.
+      # Ubuntu setup: sudo apt-get update && sudo apt-get install -y bubblewrap
+      # The executable is bwrap. See benchmarks/aicbench/RESULTS.md.
       - name: Verify package and isolated contracts
         run: ./scripts/verify.sh

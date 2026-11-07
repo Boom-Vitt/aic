@@ -1,5 +1,7 @@
 """Runner metrics, the missing-key exit, and a stubbed Claude Code comparison."""
 from pathlib import Path
+from contextlib import redirect_stderr
+import io
 import json
 import os
 import shutil
@@ -12,7 +14,18 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from benchmarks.aicbench.catalog import load_catalog
 from benchmarks.aicbench.metrics import cost_from_payload, pass_at_k, usage_from_payload
-from benchmarks.aicbench.runner import EXIT_NO_KEY, EXIT_USAGE, _api_key, _command, container_command, main
+from benchmarks.aicbench.runner import (
+    EXIT_NO_KEY,
+    EXIT_USAGE,
+    UNOFFICIAL_WARNING,
+    RunnerError,
+    _api_key,
+    _command,
+    build_report,
+    container_command,
+    main,
+    require_official,
+)
 
 STUB = '''#!/usr/bin/env python3
 import json
@@ -113,6 +126,16 @@ class RunnerTests(unittest.TestCase):
         self.assertNotIn(key, output.read_text(encoding='utf-8'))
         self.assertEqual(report['benchmark'], 'aicbench')
         self.assertTrue(report['measured'])
+        self.assertEqual(report['sandbox'], 'none')
+        self.assertIs(report['official'], False)
+        self.assertEqual(report['publication_warning'], UNOFFICIAL_WARNING)
+        with self.assertRaises(RunnerError):
+            require_official(report)
+        forged = dict(report)
+        forged['official'] = True
+        forged['publication_warning'] = None
+        with self.assertRaises(RunnerError):
+            require_official(forged)
         for arm in ('baseline', 'claude_code_plus_aic'):
             summary = report['arms'][arm]
             self.assertEqual(summary['pass_at_1'], 1.0)
@@ -194,6 +217,40 @@ class RunnerTests(unittest.TestCase):
             )
             self.assertEqual(code, EXIT_USAGE)
             self.assertFalse((self.base / 'sand.json').exists())
+
+    def test_only_container_runs_can_be_official(self):
+        unofficial = build_report((), (), {}, samples=1, sandbox='none')
+        self.assertIs(unofficial['official'], False)
+        self.assertIn('NOT AN OFFICIAL RESULT', unofficial['publication_warning'])
+        with self.assertRaises(RunnerError):
+            require_official(unofficial)
+        official = build_report((), (), {}, samples=1, sandbox='container')
+        self.assertIs(official['official'], True)
+        self.assertIsNone(official['publication_warning'])
+        self.assertEqual(official['sandbox'], 'container')
+        require_official(official)
+        stub = self._stub()
+        output = self.base / 'official.json'
+        errors = io.StringIO()
+        with redirect_stderr(errors):
+            refused = main(
+                ['--official', '--claude-bin', str(stub), '--tasks', 'bugfix-ledger-signs', '--output', str(output)],
+                self._environ('sk-ant-present'),
+            )
+        self.assertEqual(refused, EXIT_USAGE)
+        self.assertIn('NOT AN OFFICIAL RESULT', errors.getvalue())
+        self.assertIn('--sandbox container', errors.getvalue())
+        self.assertFalse(output.exists())
+        self.assertFalse((self.base / 'argv.jsonl').exists())
+        missing_key = main(
+            ['--official', '--claude-bin', str(stub), '--output', str(self.base / 'no-key.json')],
+            self._environ(None),
+        )
+        self.assertEqual(missing_key, EXIT_NO_KEY)
+        saved = self.base / 'saved.json'
+        saved.write_text(json.dumps(unofficial), encoding='utf-8')
+        checked = main(['--require-official', str(saved)], self._environ(None))
+        self.assertEqual(checked, EXIT_USAGE)
 
     def test_unknown_task_is_a_usage_error(self):
         code = main(

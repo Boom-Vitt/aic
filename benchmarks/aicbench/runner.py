@@ -3,7 +3,8 @@
 The runner shells out to the `claude` executable. It records pass@1, reported
 tokens, reported cost, and measured wall time. Without ANTHROPIC_API_KEY it
 exits 3 and does not start a model. Cost is copied from Claude Code's
-`total_cost_usd` field; this module does not apply a price table.
+`total_cost_usd` field; this module does not apply a price table. A report is
+official only when the agent ran under ``--sandbox container``.
 """
 
 from __future__ import annotations
@@ -38,6 +39,11 @@ from .metrics import cost_from_payload, cost_text, mean, pass_at_k, sum_cost, su
 EXIT_USAGE = 2
 EXIT_NO_KEY = 3
 ARMS = ("baseline", "claude_code_plus_aic")
+UNOFFICIAL_WARNING = (
+    "NOT AN OFFICIAL RESULT. This run did not use --sandbox container. "
+    "The agent could read reference/ on disk. Do not publish these numbers. "
+    "Only a completed --sandbox container run can be marked official."
+)
 APPROVAL = (
     "This task is already approved. Change only files inside the current workspace. "
     "Do not search outside it for tests, answers, or graders. "
@@ -88,6 +94,16 @@ def _parser() -> argparse.ArgumentParser:
         choices=("none", "container"),
         default="none",
         help="none uses a workspace outside the checkout. container runs the agent under bubblewrap.",
+    )
+    parser.add_argument(
+        "--official",
+        action="store_true",
+        help="Request a published result. Requires --sandbox container and is otherwise refused.",
+    )
+    parser.add_argument(
+        "--require-official",
+        type=Path,
+        help="Check a saved report and exit. Does not start a model. Unofficial reports are refused.",
     )
     return parser
 
@@ -446,7 +462,16 @@ def _suite_arm(task_records: list[dict]) -> dict:
     }
 
 
-def build_report(selected: tuple[Task, ...], arms: tuple[str, ...], results: dict[str, dict[str, list[Trial]]], *, samples: int) -> dict:
+def build_report(
+    selected: tuple[Task, ...],
+    arms: tuple[str, ...],
+    results: dict[str, dict[str, list[Trial]]],
+    *,
+    samples: int,
+    sandbox: str,
+) -> dict:
+    """Build a report. official is true only for a container sandbox run."""
+    official = sandbox == "container"
     tasks = []
     per_arm: dict[str, list[dict]] = {arm: [] for arm in arms}
     for task in selected:
@@ -461,9 +486,23 @@ def build_report(selected: tuple[Task, ...], arms: tuple[str, ...], results: dic
         "benchmark": "aicbench",
         "samples_per_task": samples,
         "measured": True,
+        "sandbox": sandbox,
+        "official": official,
+        "publication_warning": None if official else UNOFFICIAL_WARNING,
         "arms": {arm: _suite_arm(per_arm[arm]) for arm in arms},
         "tasks": tasks,
     }
+
+
+def require_official(report: dict) -> None:
+    """Refuse to treat a report as a published result unless it is a container run."""
+    if not isinstance(report, dict):
+        raise RunnerError("A report object is required.")
+    if report.get("sandbox") != "container" or report.get("official") is not True or report.get("publication_warning"):
+        raise RunnerError(
+            "Refusing to mark this report official. "
+            "Published aicbench results require a completed --sandbox container run."
+        )
 
 
 def run_comparison(args: argparse.Namespace, environ: dict[str, str]) -> dict:
@@ -514,7 +553,19 @@ def run_comparison(args: argparse.Namespace, environ: dict[str, str]) -> dict:
                         expected=manifests[task.id],
                     )
                     results[arm][task.id].append(trial)
-        return build_report(selected, arms, results, samples=args.samples)
+        return build_report(selected, arms, results, samples=args.samples, sandbox=args.sandbox)
+
+
+def _check_saved_report(path: Path) -> int:
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+        require_official(report)
+    except (OSError, UnicodeError, json.JSONDecodeError, RunnerError) as exc:
+        print(UNOFFICIAL_WARNING, file=sys.stderr)
+        print(f"aicbench: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    print("aicbench: report is an official container run.", file=sys.stderr)
+    return 0
 
 
 def main(argv: list[str] | None = None, environ: dict[str, str] | None = None) -> int:
@@ -524,11 +575,17 @@ def main(argv: list[str] | None = None, environ: dict[str, str] | None = None) -
     except SystemExit as exc:
         code = exc.code
         return EXIT_USAGE if code is None else int(code)
+    if args.require_official is not None:
+        return _check_saved_report(args.require_official)
     parent = os.environ if environ is None else environ
     try:
         if _api_key(parent) is None:
             print("aicbench: ANTHROPIC_API_KEY is missing. No model was started.", file=sys.stderr)
             return EXIT_NO_KEY
+        if args.official and args.sandbox != "container":
+            print(UNOFFICIAL_WARNING, file=sys.stderr)
+            print("aicbench: refusing to start. --official requires --sandbox container.", file=sys.stderr)
+            return EXIT_USAGE
         report = run_comparison(args, parent)
     except SystemExit as exc:
         if exc.code == EXIT_NO_KEY:
@@ -538,6 +595,8 @@ def main(argv: list[str] | None = None, environ: dict[str, str] | None = None) -
     except (RunnerError, CatalogError, GradeError, OSError) as exc:
         print(f"aicbench: {exc}", file=sys.stderr)
         return EXIT_USAGE
+    if report.get("official") is not True:
+        print(UNOFFICIAL_WARNING, file=sys.stderr)
     text = json.dumps(report, indent=2) + "\n"
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
