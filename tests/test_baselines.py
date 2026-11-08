@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import stat
 import subprocess
@@ -587,20 +588,19 @@ class MountClosureTests(unittest.TestCase):
             )
             self.assertEqual(init.returncode, 0, init.stderr)
             self.assertTrue((scratch / "repo" / ".git").is_dir())
-            probe = workspace / "probe.py"
+            probe = workspace / "probe.sh"
             probe.write_text(
-                "from pathlib import Path\n"
-                f"print(Path({str(oracle)!r}).is_file())\n"
-                f"print(Path({str(answers)!r}).is_file())\n"
-                f"print(Path({str(ROOT)!r}).exists())\n"
-                f"print(Path({str(host_home)!r}).exists())\n"
-                "import os\n"
-                "print(os.environ.get('HOME'))\n"
-                "print('ANTHROPIC_API_KEY' in os.environ)\n",
+                "#!/bin/sh\n"
+                f"if test -f {shlex.quote(str(oracle))}; then echo oracle-yes; else echo oracle-no; fi\n"
+                f"if test -f {shlex.quote(str(answers))}; then echo answers-yes; else echo answers-no; fi\n"
+                f"if test -e {shlex.quote(str(ROOT))}; then echo repo-yes; else echo repo-no; fi\n"
+                f"if test -e {shlex.quote(str(host_home))}; then echo home-yes; else echo home-no; fi\n"
+                "printf '%s\\n' \"$HOME\"\n"
+                "if test -n \"$ANTHROPIC_API_KEY\"; then echo key-yes; else echo key-no; fi\n",
                 encoding="utf-8",
             )
             seen = _run_in_container(
-                ["python3", str(probe)],
+                ["/bin/sh", str(probe)],
                 workspace=workspace,
                 home=home,
                 config=config,
@@ -614,9 +614,9 @@ class MountClosureTests(unittest.TestCase):
             )
             self.assertEqual(seen.returncode, 0, seen.stderr)
             lines = [line.strip() for line in seen.stdout.splitlines()]
-            self.assertEqual(lines[:4], ["False", "False", "False", "False"])
+            self.assertEqual(lines[:4], ["oracle-no", "answers-no", "repo-no", "home-no"])
             self.assertEqual(lines[4], str(home))
-            self.assertEqual(lines[5], "True")
+            self.assertEqual(lines[5], "key-yes")
             self.assertNotIn(KEY, init.args)
             self.assertNotIn(KEY, seen.args)
 
