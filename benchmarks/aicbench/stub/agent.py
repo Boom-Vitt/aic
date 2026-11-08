@@ -192,8 +192,9 @@ def _baseline_stub() -> int:
         return _refuse(problem)
     model = _one("--model")
     turns = _one("--max-turns")
-    if not model or not turns:
-        return _refuse("baseline stub requires one --model and one --max-turns.")
+    spend = _one("--max-budget-usd")
+    if not model or not turns or not spend:
+        return _refuse("baseline stub requires one --model, one --max-turns, and one --max-budget-usd.")
     plugin_dirs = _flag_values("--plugin-dir")
     add_dirs = _flag_values("--add-dir")
     if len(plugin_dirs) > 1 or len(add_dirs) > 1 or (plugin_dirs and add_dirs):
@@ -219,6 +220,7 @@ def _baseline_stub() -> int:
         "home_skill": home_skill,
         "home_skill_name": home_skill_name,
         "invokes_model": False,
+        "max_budget_usd": spend,
         "max_turns": turns,
         "model": model,
         "plugin_dir": plugin_dirs[0] if plugin_dirs else None,

@@ -30,7 +30,9 @@ from benchmarks.baselines.adapter import (
     git_fetch_commands,
     load_registry,
     stand_in_mount,
+    validate_registry,
 )
+from benchmarks.budget import dollar_stop, format_max_usd
 from benchmarks.aicbench.runner import EXIT_USAGE, main as aicbench_main
 
 PINS = {
@@ -71,7 +73,7 @@ PINS = {
     ),
 }
 KEY = "sk-ant-baseline-sentinel"
-BUDGET = {"max_turns": 30, "timeout_sec": 600, "max_usd": None}
+BUDGET = {"max_turns": 30, "timeout_sec": 600, "max_usd": 0.35}
 
 
 def _load_runner():
@@ -90,6 +92,22 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(registry["seed"], 0)
         self.assertFalse(registry["seed_sent_to_provider"])
         self.assertEqual(registry["budget"], BUDGET)
+        self.assertEqual(format_max_usd(registry["budget"]["max_usd"]), "0.35")
+        settings = json.loads((ROOT / "benchmarks" / "pinned.json").read_text(encoding="utf-8"))
+        stop = dollar_stop(
+            max_turns=30,
+            timeout_sec=600,
+            max_tokens=settings["max_tokens"],
+            input_usd_per_million=settings["pricing"]["input_usd_per_million"],
+            output_usd_per_million=settings["pricing"]["output_usd_per_million"],
+        )
+        self.assertEqual(stop["exact_usd_millionths"], 343200)
+        self.assertEqual(stop["max_usd"], "0.35")
+        self.assertEqual(format_max_usd(registry["budget"]["max_usd"]), stop["max_usd"])
+        rejected = json.loads((ROOT / "benchmarks" / "baselines" / "registry.json").read_text(encoding="utf-8"))
+        rejected["budget"]["max_usd"] = None
+        with self.assertRaises(AdapterError):
+            validate_registry(rejected)
         arms = {item["id"]: item for item in registry["arms"]}
         self.assertEqual(list(arms), ["plain-claude-code", "aic", *PINS])
         self.assertEqual(arms["plain-claude-code"]["mount"], "none")
@@ -204,13 +222,14 @@ class RegistryTests(unittest.TestCase):
     def test_plain_and_aic_commands_share_model_budget_and_seed_inputs(self):
         mount = Path("/tmp/aic-baseline-shipped-plugin")
         plain = agent_argv(
-            "claude", prompt="Task id: example\n", model="claude-sonnet-5-5", max_turns=30, mount="none", mount_path=None,
+            "claude", prompt="Task id: example\n", model="claude-sonnet-5-5", max_turns=30, max_usd=0.35, mount="none", mount_path=None,
         )
         treated = agent_argv(
             "claude",
             prompt="Task id: example\n",
             model="claude-sonnet-5-5",
             max_turns=30,
+            max_usd=0.35,
             mount="plugin-dir",
             mount_path=mount,
         )
@@ -219,6 +238,7 @@ class RegistryTests(unittest.TestCase):
             prompt="Task id: example\n",
             model="claude-sonnet-5-5",
             max_turns=30,
+            max_usd=0.35,
             mount="installed",
             mount_path=mount,
         )
@@ -228,6 +248,9 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(treated[treated.index("--allowedTools") + 1], tools)
         self.assertEqual(installed[installed.index("--allowedTools") + 1], tools)
         self.assertEqual(plain[plain.index("--max-turns") + 1], "30")
+        self.assertEqual(plain[plain.index("--max-budget-usd") + 1], "0.35")
+        self.assertEqual(treated[treated.index("--max-budget-usd") + 1], "0.35")
+        self.assertEqual(installed[installed.index("--max-budget-usd") + 1], "0.35")
         self.assertNotIn("--plugin-dir", plain)
         self.assertNotIn("--add-dir", plain)
         self.assertNotIn("--plugin-dir", installed)

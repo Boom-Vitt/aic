@@ -1,6 +1,8 @@
 # SWE-bench Lite: Claude Code and Claude Code plus AIC
 
-This directory runs one comparison. It asks Claude Code to repair [SWE-bench Lite](https://huggingface.co/datasets/SWE-bench/SWE-bench_Lite) instances, once as a baseline and once with the AIC plugin loaded, then scores both prediction files with the official SWE-bench harness at a pinned commit.
+This directory runs one comparison. It asks Claude Code to repair [SWE-bench Lite](https://huggingface.co/datasets/SWE-bench/SWE-bench_Lite) instances, once as a baseline and once with the AIC plugin loaded, then scores both prediction files with the official SWE-bench harness at a pinned commit. Claude runs only in the agent phase of the egress proxy, where the allow-list is `api.anthropic.com:443`. Git fetches for an instance use the install phase and do not receive the API key. The command refuses to start when bubblewrap or the proxy is missing.
+
+The official six-arm comparison is `./scripts/run-benchmarks.sh --swe-bench-lite`. That path runs `plain-claude-code`, `aic`, `ecc`, `agent-skills`, `planning-with-files`, and `gstack` through `run_official_arm` under the shared `max_usd` stop, then scores a predictions file. The evaluation command does not load a plugin. `superpowers` stays out. This directory's `--condition` flag still selects `baseline`, `aic`, or both.
 
 It does not ship a resolve rate. A completed run's only score is the harness `results.json` written under the output directory. The 10-instance smoke subset is a cheap check, not a leaderboard result and not a stratified sample.
 
@@ -44,7 +46,7 @@ Both arms use Claude Code print mode (`claude --bare -p`) with the same issue te
 | Arm | Difference |
 | --- | --- |
 | `baseline` | `--bare` and no plugin directory. The prompt does not name AIC. |
-| `aic` | `--bare` plus `--plugin-dir` set to this repository, and the prompt invokes `/aic:aic` before editing. Bare mode does not advertise discovered skills, so the skill is named explicitly. The prompt approves a fix in the working tree after the recommendation. This is explicit plugin use, not a claim of unaided native discovery. |
+| `aic` | `--bare` plus `--plugin-dir` set to a staged directory of the shipped plugin (`skills/aic`, `src/aic_quickstart`, `LICENSE`, `NOTICE`, `README.md`, and the `.claude-plugin` manifests). The repository root is not mounted. The prompt invokes `/aic:aic` before editing. Bare mode does not advertise discovered skills, so the skill is named explicitly. The prompt approves a fix in the working tree after the recommendation. This is explicit plugin use, not a claim of unaided native discovery. |
 
 The prediction patch is `git diff` of the working tree after the process exits, including a timeout. It is not parsed out of the model's prose, and the gold patch is not given to the model. The dataset export keeps `instance_id`, `repo`, `base_commit`, and `problem_statement` only.
 
@@ -64,13 +66,11 @@ From the repository root:
 python -m benchmarks.swe_bench --output .work/swe-bench-lite --smoke
 ```
 
-Omit `--smoke` to run the 300-instance test split. That is 600 Claude Code sessions when both arms run, plus the harness containers. Set a spend cap when you want one:
+Omit `--smoke` to run the 300-instance test split. That is 600 Claude Code sessions when both arms run, plus the harness containers. The shared stop is already applied: `--max-turns` 30, `--instance-timeout` 600, and `--max-budget-usd` 0.35. A different value is refused. The dollar figure is the registry stop, not a measured bill.
 
 ```bash
-python -m benchmarks.swe_bench --output .work/swe-bench-lite --smoke --max-budget-usd 2.00
+python -m benchmarks.swe_bench --output .work/swe-bench-lite --smoke
 ```
-
-`--max-budget-usd` is forwarded to Claude Code. It is a client-side cap from Claude Code's own documentation, not a measured bill.
 
 Useful flags:
 
@@ -79,7 +79,9 @@ Useful flags:
 | `--condition baseline` or `--condition aic` | Run one arm. The default is `both`. |
 | `--cache DIR` | Reuse the harness virtualenv and the downloaded public fields. The default is `OUTPUT/cache`. |
 | `--max-workers N` | Harness workers. The default is 1. |
-| `--max-turns N` | Claude Code turn cap. The default is 30. |
+| `--max-turns N` | Claude Code turn cap. The default is the shared budget, 30. Another value is refused. |
+| `--instance-timeout N` | Per-instance wall clock. The default is the shared budget, 600 seconds. Another value is refused. |
+| `--max-budget-usd N` | Shared dollar stop, 0.35. Another value is refused. |
 | `--model ID` | Forwarded as Claude Code `--model`. Omit it to use the CLI default. |
 | `--score-only` | Score `baseline/predictions.jsonl` and/or `aic/predictions.jsonl` already in `--output`. Do not combine it with `--smoke`. |
 

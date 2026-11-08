@@ -7,11 +7,11 @@
   "budget": {
     "max_turns": 30,
     "timeout_sec": 600,
-    "max_usd": null
+    "max_usd": 0.35
   },
   "public_benchmark_scores": null,
   "vendored": false,
-  "note": "Git arms are fetched at the pinned commit when a live run starts. Their trees are not copied into this repository. The license sha256 is the root license file at that commit, read 2026-11-08. A root grant is not a separate review of every nested file. Install commands are the pinned README route. An arm marked unverified-install is excluded from official comparisons.",
+  "note": "Git arms are fetched at the pinned commit when a live run starts. Their trees are not copied into this repository. The license sha256 is the root license file at that commit, read 2026-11-08. A root grant is not a separate review of every nested file. Install commands are the pinned README route. An arm marked unverified-install is excluded from official comparisons. max_usd is the shared stop from benchmarks/budget.py: 30 turns times 600 input tokens, plus 30 turns times the pinned 1024 output tokens, priced at 2 and 10 USD per million and rounded up to the next cent (0.35). Null is refused. It is a stop, not a predicted cost.",
   "arms": [
     {
       "id": "plain-claude-code",

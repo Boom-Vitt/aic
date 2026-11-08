@@ -2,8 +2,9 @@
 
 Dry-run prints the token-budget ceiling and does not call a model. A missing
 API key exits 3 before that estimate. The dev pack is the default. heldout-v2
-is the release pack. Optional suites are unpriced because their pinned CLIs
-have no token budget. aicbench's own report records Claude Code's cost.
+is the release pack. Optional suites have no token budget, so the estimate
+does not invent a suite price. They do send the shared max_usd stop. aicbench's
+own report records Claude Code's cost.
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 
@@ -26,6 +28,16 @@ if str(_ROOT) not in sys.path:
 from benchmarks.aicbench.runner import main as aicbench_main
 from benchmarks.baselines.adapter import AdapterError, load_registry
 from benchmarks.baselines.adapter import main as baselines_main
+from benchmarks.budget import shared_stop
+from benchmarks.suite_arms import (
+    apply_harness_marker,
+    observe_arms,
+    official_entries,
+    prepare_live_official_arms,
+)
+from benchmarks.suite_runtime import harness_env, open_suite_runtime, runtime_root, suite_network
+from benchmarks.swe_bench.contract import ContractError
+from benchmarks.swe_bench.live import run_official_arm
 from benchmarks.routing.baseline import load_catalog
 from benchmarks.routing.compare import _items, aic_system, main as compare_main, message_body, shared_system, skill_documents
 from benchmarks.routing.score import ScoreError, load_pack
@@ -127,12 +139,15 @@ def pack_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _baseline_ids() -> list[str]:
+def _registry() -> dict:
     try:
-        registry = load_registry()
+        return load_registry()
     except AdapterError as exc:
         raise RunError(str(exc), exc.code) from exc
-    return [item["id"] for item in registry["arms"]]
+
+
+def _baseline_ids() -> list[str]:
+    return [item["id"] for item in _registry()["arms"]]
 
 
 def estimate_for(settings: dict, pack, *, terminal: bool, swe: bool, baselines: bool = False) -> dict:
@@ -173,13 +188,33 @@ def estimate_for(settings: dict, pack, *, terminal: bool, swe: bool, baselines: 
             "command": "python3 -m benchmarks.aicbench --sandbox container --official",
         },
     ]
+    registry = _registry()
+    stop = shared_stop(settings, registry["budget"])
+    suite_note = "max_usd is the shared stop rule, not a token price for this suite."
+    official_ids = [item["id"] for item in official_entries(registry)]
     unpriced = ["aicbench"]
     if terminal:
         unpriced.append("terminal-bench")
-        components.append({"name": "terminal-bench", "priced": False, "token_budget": None})
+        components.append({
+            "name": "terminal-bench",
+            "priced": False,
+            "token_budget": None,
+            "budget": dict(registry["budget"]),
+            "max_usd": stop["max_usd"],
+            "arms": official_ids,
+            "note": suite_note,
+        })
     if swe:
         unpriced.append("swe-bench-lite")
-        components.append({"name": "swe-bench-lite", "priced": False, "token_budget": None})
+        components.append({
+            "name": "swe-bench-lite",
+            "priced": False,
+            "token_budget": None,
+            "budget": dict(registry["budget"]),
+            "max_usd": stop["max_usd"],
+            "arms": official_ids,
+            "note": suite_note,
+        })
     if baselines:
         unpriced.append("baselines")
         components.append({
@@ -198,6 +233,8 @@ def estimate_for(settings: dict, pack, *, terminal: bool, swe: bool, baselines: 
         "output_usd_per_million": output_rate,
         "pricing_url": pricing["url"],
         "pricing_checked": pricing["checked"],
+        "shared_budget": dict(registry["budget"]),
+        "shared_max_usd": stop["max_usd"],
         "components": components,
         "unpriced": unpriced,
         "public_benchmark_scores": None,
@@ -307,18 +344,11 @@ def _harness(argv: list[str], cwd: Path, env: dict[str, str], timeout: int) -> s
         raise RunError(f"optional harness failed to start: {exc.strerror}", 1) from exc
 
 
-def _terminal_argv(settings: dict, output: Path, run_id: str) -> list[str]:
-    pin = settings["terminal_bench"]
-    return [
-        sys.executable, "-m", "terminal_bench.cli.tb.main", "run",
-        "--dataset", pin["dataset"],
-        "--agent", pin["agent"],
-        "--model", f"anthropic/{settings['model']}",
-        "--n-tasks", str(pin["n_tasks"]),
-        "--n-attempts", str(pin["n_attempts"]),
-        "--output-path", str(output),
-        "--run-id", run_id,
-    ]
+def _aic_record(records: list[dict]) -> dict:
+    matches = [item for item in records if item["arm"] == "aic"]
+    if len(matches) != 1:
+        raise RunError("the aic arm is missing from the suite receipt.", 1)
+    return matches[0]
 
 
 def _swe_argv(settings: dict, predictions: Path, instance_ids: list[str], run_id: str) -> list[str]:
@@ -383,6 +413,8 @@ def execute(
     compare_runner=None,
     aicbench_runner=None,
     baseline_runner=None,
+    arm_preparer=None,
+    suite_runtime_factory=None,
 ) -> int:
     require_key()
     if args.terminal_bench_checkout and not args.terminal_bench:
@@ -432,121 +464,237 @@ def execute(
     _write_json(bundle / "provenance.json", provenance)
     _write_json(bundle / "estimate.json", estimate)
     reader = revision_reader or _checkout_sha
+    suite = None
+    observed: list[dict] = []
+    runtime = None
+    runtime_dir = None
     try:
+        try:
+            if args.terminal_bench:
+                _require_revision(
+                    args.terminal_bench_checkout, settings["terminal_bench"]["revision"], reader,
+                    "terminal-bench requires --terminal-bench-checkout at the pinned revision.",
+                )
+            if args.swe_bench_lite:
+                if args.swe_bench_lite_predictions is None:
+                    raise RunError("swe-bench-lite requires a pinned checkout and a predictions file.", 3)
+                _require_revision(
+                    args.swe_bench_lite_checkout, settings["swe_bench_lite"]["revision"], reader,
+                    "swe-bench-lite requires a pinned checkout and a predictions file.",
+                )
+                _prediction_ids(args.swe_bench_lite_predictions, settings["swe_bench_lite"]["max_predictions"])
+            (bundle / "raw").mkdir(exist_ok=True)
+            if args.terminal_bench or args.swe_bench_lite:
+                runtime_dir = runtime_root()
+                opener = suite_runtime_factory or open_suite_runtime
+                runtime = opener(dict(os.environ), runtime_dir)
+                prepare = arm_preparer or prepare_live_official_arms
+                suite = prepare(dict(os.environ))
+                observed = observe_arms(
+                    suite,
+                    settings,
+                    _registry(),
+                    run_id=f"aic-{day}-{sha[:12]}",
+                    output_root=bundle / "raw" / "terminal-bench",
+                )
+                loaded = [item["arm"] for item in observed if item["aic_treatment"] is True]
+                if loaded != ["aic"]:
+                    raise RunError("suite arms loaded the AIC plugin on the wrong arm.", 1)
+        except AdapterError as exc:
+            _write_json(bundle / "receipts" / "blocked.json", {
+                "executed": False,
+                "stopped_before_model": True,
+                "public_benchmark_scores": None,
+                "reason": str(exc),
+            })
+            raise RunError(str(exc), exc.code) from exc
+        except RunError as exc:
+            _write_json(bundle / "receipts" / "blocked.json", {
+                "executed": False,
+                "stopped_before_model": True,
+                "public_benchmark_scores": None,
+                "reason": str(exc),
+            })
+            raise
+        compare_argv = [
+            "--model", settings["model"],
+            "--output", str(bundle / "raw" / "routing"),
+            "--pack", str(pack_path),
+            "--max-tokens", str(settings["max_tokens"]),
+            "--seed", str(settings["seed"]),
+            "--temperature", str(settings["temperature"]),
+            "--timeout", "60",
+        ]
+        if secret and secret in compare_argv:
+            raise RunError("refusing to put the API key on a command line.", 1)
+        compare_call = compare_runner or compare_main
+        captured = StringIO()
+        with redirect_stdout(captured):
+            compare_code = compare_call(compare_argv, client=client, environ=os.environ)
+        (bundle / "raw" / "routing-stdout.txt").write_text(_clip(captured.getvalue(), secret), encoding="utf-8")
+        if compare_code != 0:
+            return compare_code
+        aicbench_call = aicbench_runner or aicbench_main
+        aicbench_argv = [
+            "--sandbox", "container",
+            "--official",
+            "--model", settings["model"],
+            "--output", str(bundle / "receipts" / "aicbench.json"),
+        ]
+        if secret and secret in aicbench_argv:
+            raise RunError("refusing to put the API key on a command line.", 1)
+        aicbench_code = aicbench_call(aicbench_argv, environ=os.environ)
+        if aicbench_code != 0:
+            return aicbench_code
+        if args.baselines:
+            baseline_argv = baseline_live_argv(settings, bundle / "receipts" / "baselines.json")
+            if secret and secret in baseline_argv:
+                raise RunError("refusing to put the API key on a command line.", 1)
+            baseline_call = baseline_runner or baselines_main
+            baseline_code = baseline_call(baseline_argv, environ=os.environ)
+            if baseline_code != 0:
+                return baseline_code
+        runner = harness_runner or _harness
+        run_id = f"aic-{day}-{sha[:12]}"
+        registry = _registry()
+        failed = False
         if args.terminal_bench:
-            _require_revision(
-                args.terminal_bench_checkout, settings["terminal_bench"]["revision"], reader,
-                "terminal-bench requires --terminal-bench-checkout at the pinned revision.",
-            )
+            if runtime is None:
+                raise RunError("official suite results refuse to run without the egress proxy.", 1)
+            output = bundle / "raw" / "terminal-bench"
+            output.mkdir(parents=True, exist_ok=True)
+            try:
+                env = harness_env(dict(os.environ), runtime.child_env(), secret)
+            except AdapterError as exc:
+                raise RunError(str(exc), exc.code) from exc
+            env["PYTHONPATH"] = str(args.terminal_bench_checkout) + os.pathsep + env.get("PYTHONPATH", "")
+            if secret and secret in env["PYTHONPATH"]:
+                raise RunError("refusing to put the API key on a command line.", 1)
+            exits = []
+            for record in observed:
+                argv = record["terminal_bench_command"]
+                if secret and secret in argv:
+                    raise RunError("refusing to put the API key on a command line.", 1)
+                arm_output = output / record["arm"]
+                arm_output.mkdir(parents=True, exist_ok=True)
+                completed = runner(argv, args.terminal_bench_checkout, env, settings["terminal_bench"]["wall_clock_sec"])
+                apply_harness_marker(record, arm_output)
+                record["harness_exit_code"] = completed.returncode
+                exits.append(completed.returncode)
+                (arm_output / "stdout.txt").write_text(_clip(completed.stdout or "", secret), encoding="utf-8")
+                (arm_output / "stderr.txt").write_text(_clip(completed.stderr or "", secret), encoding="utf-8")
+            treated = _aic_record(observed)
+            receipt = {
+                "arms": observed,
+                "aic_treatment": treated["aic_treatment"],
+                "budget": dict(registry["budget"]),
+                "evaluation_aic_treatment": treated["harness_loaded_aic"],
+                "executed": all(code == 0 for code in exits),
+                "exit_codes": exits,
+                "harness_loaded_aic": treated["harness_loaded_aic"],
+                "model": settings["model"],
+                "network": suite_network(),
+                "public_benchmark_scores": None,
+                "revision": settings["terminal_bench"]["revision"],
+                "sandbox": "container",
+                "score_includes_treatment": False,
+                "seed": settings["seed"],
+                "seed_sent_to_provider": False,
+            }
+            _write_json(bundle / "receipts" / "terminal-bench.json", receipt)
+            if not receipt["executed"]:
+                failed = True
         if args.swe_bench_lite:
-            if args.swe_bench_lite_predictions is None:
-                raise RunError("swe-bench-lite requires a pinned checkout and a predictions file.", 3)
-            _require_revision(
-                args.swe_bench_lite_checkout, settings["swe_bench_lite"]["revision"], reader,
-                "swe-bench-lite requires a pinned checkout and a predictions file.",
-            )
-            _prediction_ids(args.swe_bench_lite_predictions, settings["swe_bench_lite"]["max_predictions"])
-    except RunError as exc:
-        _write_json(bundle / "receipts" / "blocked.json", {
-            "executed": False,
-            "stopped_before_model": True,
-            "public_benchmark_scores": None,
-            "reason": str(exc),
-        })
-        raise
-    (bundle / "raw").mkdir()
-    compare_argv = [
-        "--model", settings["model"],
-        "--output", str(bundle / "raw" / "routing"),
-        "--pack", str(pack_path),
-        "--max-tokens", str(settings["max_tokens"]),
-        "--seed", str(settings["seed"]),
-        "--temperature", str(settings["temperature"]),
-        "--timeout", "60",
-    ]
-    if secret and secret in compare_argv:
-        raise RunError("refusing to put the API key on a command line.", 1)
-    compare_call = compare_runner or compare_main
-    captured = StringIO()
-    with redirect_stdout(captured):
-        compare_code = compare_call(compare_argv, client=client, environ=os.environ)
-    (bundle / "raw" / "routing-stdout.txt").write_text(_clip(captured.getvalue(), secret), encoding="utf-8")
-    if compare_code != 0:
-        return compare_code
-    aicbench_call = aicbench_runner or aicbench_main
-    aicbench_argv = [
-        "--sandbox", "container",
-        "--official",
-        "--model", settings["model"],
-        "--output", str(bundle / "receipts" / "aicbench.json"),
-    ]
-    if secret and secret in aicbench_argv:
-        raise RunError("refusing to put the API key on a command line.", 1)
-    aicbench_code = aicbench_call(aicbench_argv, environ=os.environ)
-    if aicbench_code != 0:
-        return aicbench_code
-    if args.baselines:
-        baseline_argv = baseline_live_argv(settings, bundle / "receipts" / "baselines.json")
-        if secret and secret in baseline_argv:
-            raise RunError("refusing to put the API key on a command line.", 1)
-        baseline_call = baseline_runner or baselines_main
-        baseline_code = baseline_call(baseline_argv, environ=os.environ)
-        if baseline_code != 0:
-            return baseline_code
-    runner = harness_runner or _harness
-    run_id = f"aic-{day}-{sha[:12]}"
-    if args.terminal_bench:
-        output = bundle / "raw" / "terminal-bench"
-        output.mkdir(parents=True)
-        argv = _terminal_argv(settings, output, run_id)
-        if secret and secret in argv:
-            raise RunError("refusing to put the API key on a command line.", 1)
-        env = dict(os.environ)
-        env["PYTHONPATH"] = str(args.terminal_bench_checkout) + os.pathsep + env.get("PYTHONPATH", "")
-        completed = runner(argv, args.terminal_bench_checkout, env, settings["terminal_bench"]["wall_clock_sec"])
-        receipt = {
-            "executed": completed.returncode == 0,
-            "exit_code": completed.returncode,
-            "aic_treatment": False,
-            "public_benchmark_scores": None,
-            "command": argv,
-            "revision": settings["terminal_bench"]["revision"],
-        }
-        _write_json(bundle / "receipts" / "terminal-bench.json", receipt)
-        (output / "stdout.txt").write_text(_clip(completed.stdout or "", secret), encoding="utf-8")
-        (output / "stderr.txt").write_text(_clip(completed.stderr or "", secret), encoding="utf-8")
-        if completed.returncode != 0:
+            if runtime is None or suite is None:
+                raise RunError("official suite results refuse to run without the egress proxy.", 1)
+            predictions = args.swe_bench_lite_predictions
+            ids = _prediction_ids(predictions, settings["swe_bench_lite"]["max_predictions"])
+            argv = _swe_argv(settings, predictions, ids, run_id)
+            if secret and secret in argv:
+                raise RunError("refusing to put the API key on a command line.", 1)
+            output = bundle / "raw" / "swe-bench-lite"
+            output.mkdir(parents=True, exist_ok=True)
+            if len(suite.arms) != len(observed):
+                raise RunError("SWE-bench Lite arms did not match the official set.", 1)
+            agent_codes = []
+            try:
+                for arm, record in zip(suite.arms, observed):
+                    workspace = suite.root / arm["id"] / "agent-work"
+                    config = suite.root / arm["id"] / "config"
+                    skill = Path(arm["mount_path"]) if arm["mount"] == "plugin-dir" else None
+                    try:
+                        completed_arm = run_official_arm(
+                            runtime,
+                            record["swe_bench_command"],
+                            key=secret,
+                            workspace=workspace,
+                            home=Path(arm["home"]),
+                            config=config,
+                            skill_root=skill,
+                            timeout=int(registry["budget"]["timeout_sec"]),
+                            seed=int(registry["seed"]),
+                        )
+                    except subprocess.TimeoutExpired:
+                        completed_arm = subprocess.CompletedProcess(record["swe_bench_command"], 124, "", "wall clock exceeded")
+                    agent_codes.append(completed_arm.returncode)
+                    arm_dir = output / "arms" / record["arm"]
+                    arm_dir.mkdir(parents=True, exist_ok=True)
+                    (arm_dir / "stdout.txt").write_text(_clip(completed_arm.stdout or "", secret), encoding="utf-8")
+                    (arm_dir / "stderr.txt").write_text(_clip(completed_arm.stderr or "", secret), encoding="utf-8")
+            except (AdapterError, ContractError) as exc:
+                code = exc.code if isinstance(exc, AdapterError) else 2
+                raise RunError(str(exc), code) from exc
+            try:
+                env = harness_env(dict(os.environ), {}, secret)
+            except AdapterError as exc:
+                raise RunError(str(exc), exc.code) from exc
+            env["PYTHONPATH"] = str(args.swe_bench_lite_checkout) + os.pathsep + env.get("PYTHONPATH", "")
+            completed = runner(argv, args.swe_bench_lite_checkout, env, settings["swe_bench_lite"]["wall_clock_sec"])
+            treated = _aic_record(observed)
+            receipt = {
+                "arms": observed,
+                "aic_treatment": treated["aic_treatment"],
+                "budget": dict(registry["budget"]),
+                "evaluation_aic_treatment": False,
+                "agent_exit_codes": agent_codes,
+                "evaluation_command": argv,
+                "executed": completed.returncode == 0 and all(code == 0 for code in agent_codes),
+                "exit_code": completed.returncode,
+                "harness_loaded_aic": False,
+                "instance_count": len(ids),
+                "model": settings["model"],
+                "network": suite_network(),
+                "note": (
+                    "Each official arm ran through the agent-phase egress proxy under the shared max_usd stop. "
+                    "The pinned harness then scores a predictions file. That evaluation command does not load a plugin. "
+                    "aic_treatment on an arm is the observer that read that arm's mount."
+                ),
+                "public_benchmark_scores": None,
+                "sandbox": "container",
+                "revision": settings["swe_bench_lite"]["revision"],
+                "score_includes_treatment": False,
+                "seed": settings["seed"],
+                "seed_sent_to_provider": False,
+            }
+            _write_json(bundle / "receipts" / "swe-bench-lite.json", receipt)
+            (output / "stdout.txt").write_text(_clip(completed.stdout or "", secret), encoding="utf-8")
+            (output / "stderr.txt").write_text(_clip(completed.stderr or "", secret), encoding="utf-8")
+            if completed.returncode != 0 or any(code != 0 for code in agent_codes):
+                failed = True
+        if failed:
             return 1
-    if args.swe_bench_lite:
-        predictions = args.swe_bench_lite_predictions
-        ids = _prediction_ids(predictions, settings["swe_bench_lite"]["max_predictions"])
-        argv = _swe_argv(settings, predictions, ids, run_id)
-        if secret and secret in argv:
-            raise RunError("refusing to put the API key on a command line.", 1)
-        output = bundle / "raw" / "swe-bench-lite"
-        output.mkdir(parents=True)
-        env = dict(os.environ)
-        env["PYTHONPATH"] = str(args.swe_bench_lite_checkout) + os.pathsep + env.get("PYTHONPATH", "")
-        completed = runner(argv, args.swe_bench_lite_checkout, env, settings["swe_bench_lite"]["wall_clock_sec"])
-        receipt = {
-            "executed": completed.returncode == 0,
-            "exit_code": completed.returncode,
-            "aic_treatment": False,
-            "instance_count": len(ids),
-            "public_benchmark_scores": None,
-            "command": argv,
-            "revision": settings["swe_bench_lite"]["revision"],
-        }
-        _write_json(bundle / "receipts" / "swe-bench-lite.json", receipt)
-        (output / "stdout.txt").write_text(_clip(completed.stdout or "", secret), encoding="utf-8")
-        (output / "stderr.txt").write_text(_clip(completed.stderr or "", secret), encoding="utf-8")
-        if completed.returncode != 0:
-            return 1
-    provenance["completed"] = True
-    (bundle / "provenance.json").write_text(
-        json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8",
-    )
-    return 0
+        provenance["completed"] = True
+        (bundle / "provenance.json").write_text(
+            json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8",
+        )
+        return 0
+    finally:
+        if runtime is not None:
+            runtime.close()
+        if runtime_dir is not None:
+            shutil.rmtree(runtime_dir, ignore_errors=True)
+        if suite is not None:
+            suite.close()
 
 
 def main(
@@ -561,6 +709,8 @@ def main(
     compare_runner=None,
     aicbench_runner=None,
     baseline_runner=None,
+    arm_preparer=None,
+    suite_runtime_factory=None,
 ) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -574,6 +724,8 @@ def main(
             compare_runner=compare_runner,
             aicbench_runner=aicbench_runner,
             baseline_runner=baseline_runner,
+            arm_preparer=arm_preparer,
+            suite_runtime_factory=suite_runtime_factory,
         )
     except (RunError, ScoreError) as exc:
         print(str(exc), file=sys.stderr)

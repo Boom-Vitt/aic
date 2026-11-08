@@ -17,7 +17,7 @@
       "url": "https://github.com/SWE-bench/SWE-bench",
       "revision_observed": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
       "license_observed": "MIT on the SWE-bench software repository via the GitHub license API. Dataset rows and SWE-bench Verified are not included here and need their own terms check before use.",
-      "blocked": "Not run. A scale run needs a local checkout at one pinned revision, the suite's own evaluator, Docker where the suite requires it, and the operator's model CLI under one shared model, budget, and seed."
+      "blocked": "Not run. The adapter can load the official arms under the shared budget, including max_usd 0.35. No model run is in the score history. A scale run still needs a local checkout at the pinned revision, the suite evaluator, and ANTHROPIC_API_KEY."
     },
     {
       "id": "swe-bench-verified",
@@ -37,7 +37,7 @@
       "url": "https://github.com/laude-institute/terminal-bench",
       "revision_observed": "d28711d0da2675d0bb1d56de45ae5df6082438a3",
       "license_observed": "Apache-2.0 on laude-institute/terminal-bench via the GitHub license API at that revision. Individual tasks can carry extra notices. None are vendored here.",
-      "blocked": "Not run. A scale run needs that pinned checkout, its evaluator, and the same model, budget, and seed as the other arms."
+      "blocked": "Not run. The adapter can load the official arms under the shared budget, including max_usd 0.35. No model run is in the score history. A scale run still needs that pinned checkout, its evaluator, and ANTHROPIC_API_KEY."
     },
     {
       "id": "aider-polyglot",
