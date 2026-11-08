@@ -24,24 +24,28 @@ Landed on `main` through [#31](https://github.com/Boom-Vitt/aic/pull/31) (`79093
 | `scripts/run-benchmarks.sh` and manual `benchmarks.yml` | [#30](https://github.com/Boom-Vitt/aic/pull/30) |
 | Vulnerability stewardship | [#31](https://github.com/Boom-Vitt/aic/pull/31) |
 
+The shared dollar stop and the suite arm wiring are in the working tree that contains this file. They are not a score.
+
+- `benchmarks/baselines/registry.json` sets `max_usd` to `0.35` for every arm. `max_turns` stays 30 and `timeout_sec` stays 600. The stop prices 30 × 600 input tokens and 30 × 1024 output tokens at the pinned Claude Sonnet 5.5 rates (2 USD and 10 USD per million). The exact product is 0.3432 USD. The sent cap rounds that up to the next cent. It is a stop rule, not a predicted cost. Official comparisons refuse a null cap.
+- The pinned Terminal-Bench adapter (`d28711d0da2675d0bb1d56de45ae5df6082438a3`) and the SWE-bench Lite adapter (`02e7a74ffd0b707aab73d203fe87bdc7c76afc8e`) load `plain-claude-code`, `aic`, `ecc`, `agent-skills`, `planning-with-files`, and `gstack` under that model, budget, and seed. `superpowers` stays `unverified-install` and out of the comparison.
+- `python3 -m benchmarks.suite_arms stub` is the key-free proof. It does not call a model and does not fetch third-party trees. No score-history row was added.
+
 `docs/BENCHMARKS.md` still lists SWE-bench Lite, SWE-bench Verified, Terminal-Bench, and Aider polyglot as not run. Routing label matches inside a results bundle are not copied into the table below.
 
 ## Blocked
 
 - No `ANTHROPIC_API_KEY` repository secret, and no signed-in Claude Code in CI or in this cloud environment. A missing key exits 3. Nothing in that path is a score.
 - SWE-bench Lite and Verified, Terminal-Bench, and Aider polyglot have not been run. Aider's exercises are not licensed for copying into this tree. See `docs/BENCHMARKS.md`.
-- The Terminal-Bench and SWE-bench flags on `./scripts/run-benchmarks.sh` still record `aic_treatment` false. They do not load AIC or the other registered plugins inside those harnesses.
-- Registered comparable repositories are pinned and wired. They have not been fetched or scored in a model run.
+- Terminal-Bench and SWE-bench Lite have not been scored. `./scripts/run-benchmarks.sh --terminal-bench` and `--swe-bench-lite` now load the official arms under one model, one budget, and one seed. `aic_treatment` is true only when a process actually read the AIC plugin for the `aic` arm. It stays false for `plain-claude-code` and for the other plugins. `harness_loaded_aic` stays false until that run writes `arm-load.json`. The SWE-bench evaluation step scores a predictions file and does not load a plugin (`evaluation_aic_treatment` false). `public_benchmark_scores` stays null. The key-free stub is not a model run.
+- Registered comparable repositories are pinned and wired. They have not been fetched or scored in a model run. The suite stub uses local stand-ins for the git arms and does not fetch them.
 - Official aicbench numbers still require `--sandbox container`. Official baseline results also refuse sandbox `none` and refuse to run without the egress proxy. The baseline stub proof uses sandbox `none` on purpose, so the stub can read the reference solution. That report stays unofficial. `superpowers` is an unverified install and is excluded from official comparisons.
 
 ## Next
 
 1. Add `ANTHROPIC_API_KEY` as a repository secret. Run `./scripts/run-benchmarks.sh --baselines` (or dispatch `.github/workflows/benchmarks.yml` with `baselines` true). Append one score-history row per arm from that bundle only. Link the raw `results/` tree. Leave the row out if the model did not run.
-2. Set one shared `max_usd` in `benchmarks/baselines/registry.json` before any wider task list. The current budget sends no dollar cap. `max_turns` is 30 and `timeout_sec` is 600 for every arm.
-3. Load the same arms inside the pinned Terminal-Bench and SWE-bench Lite adapters, under the same model, budget, and seed. Until that lands, those receipts stay `aic_treatment: false`.
-4. Leave Aider polyglot unwired until each Exercism track's terms are reviewed. Do not copy the exercises.
-5. Keep `benchmarks/routing/heldout-v2.json` sealed. Score it once per release. Do not tune on it.
-6. Do not promote AIC on a benchmark claim before a real run is in the score history.
+2. Leave Aider polyglot unwired until each Exercism track's terms are reviewed. Do not copy the exercises.
+3. Keep `benchmarks/routing/heldout-v2.json` sealed. Score it once per release. Do not tune on it.
+4. Do not promote AIC on a benchmark claim before a real run is in the score history.
 
 ## Baselines
 

@@ -1,6 +1,8 @@
 # Terminal-Bench adapter
 
-This adapter runs [Terminal-Bench](https://github.com/harbor-framework/terminal-bench) through [Harbor](https://github.com/harbor-framework/harbor) on two Claude Code configurations and writes one JSON receipt:
+This file's Harbor adapter runs [Terminal-Bench](https://github.com/harbor-framework/terminal-bench) through [Harbor](https://github.com/harbor-framework/harbor) on two Claude Code configurations and writes one JSON receipt. That pin is not the laude-institute revision used by `./scripts/run-benchmarks.sh --terminal-bench`. The official-arm comparison for revision `d28711d0da2675d0bb1d56de45ae5df6082438a3` lives in `benchmarks/suite_arms.py` and `benchmarks/terminal_bench/claude_agent.py`. It loads the registry arms under the shared budget. `python3 -m benchmarks.suite_arms stub` proves that wiring without a key. It is not a Terminal-Bench score.
+
+The Harbor adapter below still compares two configurations:
 
 - **baseline:** plain Claude Code, with no AIC skill and no AIC plugin
 - **aic:** Claude Code with the AIC plugin manifest and the portable AIC skill

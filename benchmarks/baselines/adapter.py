@@ -35,6 +35,7 @@ from benchmarks.aicbench.grading import (
 )
 from benchmarks.aicbench.metrics import cost_from_payload, cost_text
 from benchmarks.aicbench.sandbox import container_command
+from benchmarks.budget import ALLOWED_TOOLS, BudgetError, format_max_usd, shared_stop
 from benchmarks.baselines.proxy import (
     PROXY_PORT,
     PROXY_URL,
@@ -57,7 +58,6 @@ _HEX = re.compile(r"[0-9a-f]{64}\Z")
 _MOUNTS = frozenset({"none", "plugin-dir", "installed"})
 _INSTALL_STATUSES = frozenset({"none", "documented", "unverified-install"})
 _CHECKOUT = "{checkout}"
-_ALLOWED_TOOLS = "Read,Edit,Write,Bash,AskUserQuestion"
 _SYSTEM_PREFIXES = ("/usr/", "/lib/", "/lib64/", "/bin/", "/sbin/")
 _SHIPPED_FILES = (
     ".claude-plugin/plugin.json",
@@ -253,8 +253,13 @@ def validate_registry(data: dict) -> dict:
         raise AdapterError("baseline turn and timeout limits must be integers.", 2)
     if not 1 <= turns <= 100 or not 1 <= timeout <= 7200:
         raise AdapterError("baseline budget is outside the allowed range.", 2)
-    if spend is not None and (isinstance(spend, bool) or not isinstance(spend, (int, float)) or spend < 0):
-        raise AdapterError("baseline max_usd must be null or a non-negative number.", 2)
+    try:
+        format_max_usd(spend)
+    except BudgetError as exc:
+        raise AdapterError(
+            "baseline max_usd must be a positive number of cents. Official comparisons do not accept a null dollar cap.",
+            2,
+        ) from exc
     arms = data.get("arms")
     if not isinstance(arms, list) or len(arms) < 2:
         raise AdapterError("baseline registry needs the plain arm, AIC, and any comparables.", 2)
@@ -298,6 +303,16 @@ def _assert_pinned(registry: dict, root: Path = ROOT) -> None:
     settings = load_json(root / "benchmarks" / "pinned.json")
     if registry["model"] != settings.get("model") or registry["seed"] != settings.get("seed"):
         raise AdapterError("baseline registry model and seed must match benchmarks/pinned.json.", 2)
+    try:
+        expected = shared_stop(settings, registry["budget"])["max_usd"]
+        observed = format_max_usd(registry["budget"]["max_usd"])
+    except BudgetError as exc:
+        raise AdapterError(str(exc), 2) from exc
+    if observed != expected:
+        raise AdapterError(
+            f"baseline max_usd must be the shared stop {expected}. Official comparisons do not accept a null dollar cap.",
+            2,
+        )
 
 
 def git_fetch_commands(repository: str, commit: str, dest: Path) -> list[list[str]]:
@@ -593,11 +608,16 @@ def agent_argv(
     prompt: str,
     model: str,
     max_turns: int,
+    max_usd: object,
     mount: str,
     mount_path: Path | None,
 ) -> list[str]:
     if "\x00" in prompt or "\x00" in binary or "\x00" in model:
         raise AdapterError("refusing a NUL in the agent command.", 2)
+    try:
+        spend = format_max_usd(max_usd)
+    except BudgetError as exc:
+        raise AdapterError(str(exc), 2) from exc
     argv = [
         binary,
         "--bare",
@@ -610,9 +630,11 @@ def agent_argv(
         "--permission-prompts",
         "none",
         "--allowedTools",
-        _ALLOWED_TOOLS,
+        ALLOWED_TOOLS,
         "--max-turns",
         str(max_turns),
+        "--max-budget-usd",
+        spend,
         "--no-session-persistence",
         "--model",
         model,
@@ -1129,13 +1151,16 @@ def execute_arms(
                         prompt=prompt,
                         model=registry["model"],
                         max_turns=registry["budget"]["max_turns"],
+                        max_usd=registry["budget"]["max_usd"],
                         mount=mount,
                         mount_path=None if mount == "installed" else mount_path,
                     )
                     if key and key in argv:
                         raise AdapterError("refusing to put the API key on a command line.", 1)
-                    if _ALLOWED_TOOLS not in argv:
+                    if ALLOWED_TOOLS not in argv:
                         raise AdapterError("agent command dropped the shared tool list.", 1)
+                    if "--max-budget-usd" not in argv:
+                        raise AdapterError("agent command dropped the shared dollar cap.", 1)
                     env = _child_env(
                         parent_env,
                         task=task,
@@ -1209,6 +1234,8 @@ def execute_arms(
                         harness_error = harness_error or "stub did not observe the shared model and seed."
                     if payload.get("max_turns") != str(registry["budget"]["max_turns"]):
                         harness_error = harness_error or "stub did not observe the shared turn budget."
+                    if payload.get("max_budget_usd") != format_max_usd(registry["budget"]["max_usd"]):
+                        harness_error = harness_error or "stub did not observe the shared dollar cap."
                     if payload.get("task_id") != task.id:
                         harness_error = harness_error or "stub did not observe the task id."
                 try:

@@ -16,6 +16,9 @@ import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
+from benchmarks.aicbench.grading import outside_repository_temp
+from benchmarks.baselines.adapter import load_registry, stage_shipped_plugin
+from benchmarks.budget import format_max_usd
 from benchmarks.swe_bench.constants import (
     AIC_CONDITION,
     CHECKED_ON,
@@ -64,6 +67,8 @@ _SIDECAR_LIMIT = 100_000
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
+    budget = load_registry()["budget"]
+    spend = format_max_usd(budget["max_usd"])
     parser = argparse.ArgumentParser(
         prog="python -m benchmarks.swe_bench",
         description=(
@@ -77,14 +82,20 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--condition", choices=("both", "baseline", "aic"), default="both")
     parser.add_argument("--score-only", action="store_true", help="Score predictions.jsonl files already in the output directory.")
     parser.add_argument("--max-workers", type=int, default=1)
-    parser.add_argument("--max-turns", type=int, default=30)
-    parser.add_argument("--instance-timeout", type=int, default=1800)
+    parser.add_argument("--max-turns", type=int, default=budget["max_turns"])
+    parser.add_argument("--instance-timeout", type=int, default=budget["timeout_sec"])
     parser.add_argument("--score-timeout", type=int, default=86400)
-    parser.add_argument("--max-budget-usd")
+    parser.add_argument("--max-budget-usd", default=spend)
     parser.add_argument("--model", help="Claude Code model id. Omit to use the CLI default.")
     args = parser.parse_args(argv)
     if min(args.max_workers, args.max_turns, args.instance_timeout, args.score_timeout) < 1:
         parser.error("Worker, turn, and timeout limits must be positive integers.")
+    if (
+        args.max_turns != budget["max_turns"]
+        or args.instance_timeout != budget["timeout_sec"]
+        or args.max_budget_usd != spend
+    ):
+        parser.error("SWE-bench Lite must use the shared baseline budget. Official comparisons do not accept a null dollar cap.")
     try:
         conditions_for(args.condition)
         reject_score_only_smoke(args.score_only, args.smoke)
@@ -172,23 +183,27 @@ def execute_run(args: argparse.Namespace, env: Mapping[str, str]) -> int:
     metadata = base_metadata(args, chosen, selected)
     write_json(output / "run.json", metadata)
     failures = 0
-    for condition in selected:
-        failures += generate_condition(
-            condition,
-            chosen,
-            output,
-            cache,
-            env,
-            key,
-            plugin_dir=REPO_ROOT if condition == AIC_CONDITION else None,
-            model=args.model,
-            max_turns=args.max_turns,
-            max_budget_usd=args.max_budget_usd,
-            timeout=args.instance_timeout,
-        )
+    plugin_root = None
     metadata["status"] = "failed"
     code = 1
     try:
+        if AIC_CONDITION in selected:
+            plugin_root = Path(tempfile.mkdtemp(prefix="aic-swe-plugin-", dir=outside_repository_temp()))
+            stage_shipped_plugin(plugin_root)
+        for condition in selected:
+            failures += generate_condition(
+                condition,
+                chosen,
+                output,
+                cache,
+                env,
+                key,
+                plugin_dir=plugin_root if condition == AIC_CONDITION else None,
+                model=args.model,
+                max_turns=args.max_turns,
+                max_budget_usd=args.max_budget_usd,
+                timeout=args.instance_timeout,
+            )
         codes = score_conditions(
             args,
             env,
@@ -204,6 +219,8 @@ def execute_run(args: argparse.Namespace, env: Mapping[str, str]) -> int:
         metadata["official_reports"] = report_index(output, selected)
         return code
     finally:
+        if plugin_root is not None:
+            shutil.rmtree(plugin_root, ignore_errors=True)
         write_json(output / "run.json", metadata)
 
 
