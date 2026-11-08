@@ -57,6 +57,43 @@ For explicitly authorized measured optimization under `adaptive-controller`, add
 
 Optional [tmux 3.8 supervision](supervision.md) with the original [task-local profile](../assets/tmux.conf) can expose approved terminal process state; native OMP children use Agent Hub (`Alt+A`, tree `t`) when available. Keep the task/owner/dependency/blocker/evidence/next-action board in existing artifacts. Process exit and detach/reattach do not prove acceptance or authorize unattended model work.
 
+## Vulnerability stewardship
+
+Treat security as part of the milestone that touches it, not a separate project. A milestone needs this step when it adds, changes or exposes a trust boundary:
+- authentication or authorization;
+- parsing untrusted input, files or paths;
+- network listeners or outbound requests;
+- payments, credits or quotas;
+- secrets and credentials;
+- permissions;
+- data deletion;
+- dependencies, lockfiles or container images.
+
+Scale the effort to the exposure. A small owner-held change uses the checklist in place. A consequential or public surface usually warrants an `independent-review` stage with clean, selected input, when an evaluator is available and approved. Otherwise, record that limit.
+
+1. **Map the boundary.** Read code and configuration read-only. Record:
+   - who can reach the surface;
+   - with which input;
+   - what it can read, change or spend.
+2. **Use existing checks first.** Run the project's own dependency audit, secret scan or static analysis when they exist and the run is approved. Do not install a new service, enable a hosted scanner or send source code elsewhere without approval.
+3. **Treat findings as hypotheses.** Scanner output, advisories, model findings and worker reports are leads. A finding is confirmed only by evidence:
+   - a source line plus a reachable path from untrusted input;
+   - a reproduced failing test;
+   - an advisory that matches the pinned version actually in use.
+4. **Prioritize by exploitability and exposure.** Rank reachable-from-untrusted-input, known-exploited, data-exposure and money-moving issues first, then the rest.
+5. **Fix test-first at the boundary, within scope.**
+   - Fix only inside the milestone's approved write scope and checks. Otherwise, report the item as confirmed but open.
+   - Write a failing test through the real route or entry point, then make the smallest root-cause fix.
+   - Rerun that test and the affected suite.
+   - Never "fix" by weakening a check, widening an allowlist, disabling a scanner or deleting the test.
+6. **Report each item with its status:** confirmed and fixed (with the test), confirmed but open, not reproduced, or not checked. Unverified items stay labeled as such.
+
+Boundaries:
+- Without explicit approval, do not rotate credentials, change permissions, upgrade dependencies beyond the approved target, or deploy.
+- Never test systems the user does not own or administer.
+- Keep exploit payloads, real secrets and customer data out of public issues, pull requests and logs. Use the project's private disclosure channel (for example its SECURITY.md).
+- Record reusable lessons as reviewed [memory](memory.md) notes without sensitive detail.
+
 ## Acceptance ledger and delivery
 
 For each original acceptance ID, link the delivered artifact/version to the check actually performed, observed result, evidence location and limits. A milestone may be passed while the project is partial. A project is passed only when all original acceptance is evidenced on the integrated deliverable and no required milestone/check remains incomplete.
