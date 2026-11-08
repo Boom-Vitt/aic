@@ -2,8 +2,10 @@
 
 The API key stays in the host agent phase, behind the egress proxy. The task
 container receives neither the key nor a copy of an installed third-party arm.
-Bash commands that the agent issues are forwarded only when the payload does
-not contain the key, and the container environment has no API key.
+Before any command is forwarded, the container is disconnected from every
+network that is not ``none`` or Docker-internal. Official runs refuse when
+that closed state cannot be read back from the container. A contiguous-key
+check remains only as defense in depth.
 """
 from __future__ import annotations
 
@@ -23,6 +25,9 @@ from benchmarks.suite_runtime import PROXY_REFUSAL, attach_suite_runtime, read_k
 
 
 _MAX_COPY = 1_000_000
+NETWORK_REFUSAL = (
+    "official suite results refuse to run while the task container has network egress."
+)
 _CONTAINER_ENV = {
     "HOME": "/root",
     "LANG": "C.UTF-8",
@@ -50,7 +55,7 @@ def contains_secret(path: Path, secret: str) -> bool:
 
 
 def dispatch_task_command(data: bytes, key: str, execute) -> bytes:
-    """Run a container command. A payload that contains the key is refused."""
+    """Forward a command. The contiguous-key check is not the network boundary."""
     if key and key.encode() in data:
         return b"refused\n"
     try:
@@ -168,13 +173,138 @@ def _outside(prefix: str) -> Path:
     return Path(tempfile.mkdtemp(prefix=prefix, dir=parent))
 
 
+def _network_mode(attrs: dict) -> str:
+    host = attrs.get("HostConfig")
+    if not isinstance(host, dict):
+        raise AdapterError(NETWORK_REFUSAL, 1)
+    mode = host.get("NetworkMode")
+    if not isinstance(mode, str):
+        raise AdapterError(NETWORK_REFUSAL, 1)
+    return mode
+
+
+def _attachments(attrs: dict) -> dict:
+    settings = attrs.get("NetworkSettings")
+    if not isinstance(settings, dict):
+        raise AdapterError(NETWORK_REFUSAL, 1)
+    networks = settings.get("Networks")
+    if networks is None:
+        return {}
+    if not isinstance(networks, dict):
+        raise AdapterError(NETWORK_REFUSAL, 1)
+    return networks
+
+
+def read_container_attrs(container) -> dict:
+    """Reload the container and return its live network settings."""
+    reload = getattr(container, "reload", None)
+    if not callable(reload):
+        raise AdapterError(NETWORK_REFUSAL, 1)
+    try:
+        reload()
+    except Exception as exc:
+        raise AdapterError(NETWORK_REFUSAL, 1) from exc
+    attrs = getattr(container, "attrs", None)
+    if not isinstance(attrs, dict):
+        raise AdapterError(NETWORK_REFUSAL, 1)
+    return attrs
+
+
+def _attachment_is_closed(container, name: str, info: object) -> bool:
+    """True for the none network and for a Docker-internal network with no external route."""
+    if name == "none":
+        return True
+    if isinstance(info, dict) and info.get("Internal") is True:
+        return True
+    checker = getattr(container, "network_is_internal", None)
+    if callable(checker):
+        try:
+            if checker(name) is True:
+                return True
+        except Exception:
+            return False
+    client = getattr(container, "client", None)
+    networks = getattr(client, "networks", None) if client is not None else None
+    getter = getattr(networks, "get", None) if networks is not None else None
+    if getter is None:
+        return False
+    try:
+        network = getter(name)
+        if hasattr(network, "reload"):
+            network.reload()
+        network_attrs = getattr(network, "attrs", None)
+    except Exception:
+        return False
+    return isinstance(network_attrs, dict) and network_attrs.get("Internal") is True
+
+
+def task_container_is_isolated(container) -> bool:
+    """True when host networking is off and every live attachment is none or internal.
+
+    ``HostConfig.NetworkMode`` stays at the value from container create, so an
+    empty ``NetworkSettings.Networks`` map is the live proof that a bridge is gone.
+    """
+    attrs = read_container_attrs(container)
+    mode = _network_mode(attrs)
+    if mode == "host" or mode.startswith("container:"):
+        return False
+    for name, info in _attachments(attrs).items():
+        if not _attachment_is_closed(container, name, info):
+            return False
+    return True
+
+
+def _disconnect(container, name: str, info: object) -> None:
+    custom = getattr(container, "disconnect_network", None)
+    if callable(custom):
+        custom(name, info if isinstance(info, dict) else {})
+        return
+    client = getattr(container, "client", None)
+    api = getattr(client, "api", None) if client is not None else None
+    ident = getattr(container, "id", None)
+    if api is None or not isinstance(ident, str) or not ident:
+        raise AdapterError(NETWORK_REFUSAL, 1)
+    net_id = info.get("NetworkID") if isinstance(info, dict) else None
+    target = net_id or name
+    try:
+        api.disconnect_container_from_network(ident, target, force=True)
+    except TypeError:
+        try:
+            api.disconnect_container_from_network(ident, target)
+        except Exception as exc:
+            raise AdapterError(NETWORK_REFUSAL, 1) from exc
+    except Exception as exc:
+        raise AdapterError(NETWORK_REFUSAL, 1) from exc
+
+
+def isolate_task_container(container) -> None:
+    """Drop external networks, then refuse unless the live settings are closed.
+
+    A task that still has a route out does not run in official mode.
+    """
+    attrs = read_container_attrs(container)
+    mode = _network_mode(attrs)
+    if mode == "host" or mode.startswith("container:"):
+        raise AdapterError(NETWORK_REFUSAL, 1)
+    for name, info in list(_attachments(attrs).items()):
+        if _attachment_is_closed(container, name, info):
+            continue
+        _disconnect(container, name, info)
+    if not task_container_is_isolated(container):
+        raise AdapterError(NETWORK_REFUSAL, 1)
+
+
 def container_execute(session, argv: list[str]) -> tuple[int, str, str]:
-    """Run argv in the task container. The environment has no API key."""
+    """Run argv in the task container after its network settings are verified closed."""
     env = dict(_CONTAINER_ENV)
     container = getattr(session, "container", None)
-    if container is not None and hasattr(container, "exec_run"):
+    if container is not None:
+        if not task_container_is_isolated(container):
+            raise AdapterError(NETWORK_REFUSAL, 1)
+        if not hasattr(container, "exec_run"):
+            raise AdapterError(NETWORK_REFUSAL, 1)
         result = container.exec_run(["/bin/bash", *argv], environment=env)
-        code = int(getattr(result, "exit_code", 1) or 0)
+        code = int(getattr(result, "exit_code", 0) or 0)
         output = getattr(result, "output", b"")
         text = output.decode("utf-8", "replace") if isinstance(output, bytes) else str(output or "")
         return code, text, ""
@@ -240,6 +370,9 @@ def execute_registry_phase(
         argv = shlex.split(command)
         if any(key in part for part in argv) or "agent-env.sh" in command:
             raise AdapterError("refusing to put the API key in the task command.", 1)
+        container = getattr(session, "container", None) if session is not None else None
+        if container is not None:
+            isolate_task_container(container)
         sock_path = bridge_dir / "bridge.sock"
         wrapper = write_bash_wrapper(wrapper_dir, sock_path)
         if key in wrapper.read_text(encoding="utf-8"):

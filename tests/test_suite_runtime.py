@@ -2,6 +2,7 @@
 
 These tests do not call a model, fetch a repository, or start Docker.
 """
+import base64
 from contextlib import redirect_stderr
 from io import StringIO
 import json
@@ -24,10 +25,14 @@ from benchmarks.suite_runtime import (
 )
 from benchmarks.swe_bench.live import generate_condition, main
 from benchmarks.terminal_bench.phases import (
+    NETWORK_REFUSAL,
     TaskBridge,
+    container_execute,
     contains_secret,
     dispatch_task_command,
     execute_registry_phase,
+    isolate_task_container,
+    task_container_is_isolated,
 )
 
 
@@ -341,6 +346,155 @@ class SuiteRuntimeTests(unittest.TestCase):
                 self.assertEqual(argv[argv.index("--max-budget-usd") + 1], "0.35")
                 self.assertNotIn("--plugin-dir", argv)
         self.assertEqual(failures, 0)
+
+
+class TaskContainer:
+    """In-memory docker container. Disconnect clears attachments and leaves the create-time mode."""
+
+    def __init__(self, mode="bridge", networks=None, internal=(), disconnects=True):
+        self.mode = mode
+        self.networks = {"bridge": {"NetworkID": "bridge-id"}} if networks is None else dict(networks)
+        self._internal = set(internal)
+        self.disconnects = disconnects
+        self.trace = []
+        self.execs = []
+
+    @property
+    def attrs(self):
+        return {
+            "HostConfig": {"NetworkMode": self.mode},
+            "NetworkSettings": {"Networks": {name: dict(info) for name, info in self.networks.items()}},
+        }
+
+    def reload(self):
+        self.trace.append("reload")
+
+    def network_is_internal(self, name):
+        return name in self._internal
+
+    def disconnect_network(self, name, info):
+        self.trace.append("disconnect")
+        if self.disconnects:
+            self.networks.pop(name, None)
+
+    def exec_run(self, argv, environment=None):
+        self.trace.append("exec")
+        self.execs.append({
+            "argv": list(argv),
+            "networks": set(self.networks),
+            "mode": self.mode,
+        })
+        return type("Result", (), {"exit_code": 0, "output": b"ok"})()
+
+
+class _NetSession:
+    def __init__(self, container):
+        self.container = container
+        self.commands = []
+
+    def copy_to_container(self, *args, **kwargs):
+        raise AssertionError("copied into the task container")
+
+
+class TaskNetworkTests(unittest.TestCase):
+    def setUp(self):
+        (ROOT / ".work").mkdir(exist_ok=True)
+        self.temp = tempfile.TemporaryDirectory(prefix="aic-task-net-", dir=outside_repository_temp())
+        self.addCleanup(self.temp.cleanup)
+        self.base = Path(self.temp.name)
+        self.key_file = self.base / "agent-key"
+        self.key_file.write_text(KEY, encoding="utf-8")
+        os.chmod(self.key_file, 0o600)
+
+    def _phase(self, container, runtime):
+        return execute_registry_phase(
+            instruction="Fix the task.",
+            model="claude-sonnet-5-5",
+            max_turns=30,
+            max_usd="0.35",
+            plugin_dir=None,
+            home_dir=None,
+            mount="none",
+            arm_id="plain-claude-code",
+            session=_NetSession(container),
+            environ={"AIC_SUITE_KEY_FILE": str(self.key_file)},
+            seed=0,
+            timeout=5,
+            runtime=runtime,
+        )
+
+    def test_official_runs_refuse_a_networked_task_container(self):
+        for container in (
+            TaskContainer(mode="host", networks={}),
+            TaskContainer(mode="container:other", networks={}),
+            TaskContainer(mode="lab", networks={"lab": {"NetworkID": "lab"}}, disconnects=False),
+            TaskContainer(disconnects=False),
+        ):
+            launched = []
+
+            class Runtime:
+                def run(self, argv, **kwargs):
+                    launched.append(list(argv))
+                    return subprocess.CompletedProcess(argv, 0, "", "")
+
+            with self.assertRaises(AdapterError) as caught:
+                self._phase(container, Runtime())
+            self.assertIn("network egress", str(caught.exception))
+            self.assertEqual(caught.exception.code, 1)
+            self.assertEqual(launched, [])
+            self.assertEqual(container.execs, [])
+            self.assertNotIn("exec", container.trace)
+
+    def test_forwarded_exec_waits_until_network_removal_is_verified(self):
+        container = TaskContainer(mode="bridge")
+        seen = {}
+
+        class Runtime:
+            def run(self, argv, **kwargs):
+                seen["networks"] = set(container.networks)
+                seen["trace"] = list(container.trace)
+                return subprocess.CompletedProcess(argv, 0, "", "")
+
+        self._phase(container, Runtime())
+        self.assertEqual(seen["networks"], set())
+        self.assertEqual(seen["trace"], ["reload", "disconnect", "reload"])
+        self.assertTrue(task_container_is_isolated(container))
+        session = _NetSession(container)
+        container_execute(session, ["-lc", "pwd"])
+        self.assertEqual(container.execs[0]["networks"], set())
+        self.assertLess(container.trace.index("disconnect"), container.trace.index("exec"))
+        self.assertEqual(container.trace[-1], "exec")
+        stale = TaskContainer(mode="bridge", networks={})
+        self.assertTrue(task_container_is_isolated(stale))
+        internal = TaskContainer(mode="lab", networks={"lab": {"NetworkID": "lab"}}, internal=("lab",))
+        isolate_task_container(internal)
+        self.assertNotIn("disconnect", internal.trace)
+        self.assertEqual(set(internal.networks), {"lab"})
+
+    def test_split_and_encoded_keys_do_not_reach_a_networked_container(self):
+        container = TaskContainer(disconnects=False)
+        session = _NetSession(container)
+        reached = []
+
+        def execute(argv):
+            reached.append(list(argv))
+            return container_execute(session, argv)
+
+        split = json.dumps(["-lc", KEY[:8], KEY[8:]]).encode()
+        encoded = base64.b64encode(KEY.encode()).decode()
+        wrapped = json.dumps(["-lc", encoded]).encode()
+        self.assertNotIn(KEY.encode(), split)
+        self.assertNotIn(KEY, encoded)
+        for payload in (split, wrapped):
+            with self.assertRaises(AdapterError) as caught:
+                dispatch_task_command(payload, KEY, execute)
+            self.assertEqual(str(caught.exception), NETWORK_REFUSAL)
+        self.assertEqual(len(reached), 2)
+        self.assertEqual(container.execs, [])
+        contiguous = dispatch_task_command(json.dumps(["-lc", KEY]).encode(), KEY, execute)
+        self.assertEqual(contiguous, b"refused\n")
+        self.assertEqual(len(reached), 2)
+        self.assertEqual(container.execs, [])
 
 
 if __name__ == "__main__":
