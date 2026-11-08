@@ -151,6 +151,26 @@ def _skill_stand_in(directory: str) -> bool:
     return "AIC baseline stub stand-in. Not upstream text." in text
 
 
+def _home_skill() -> tuple[bool, str | None]:
+    """Stand-in skill written into this arm's fresh HOME. Symlinks are ignored."""
+    home = os.environ.get("HOME", "")
+    if not home:
+        return False, None
+    root = Path(home) / ".claude" / "skills"
+    if root.is_symlink() or not root.is_dir():
+        return False, None
+    try:
+        children = sorted(root.iterdir())
+    except OSError:
+        return False, None
+    for path in children:
+        if path.is_symlink() or not path.is_dir():
+            continue
+        if _skill_stand_in(str(path)):
+            return True, path.name
+    return False, None
+
+
 def _baseline_stub() -> int:
     """Offline baseline adapter proof.
 
@@ -188,6 +208,7 @@ def _baseline_stub() -> int:
         skill_stand_in = _skill_stand_in(add_dirs[0])
         if not skill_stand_in:
             return _refuse("add-dir mount has no stand-in skill marker.")
+    home_skill, home_skill_name = _home_skill()
     prompt = next((arg for arg in sys.argv[1:] if arg.startswith("Task id:")), "")
     task_id = ""
     if prompt.startswith("Task id:"):
@@ -195,6 +216,8 @@ def _baseline_stub() -> int:
     payload = {
         "add_dir": add_dirs[0] if add_dirs else None,
         "api_key_visible": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()),
+        "home_skill": home_skill,
+        "home_skill_name": home_skill_name,
         "invokes_model": False,
         "max_turns": turns,
         "model": model,

@@ -187,7 +187,7 @@ def estimate_for(settings: dict, pack, *, terminal: bool, swe: bool, baselines: 
             "priced": False,
             "token_budget": None,
             "arms": _baseline_ids(),
-            "note": "A live run fetches each git arm at its pinned commit. A dry run does not fetch.",
+            "note": "A live run fetches each official git arm at its pinned commit inside the container sandbox. A dry run does not fetch. Unverified installs are excluded.",
         })
     return {
         "model": settings["model"],
@@ -335,6 +335,17 @@ def _swe_argv(settings: dict, predictions: Path, instance_ids: list[str], run_id
     ]
 
 
+def baseline_live_argv(settings: dict, output: Path) -> list[str]:
+    """Arguments for the live baseline CLI. --model must be one of them."""
+    return [
+        "live",
+        "--sandbox", "container",
+        "--model", settings["model"],
+        "--output", str(output),
+        "--task", "bugfix-ledger-signs",
+    ]
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="run-benchmarks")
     parser.add_argument("--routing-pack", choices=("dev", "heldout-v2"), default="dev")
@@ -475,12 +486,7 @@ def execute(
     if aicbench_code != 0:
         return aicbench_code
     if args.baselines:
-        baseline_argv = [
-            "live",
-            "--model", settings["model"],
-            "--output", str(bundle / "receipts" / "baselines.json"),
-            "--task", "bugfix-ledger-signs",
-        ]
+        baseline_argv = baseline_live_argv(settings, bundle / "receipts" / "baselines.json")
         if secret and secret in baseline_argv:
             raise RunError("refusing to put the API key on a command line.", 1)
         baseline_call = baseline_runner or baselines_main

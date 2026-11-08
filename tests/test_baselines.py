@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 import sys
@@ -35,14 +36,14 @@ PINS = {
         "22f0b463e7a5e579904dd6211a520321035526f7",
         "a37e0e9697144819e1d965176ac4ae5bc3fa02d11e7812036bbcadf6dafe2400",
         "Copyright (c) 2025 Jesse Vincent",
-        "plugin-dir",
+        "installed",
     ),
     "ecc": (
         "affaan-m/ECC",
         "d2ef2680594f9a17526a6e1a2e18b3d242c5d17b",
         "326146379f01bb137c0a5d3c54770c1aa31076705c8b88a7f6b26a460f6221b2",
         "Copyright (c) 2026 Affaan Mustafa",
-        "plugin-dir",
+        "installed",
     ),
     "agent-skills": (
         "addyosmani/agent-skills",
@@ -63,7 +64,7 @@ PINS = {
         "23f9d07ce9e802ac148a8a353228f201655fc5b8",
         "e56fbb5b3d95756f3fa1cfefa24732ec79f18ece1ad08a4e79e00df57e8b198c",
         "Copyright (c) 2026 Garry Tan",
-        "add-dir",
+        "installed",
     ),
 }
 KEY = "sk-ant-baseline-sentinel"
@@ -102,6 +103,18 @@ class RegistryTests(unittest.TestCase):
             self.assertEqual(entry["license_spdx"], "MIT")
             self.assertEqual(entry["mount"], mount)
             self.assertTrue(entry["fetches"])
+            self.assertIn(entry["install_status"], {"documented", "unverified-install"})
+            self.assertTrue(entry["install_commands"])
+            self.assertEqual(entry["official_comparison"], entry["install_status"] == "documented")
+        self.assertEqual(arms["superpowers"]["install_status"], "unverified-install")
+        self.assertEqual(arms["superpowers"]["install_commands"][0][:3], ["/plugin", "marketplace", "add"])
+        self.assertEqual(arms["ecc"]["install_commands"][0][:4], ["npx", "--yes", "ecc-universal@2.2.3", "setup"])
+        self.assertEqual(arms["gstack"]["install_commands"], [["./setup"]])
+        self.assertEqual(arms["aic"]["install_commands"], [["claude", "--plugin-dir", "{checkout}"]])
+        self.assertEqual(arms["agent-skills"]["install_commands"], [["claude", "--plugin-dir", "{checkout}"]])
+        self.assertEqual(arms["planning-with-files"]["install_commands"], [["claude", "--plugin-dir", "{checkout}"]])
+        self.assertEqual(arms["plain-claude-code"]["install_status"], "none")
+        self.assertEqual(arms["plain-claude-code"]["install_commands"], [])
         self.assertFalse((ROOT / "benchmarks" / "baselines" / "vendor").exists())
         self.assertEqual(list((ROOT / "benchmarks" / "baselines").rglob("LICENSE*")), [])
 
@@ -169,7 +182,7 @@ class RegistryTests(unittest.TestCase):
             self.assertTrue(all(command[0] == "git" for command in launched))
 
     def test_stand_in_is_not_upstream_text_and_stays_outside_the_repo(self):
-        entry = next(item for item in load_registry()["arms"] if item["id"] == "ecc")
+        entry = next(item for item in load_registry()["arms"] if item["id"] == "agent-skills")
         with self.assertRaises(AdapterError):
             assert_outside_repo(ROOT / "benchmarks" / "baselines" / "checkout")
         with tempfile.TemporaryDirectory(prefix="aic-baseline-standin-") as temporary:
@@ -182,10 +195,11 @@ class RegistryTests(unittest.TestCase):
             self.assertNotIn(entry["copyright_notice"], license_text)
             self.assertNotIn("Permission is hereby granted", license_text)
             manifest = json.loads((dest / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
-            self.assertEqual(manifest["name"], "ecc")
+            self.assertEqual(manifest["name"], "agent-skills")
             self.assertTrue(manifest["stub"])
 
     def test_plain_and_aic_commands_share_model_budget_and_seed_inputs(self):
+        mount = Path("/tmp/aic-baseline-shipped-plugin")
         plain = agent_argv(
             "claude", prompt="Task id: example\n", model="claude-sonnet-5-5", max_turns=30, mount="none", mount_path=None,
         )
@@ -195,14 +209,29 @@ class RegistryTests(unittest.TestCase):
             model="claude-sonnet-5-5",
             max_turns=30,
             mount="plugin-dir",
-            mount_path=ROOT,
+            mount_path=mount,
         )
+        installed = agent_argv(
+            "claude",
+            prompt="Task id: example\n",
+            model="claude-sonnet-5-5",
+            max_turns=30,
+            mount="installed",
+            mount_path=mount,
+        )
+        tools = "Read,Edit,Write,Bash,AskUserQuestion"
         self.assertEqual(plain[plain.index("--model") + 1], treated[treated.index("--model") + 1])
+        self.assertEqual(plain[plain.index("--allowedTools") + 1], tools)
+        self.assertEqual(treated[treated.index("--allowedTools") + 1], tools)
+        self.assertEqual(installed[installed.index("--allowedTools") + 1], tools)
         self.assertEqual(plain[plain.index("--max-turns") + 1], "30")
         self.assertNotIn("--plugin-dir", plain)
         self.assertNotIn("--add-dir", plain)
-        self.assertEqual(treated[treated.index("--plugin-dir") + 1], str(ROOT))
-        self.assertNotIn(KEY, plain + treated)
+        self.assertNotIn("--plugin-dir", installed)
+        self.assertNotIn("--add-dir", installed)
+        self.assertEqual(treated[treated.index("--plugin-dir") + 1], str(mount))
+        self.assertNotIn(str(ROOT), treated)
+        self.assertNotIn(KEY, plain + treated + installed)
 
 
 class StubProofTests(unittest.TestCase):
@@ -239,6 +268,9 @@ class StubProofTests(unittest.TestCase):
         self.assertEqual(report["budget"], BUDGET)
         self.assertEqual(report["sample_size"], 1)
         self.assertEqual(report["task"], "bugfix-ledger-signs")
+        self.assertEqual(report["sandbox"], "none")
+        self.assertFalse(report["official"])
+        self.assertIsNone(report["network"])
         registry = load_registry()
         self.assertEqual([item["arm"] for item in report["receipts"]], [item["id"] for item in registry["arms"]])
         prompts = set()
@@ -258,6 +290,9 @@ class StubProofTests(unittest.TestCase):
             self.assertEqual(receipt["license_spdx"], entry.get("license_spdx"))
             self.assertEqual(receipt["commit"], entry.get("commit"))
             self.assertEqual(receipt["repository"], entry.get("repository"))
+            self.assertEqual(receipt["sandbox"], "none")
+            self.assertFalse(receipt["sandboxed"])
+            self.assertEqual(receipt["install_status"], entry["install_status"])
             prompts.add(receipt["prompt_sha256"])
         self.assertEqual(len(prompts), 1)
         self.assertEqual(
@@ -355,6 +390,7 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(seen[0][0][0], "live")
         self.assertEqual(seen[0][0][seen[0][0].index("--model") + 1], "claude-sonnet-5-5")
+        self.assertEqual(seen[0][0][seen[0][0].index("--sandbox") + 1], "container")
         self.assertIn("receipts/baselines.json", seen[0][0][seen[0][0].index("--output") + 1])
         self.assertEqual(seen[0][1], KEY)
 
@@ -385,6 +421,204 @@ class CommandTests(unittest.TestCase):
             self.assertIn(f"`{arm_id}`", benchmarks)
             self.assertIn(PINS[arm_id][1], benchmarks)
         self.assertIn("Issue [#4](https://github.com/Boom-Vitt/aic/issues/4)", roadmap)
+        self.assertIn("Official baseline results refuse sandbox", benchmarks)
+        self.assertIn("unverified-install", benchmarks)
+        self.assertIn("api.anthropic.com:443", benchmarks)
+        self.assertIn("registry.npmjs.org:443", benchmarks)
+
+    def test_run_benchmarks_sh_model_flag_reaches_the_live_cli(self):
+        import benchmarks.baselines.adapter as adapter
+
+        seen = []
+
+        def baseline(argv, environ=None):
+            seen.append(list(argv))
+            code = adapter.main(list(argv), environ={"PATH": (environ or {}).get("PATH", "")})
+            self.assertEqual(code, 3)
+            return 0
+
+        code = self.runner.main(
+            ["--baselines"],
+            compare_runner=lambda *_args, **_kwargs: 0,
+            aicbench_runner=lambda *_args, **_kwargs: 0,
+            baseline_runner=baseline,
+            results_root=Path(self.temp.name),
+            today=date(2026, 11, 8),
+        )
+        self.assertEqual(code, 0, seen)
+        output = Path(seen[0][seen[0].index("--output") + 1])
+        self.assertEqual(seen[0], self.runner.baseline_live_argv({"model": "claude-sonnet-5-5"}, output))
+        direct = subprocess.run(
+            [sys.executable, "-m", "benchmarks.baselines", *self.runner.baseline_live_argv(
+                {"model": "claude-sonnet-5-5"}, Path(self.temp.name) / "live.json",
+            )],
+            cwd=ROOT,
+            env={"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(ROOT), "PYTHONDONTWRITEBYTECODE": "1"},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(direct.returncode, 3, direct.stderr)
+        self.assertIn("ANTHROPIC_API_KEY", direct.stderr)
+        self.assertNotIn("unrecognized arguments", direct.stderr)
+        refused = subprocess.run(
+            [sys.executable, "-m", "benchmarks.baselines", "live", "--sandbox", "none", "--model", "claude-sonnet-5-5"],
+            cwd=ROOT,
+            env={
+                "PATH": os.environ.get("PATH", ""),
+                "PYTHONPATH": str(ROOT),
+                "ANTHROPIC_API_KEY": KEY,
+                "PYTHONDONTWRITEBYTECODE": "1",
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(refused.returncode, 2, refused.stderr)
+        self.assertIn("official baseline results refuse sandbox none", refused.stderr)
+        self.assertFalse((Path(self.temp.name) / "live.json").exists())
+
+
+class MountClosureTests(unittest.TestCase):
+    def test_no_arm_mount_reaches_oracles_references_or_answers(self):
+        from benchmarks.aicbench.grading import outside_repository_temp
+        from benchmarks.aicbench.sandbox import container_command
+        from benchmarks.baselines.adapter import NETWORK, assert_mount_closed, stand_in_mount
+
+        binary = Path("/usr/bin/true")
+        if not binary.is_file():
+            binary = Path("/bin/true")
+        self.assertFalse(NETWORK["unshare_net"])
+        self.assertFalse(NETWORK["per_host_filter"])
+        self.assertIn("api.anthropic.com", NETWORK["reachable_destinations"])
+        self.assertIn("github.com", NETWORK["reachable_destinations"])
+        self.assertIn("registry.npmjs.org", NETWORK["reachable_destinations"])
+        self.assertNotIn("--unshare-net", NETWORK["unshare"])
+        forbidden = [
+            (ROOT / "benchmarks" / "aicbench" / "tasks").resolve(),
+            (ROOT / "benchmarks" / "routing" / "heldout-v2.json").resolve(),
+            (ROOT / "benchmarks" / "routing" / "heldout-v2-answers.json").resolve(),
+        ]
+        with tempfile.TemporaryDirectory(prefix="aic-mount-", dir=outside_repository_temp()) as temporary:
+            base = Path(temporary)
+            for entry in load_registry()["arms"]:
+                home = base / entry["id"] / "home"
+                config = base / entry["id"] / "config"
+                checkout = base / entry["id"] / "checkout"
+                workspace = base / entry["id"] / "workspace"
+                home.mkdir(parents=True)
+                config.mkdir()
+                workspace.mkdir()
+                mount, path = stand_in_mount(entry, checkout, home)
+                mounts = [home, workspace]
+                if path is not None:
+                    mounts.append(path)
+                if checkout.exists():
+                    mounts.append(checkout)
+                for candidate in mounts:
+                    assert_mount_closed(candidate)
+                    for child in candidate.rglob("*"):
+                        resolved = child.resolve()
+                        for banned in forbidden:
+                            self.assertFalse(
+                                resolved == banned or banned in resolved.parents,
+                                f"{entry['id']} mount reaches {banned}",
+                            )
+                        self.assertNotEqual(resolved, ROOT.resolve())
+                        self.assertNotIn(ROOT.resolve(), resolved.parents)
+                command = container_command(
+                    [str(binary), "--version"],
+                    workspace=workspace,
+                    skill_root=path if mount == "plugin-dir" else None,
+                    home=home,
+                    config=config,
+                    binary=binary,
+                    repo=ROOT,
+                )
+                blob = "\n".join(str(item) for item in command)
+                self.assertNotIn("--unshare-net", command)
+                self.assertNotIn(str(ROOT.resolve()), blob)
+                self.assertNotIn("heldout-v2-answers.json", blob)
+                self.assertNotIn(str(forbidden[0]), blob)
+                if entry["id"] == "aic":
+                    self.assertEqual(mount, "plugin-dir")
+                    self.assertNotEqual(path.resolve(), ROOT.resolve())
+                    names = {item.relative_to(path).as_posix() for item in path.rglob("*") if item.is_file()}
+                    self.assertIn("skills/aic/SKILL.md", names)
+                    self.assertIn(".claude-plugin/plugin.json", names)
+                    self.assertNotIn("benchmarks/routing/heldout-v2-answers.json", names)
+                    self.assertFalse(any(name.startswith("benchmarks/") or "/oracle/" in f"/{name}/" for name in names))
+                    self.assertFalse(any(name.split("/")[-2:] == ["reference", "orders.py"] for name in names))
+
+    @unittest.skipUnless(shutil.which("bwrap"), "bubblewrap is not installed")
+    def test_container_hides_the_repository_and_can_init_git(self):
+        from benchmarks.aicbench.grading import outside_repository_temp
+        from benchmarks.baselines.adapter import _require_bwrap, _run_in_container
+
+        class _Task:
+            reference = ROOT
+            remove = []
+
+        parent = {"PATH": os.environ.get("PATH", "")}
+        bwrap = _require_bwrap(parent)
+        oracle = next((ROOT / "benchmarks" / "aicbench" / "tasks").rglob("test_oracle.py"))
+        answers = ROOT / "benchmarks" / "routing" / "heldout-v2-answers.json"
+        host_home = Path.home()
+        with tempfile.TemporaryDirectory(prefix="aic-bwrap-", dir=outside_repository_temp()) as temporary:
+            base = Path(temporary)
+            home = base / "home"
+            config = base / "config"
+            scratch = base / "scratch"
+            workspace = base / "workspace"
+            for path in (home, config, scratch, workspace):
+                path.mkdir()
+            init = _run_in_container(
+                ["git", "init", str(scratch / "repo")],
+                workspace=scratch,
+                home=home,
+                config=config,
+                skill_root=None,
+                parent=parent,
+                timeout=30,
+                task=_Task(),
+                seed=0,
+                key=KEY,
+                bwrap=bwrap,
+            )
+            self.assertEqual(init.returncode, 0, init.stderr)
+            self.assertTrue((scratch / "repo" / ".git").is_dir())
+            probe = workspace / "probe.py"
+            probe.write_text(
+                "from pathlib import Path\n"
+                f"print(Path({str(oracle)!r}).is_file())\n"
+                f"print(Path({str(answers)!r}).is_file())\n"
+                f"print(Path({str(ROOT)!r}).exists())\n"
+                f"print(Path({str(host_home)!r}).exists())\n"
+                "import os\n"
+                "print(os.environ.get('HOME'))\n"
+                "print('ANTHROPIC_API_KEY' in os.environ)\n",
+                encoding="utf-8",
+            )
+            seen = _run_in_container(
+                ["python3", str(probe)],
+                workspace=workspace,
+                home=home,
+                config=config,
+                skill_root=None,
+                parent=parent,
+                timeout=30,
+                task=_Task(),
+                seed=0,
+                key=KEY,
+                bwrap=bwrap,
+            )
+            self.assertEqual(seen.returncode, 0, seen.stderr)
+            lines = [line.strip() for line in seen.stdout.splitlines()]
+            self.assertEqual(lines[:4], ["False", "False", "False", "False"])
+            self.assertEqual(lines[4], str(home))
+            self.assertEqual(lines[5], "True")
+            self.assertNotIn(KEY, init.args)
+            self.assertNotIn(KEY, seen.args)
 
 
 class ModeBitTests(unittest.TestCase):
