@@ -1,6 +1,8 @@
 # SWE-bench Lite: Claude Code and Claude Code plus AIC
 
-This directory runs one comparison. It asks Claude Code to repair [SWE-bench Lite](https://huggingface.co/datasets/SWE-bench/SWE-bench_Lite) instances, once as a baseline and once with the AIC plugin loaded, then scores both prediction files with the official SWE-bench harness at a pinned commit.
+This directory runs one comparison. It asks Claude Code to repair [SWE-bench Lite](https://huggingface.co/datasets/SWE-bench/SWE-bench_Lite) instances, once as a baseline and once with the AIC plugin loaded, then scores both prediction files with the official SWE-bench harness at a pinned commit. Claude runs only in the agent phase of the egress proxy, where the allow-list is `api.anthropic.com:443`. Git fetches for an instance use the install phase and do not receive the API key. The command refuses to start when bubblewrap or the proxy is missing.
+
+The official six-arm comparison is `./scripts/run-benchmarks.sh --swe-bench-lite`. That path runs `plain-claude-code`, `aic`, `ecc`, `agent-skills`, `planning-with-files`, and `gstack` through `run_official_arm` under the shared `max_usd` stop, then scores a predictions file. The evaluation command does not load a plugin. `superpowers` stays out. This directory's `--condition` flag still selects `baseline`, `aic`, or both.
 
 It does not ship a resolve rate. A completed run's only score is the harness `results.json` written under the output directory. The 10-instance smoke subset is a cheap check, not a leaderboard result and not a stratified sample.
 

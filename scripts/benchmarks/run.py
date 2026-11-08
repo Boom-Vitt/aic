@@ -17,6 +17,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 
@@ -34,6 +35,9 @@ from benchmarks.suite_arms import (
     official_entries,
     prepare_live_official_arms,
 )
+from benchmarks.suite_runtime import harness_env, open_suite_runtime, runtime_root, suite_network
+from benchmarks.swe_bench.contract import ContractError
+from benchmarks.swe_bench.live import run_official_arm
 from benchmarks.routing.baseline import load_catalog
 from benchmarks.routing.compare import _items, aic_system, main as compare_main, message_body, shared_system, skill_documents
 from benchmarks.routing.score import ScoreError, load_pack
@@ -410,6 +414,7 @@ def execute(
     aicbench_runner=None,
     baseline_runner=None,
     arm_preparer=None,
+    suite_runtime_factory=None,
 ) -> int:
     require_key()
     if args.terminal_bench_checkout and not args.terminal_bench:
@@ -461,6 +466,8 @@ def execute(
     reader = revision_reader or _checkout_sha
     suite = None
     observed: list[dict] = []
+    runtime = None
+    runtime_dir = None
     try:
         try:
             if args.terminal_bench:
@@ -478,6 +485,9 @@ def execute(
                 _prediction_ids(args.swe_bench_lite_predictions, settings["swe_bench_lite"]["max_predictions"])
             (bundle / "raw").mkdir(exist_ok=True)
             if args.terminal_bench or args.swe_bench_lite:
+                runtime_dir = runtime_root()
+                opener = suite_runtime_factory or open_suite_runtime
+                runtime = opener(dict(os.environ), runtime_dir)
                 prepare = arm_preparer or prepare_live_official_arms
                 suite = prepare(dict(os.environ))
                 observed = observe_arms(
@@ -549,10 +559,17 @@ def execute(
         registry = _registry()
         failed = False
         if args.terminal_bench:
+            if runtime is None:
+                raise RunError("official suite results refuse to run without the egress proxy.", 1)
             output = bundle / "raw" / "terminal-bench"
             output.mkdir(parents=True, exist_ok=True)
-            env = dict(os.environ)
+            try:
+                env = harness_env(dict(os.environ), runtime.child_env(), secret)
+            except AdapterError as exc:
+                raise RunError(str(exc), exc.code) from exc
             env["PYTHONPATH"] = str(args.terminal_bench_checkout) + os.pathsep + env.get("PYTHONPATH", "")
+            if secret and secret in env["PYTHONPATH"]:
+                raise RunError("refusing to put the API key on a command line.", 1)
             exits = []
             for record in observed:
                 argv = record["terminal_bench_command"]
@@ -576,8 +593,10 @@ def execute(
                 "exit_codes": exits,
                 "harness_loaded_aic": treated["harness_loaded_aic"],
                 "model": settings["model"],
+                "network": suite_network(),
                 "public_benchmark_scores": None,
                 "revision": settings["terminal_bench"]["revision"],
+                "sandbox": "container",
                 "score_includes_treatment": False,
                 "seed": settings["seed"],
                 "seed_sent_to_provider": False,
@@ -586,6 +605,8 @@ def execute(
             if not receipt["executed"]:
                 failed = True
         if args.swe_bench_lite:
+            if runtime is None or suite is None:
+                raise RunError("official suite results refuse to run without the egress proxy.", 1)
             predictions = args.swe_bench_lite_predictions
             ids = _prediction_ids(predictions, settings["swe_bench_lite"]["max_predictions"])
             argv = _swe_argv(settings, predictions, ids, run_id)
@@ -593,7 +614,40 @@ def execute(
                 raise RunError("refusing to put the API key on a command line.", 1)
             output = bundle / "raw" / "swe-bench-lite"
             output.mkdir(parents=True, exist_ok=True)
-            env = dict(os.environ)
+            if len(suite.arms) != len(observed):
+                raise RunError("SWE-bench Lite arms did not match the official set.", 1)
+            agent_codes = []
+            try:
+                for arm, record in zip(suite.arms, observed):
+                    workspace = suite.root / arm["id"] / "agent-work"
+                    config = suite.root / arm["id"] / "config"
+                    skill = Path(arm["mount_path"]) if arm["mount"] == "plugin-dir" else None
+                    try:
+                        completed_arm = run_official_arm(
+                            runtime,
+                            record["swe_bench_command"],
+                            key=secret,
+                            workspace=workspace,
+                            home=Path(arm["home"]),
+                            config=config,
+                            skill_root=skill,
+                            timeout=int(registry["budget"]["timeout_sec"]),
+                            seed=int(registry["seed"]),
+                        )
+                    except subprocess.TimeoutExpired:
+                        completed_arm = subprocess.CompletedProcess(record["swe_bench_command"], 124, "", "wall clock exceeded")
+                    agent_codes.append(completed_arm.returncode)
+                    arm_dir = output / "arms" / record["arm"]
+                    arm_dir.mkdir(parents=True, exist_ok=True)
+                    (arm_dir / "stdout.txt").write_text(_clip(completed_arm.stdout or "", secret), encoding="utf-8")
+                    (arm_dir / "stderr.txt").write_text(_clip(completed_arm.stderr or "", secret), encoding="utf-8")
+            except (AdapterError, ContractError) as exc:
+                code = exc.code if isinstance(exc, AdapterError) else 2
+                raise RunError(str(exc), code) from exc
+            try:
+                env = harness_env(dict(os.environ), {}, secret)
+            except AdapterError as exc:
+                raise RunError(str(exc), exc.code) from exc
             env["PYTHONPATH"] = str(args.swe_bench_lite_checkout) + os.pathsep + env.get("PYTHONPATH", "")
             completed = runner(argv, args.swe_bench_lite_checkout, env, settings["swe_bench_lite"]["wall_clock_sec"])
             treated = _aic_record(observed)
@@ -602,14 +656,21 @@ def execute(
                 "aic_treatment": treated["aic_treatment"],
                 "budget": dict(registry["budget"]),
                 "evaluation_aic_treatment": False,
+                "agent_exit_codes": agent_codes,
                 "evaluation_command": argv,
-                "executed": completed.returncode == 0,
+                "executed": completed.returncode == 0 and all(code == 0 for code in agent_codes),
                 "exit_code": completed.returncode,
                 "harness_loaded_aic": False,
                 "instance_count": len(ids),
                 "model": settings["model"],
-                "note": "The pinned harness scores a predictions file. It does not load a plugin. aic_treatment on an arm is the observer that read that arm's mount.",
+                "network": suite_network(),
+                "note": (
+                    "Each official arm ran through the agent-phase egress proxy under the shared max_usd stop. "
+                    "The pinned harness then scores a predictions file. That evaluation command does not load a plugin. "
+                    "aic_treatment on an arm is the observer that read that arm's mount."
+                ),
                 "public_benchmark_scores": None,
+                "sandbox": "container",
                 "revision": settings["swe_bench_lite"]["revision"],
                 "score_includes_treatment": False,
                 "seed": settings["seed"],
@@ -618,7 +679,7 @@ def execute(
             _write_json(bundle / "receipts" / "swe-bench-lite.json", receipt)
             (output / "stdout.txt").write_text(_clip(completed.stdout or "", secret), encoding="utf-8")
             (output / "stderr.txt").write_text(_clip(completed.stderr or "", secret), encoding="utf-8")
-            if completed.returncode != 0:
+            if completed.returncode != 0 or any(code != 0 for code in agent_codes):
                 failed = True
         if failed:
             return 1
@@ -628,6 +689,10 @@ def execute(
         )
         return 0
     finally:
+        if runtime is not None:
+            runtime.close()
+        if runtime_dir is not None:
+            shutil.rmtree(runtime_dir, ignore_errors=True)
         if suite is not None:
             suite.close()
 
@@ -645,6 +710,7 @@ def main(
     aicbench_runner=None,
     baseline_runner=None,
     arm_preparer=None,
+    suite_runtime_factory=None,
 ) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -659,6 +725,7 @@ def main(
             aicbench_runner=aicbench_runner,
             baseline_runner=baseline_runner,
             arm_preparer=arm_preparer,
+            suite_runtime_factory=suite_runtime_factory,
         )
     except (RunError, ScoreError) as exc:
         print(str(exc), file=sys.stderr)

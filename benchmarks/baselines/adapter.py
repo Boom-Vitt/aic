@@ -906,6 +906,9 @@ def _run_in_container(
     bwrap: str,
     phase: str,
     proxies: PhaseProxies,
+    extra_binds: tuple[tuple[str, str], ...] = (),
+    path_prefix: Path | None = None,
+    launch=None,
 ) -> subprocess.CompletedProcess:
     if proxies is None or phase not in {"install", "agent"}:
         raise AdapterError(_PROXY_REFUSAL, 1)
@@ -925,6 +928,9 @@ def _run_in_container(
     if skill_root is not None:
         assert_mount_closed(skill_root)
     proxy_dir = str(socket_path.parent.resolve())
+    binds = [(proxy_dir, proxy_dir)]
+    for source, dest in extra_binds:
+        binds.append((source, dest))
     try:
         command = container_command(
             inner,
@@ -935,7 +941,7 @@ def _run_in_container(
             binary=Path(python),
             repo=ROOT,
             unshare_net=True,
-            extra_binds=((proxy_dir, proxy_dir),),
+            extra_binds=tuple(binds),
             extra_ro_binds=_tool_binds(real, (workspace, home, config, skill_root) if skill_root else (workspace, home, config)),
         )
     except GradeError as exc:
@@ -948,7 +954,12 @@ def _run_in_container(
     env = _child_env(
         parent, task=task, seed=seed, home=home, stub=False, key=key, config=config, phase=phase,
     )
-    return subprocess.run(
+    if path_prefix is not None:
+        env["PATH"] = str(path_prefix) + os.pathsep + env.get("PATH", "")
+    if phase == "install" and ("ANTHROPIC_API_KEY" in env or (key and any(key in value for value in env.values()))):
+        raise AdapterError("install phase environment contains a secret.", 1)
+    runner = subprocess.run if launch is None else launch
+    return runner(
         command,
         cwd=str(workspace),
         env=env,

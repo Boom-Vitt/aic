@@ -2,9 +2,11 @@
 
 The key-free stub stages mounts and runs the local stub agent. It does not
 fetch a third-party repository, call a model, or start Terminal-Bench or
-SWE-bench. A live run may fetch through the two-phase egress proxy. Receipts
-set ``aic_treatment`` only when a process actually saw the AIC plugin.
-``public_benchmark_scores`` stays null.
+SWE-bench. A live run fetches through the install-phase egress proxy, which
+has no API key. The agent phase is the only phase that receives the key, and
+its allow-list is ``api.anthropic.com:443``. Official runs refuse to start
+without bubblewrap and the proxy. Receipts set ``aic_treatment`` only when a
+process actually saw the AIC plugin. ``public_benchmark_scores`` stays null.
 """
 from __future__ import annotations
 

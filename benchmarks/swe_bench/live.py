@@ -1,7 +1,9 @@
 """Generate SWE-bench Lite predictions and score them with the pinned harness.
 
 ``main`` returns exit 3 before creating directories, downloading data, or
-starting a process when ``ANTHROPIC_API_KEY`` is missing or blank.
+starting a process when ``ANTHROPIC_API_KEY`` is missing or blank. A present
+key still refuses to start when bubblewrap or the egress proxy is missing.
+Claude receives the key only inside the agent phase.
 """
 from __future__ import annotations
 
@@ -16,9 +18,10 @@ import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
-from benchmarks.aicbench.grading import outside_repository_temp
-from benchmarks.baselines.adapter import load_registry, stage_shipped_plugin
+from benchmarks.aicbench.grading import GradeError, outside_repository_temp
+from benchmarks.baselines.adapter import AdapterError, load_registry, stage_shipped_plugin
 from benchmarks.budget import format_max_usd
+from benchmarks.suite_runtime import PROXY_REFUSAL, open_suite_runtime, runtime_root
 from benchmarks.swe_bench.constants import (
     AIC_CONDITION,
     CHECKED_ON,
@@ -64,6 +67,54 @@ from benchmarks.swe_bench.contract import (
 )
 
 _SIDECAR_LIMIT = 100_000
+
+
+def run_official_arm(
+    runtime,
+    argv: list[str],
+    *,
+    key: str,
+    workspace: Path,
+    home: Path,
+    config: Path,
+    skill_root: Path | None,
+    timeout: int,
+    seed: int,
+    launch=None,
+):
+    """Run one official arm in the agent phase.
+
+    The API key is an environment value of that phase only. It is not a
+    command argument, and the install phase never receives it.
+    """
+    if runtime is None:
+        raise ContractError(PROXY_REFUSAL)
+    if not argv or any("\x00" in part for part in argv):
+        raise ContractError("Refusing to run an empty agent command.")
+    if key and any(key in part for part in argv):
+        raise ContractError("Refusing to put the API key on a command line.")
+    for path in (workspace, home, config):
+        path.mkdir(parents=True, exist_ok=True)
+    return runtime.run(
+        list(argv),
+        phase="agent",
+        key=key,
+        workspace=workspace,
+        home=home,
+        config=config,
+        skill_root=skill_root,
+        timeout=timeout,
+        seed=seed,
+        launch=launch,
+    )
+
+
+def _outside_work(name: str) -> Path:
+    try:
+        parent = outside_repository_temp()
+    except GradeError as exc:
+        raise ContractError(str(exc)) from exc
+    return Path(tempfile.mkdtemp(prefix=f"aic-swe-{name}-", dir=parent))
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -131,6 +182,24 @@ def execute_run(args: argparse.Namespace, env: Mapping[str, str]) -> int:
     if not key:
         print(MISSING_KEY_MESSAGE, file=sys.stderr)
         return MISSING_KEY_EXIT
+    egress = None
+    runtime = None
+    try:
+        egress = runtime_root()
+        try:
+            runtime = open_suite_runtime(dict(env), egress)
+        except AdapterError as exc:
+            print(str(exc), file=sys.stderr)
+            return exc.code
+        return _execute_with_runtime(args, env, key, runtime)
+    finally:
+        if runtime is not None:
+            runtime.close()
+        if egress is not None:
+            shutil.rmtree(egress, ignore_errors=True)
+
+
+def _execute_with_runtime(args: argparse.Namespace, env: Mapping[str, str], key: str, runtime) -> int:
     output = lexical_absolute(Path(args.output), Path.cwd())
     cache = lexical_absolute(Path(args.cache), Path.cwd()) if args.cache else output / "cache"
     assert_not_vendored(output, REPO_ROOT)
@@ -198,6 +267,7 @@ def execute_run(args: argparse.Namespace, env: Mapping[str, str]) -> int:
                 cache,
                 env,
                 key,
+                runtime,
                 plugin_dir=plugin_root if condition == AIC_CONDITION else None,
                 model=args.model,
                 max_turns=args.max_turns,
@@ -330,6 +400,7 @@ def generate_condition(
     cache: Path,
     env: Mapping[str, str],
     key: str,
+    runtime,
     *,
     plugin_dir: Path | None,
     model: str | None,
@@ -338,56 +409,70 @@ def generate_condition(
     timeout: int,
 ) -> int:
     root = output / condition
-    work = root / "work"
     attempts = root / "attempts"
-    home = root / "home"
-    for path in (work, attempts, home):
-        path.mkdir(parents=True, exist_ok=True)
+    attempts.mkdir(parents=True, exist_ok=True)
     predictions = root / "predictions.jsonl"
+    work = _outside_work(condition)
+    home = work / "home"
+    config = work / "config"
+    home.mkdir()
+    config.mkdir()
     failures = 0
-    for instance in chosen:
-        destination = work / instance["instance_id"]
-        destination.mkdir()
-        try:
-            cloned = _materialize(instance, destination, env, key)
-            if not cloned:
-                failures += 1
-                continue
-            prompt = issue_prompt(instance["problem_statement"], use_aic=plugin_dir is not None)
-            command = claude_command(
-                prompt=prompt,
-                plugin_dir=plugin_dir,
-                model=model,
-                max_turns=max_turns,
-                max_budget_usd=max_budget_usd,
-            )
-            claude_env = child_env(env, home=home, hf_home=cache / "hf-home", api_key=key)
-            timed_out = False
+    try:
+        for instance in chosen:
+            destination = work / instance["instance_id"]
+            destination.mkdir()
             try:
-                completed = run_command(command, cwd=destination, env=claude_env, timeout=timeout)
-                exit_code = completed.returncode
-                stdout = completed.stdout
-                stderr = completed.stderr
-            except subprocess.TimeoutExpired as exc:
-                timed_out = True
-                exit_code = 124
-                stdout = _text(exc.output)
-                stderr = _text(exc.stderr)
-                failures += 1
-            patch = _working_tree_patch(destination, env)
-            append_line(predictions, json.dumps(prediction_record(instance["instance_id"], patch, condition), ensure_ascii=False) + "\n")
-            write_json(attempts / f"{instance['instance_id']}.json", {
-                "instance_id": instance["instance_id"],
-                "exit_code": exit_code,
-                "timed_out": timed_out,
-                "stdout": redact(stdout, key)[:_SIDECAR_LIMIT],
-                "stderr": redact(stderr, key)[:_SIDECAR_LIMIT],
-            })
-            if not timed_out and exit_code != 0:
-                failures += 1
-        finally:
-            if destination.is_dir() and not destination.is_symlink() and destination.parent == work:
-                shutil.rmtree(destination)
+                cloned = _materialize(instance, destination, runtime, seed=load_registry()["seed"], key=key)
+                if not cloned:
+                    failures += 1
+                    continue
+                prompt = issue_prompt(instance["problem_statement"], use_aic=plugin_dir is not None)
+                command = claude_command(
+                    prompt=prompt,
+                    plugin_dir=plugin_dir,
+                    model=model,
+                    max_turns=max_turns,
+                    max_budget_usd=max_budget_usd,
+                )
+                timed_out = False
+                try:
+                    completed = run_official_arm(
+                        runtime,
+                        command,
+                        key=key,
+                        workspace=destination,
+                        home=home,
+                        config=config,
+                        skill_root=plugin_dir,
+                        timeout=timeout,
+                        seed=load_registry()["seed"],
+                    )
+                    exit_code = completed.returncode
+                    stdout = completed.stdout
+                    stderr = completed.stderr
+                except subprocess.TimeoutExpired as exc:
+                    timed_out = True
+                    exit_code = 124
+                    stdout = _text(exc.output)
+                    stderr = _text(exc.stderr)
+                    failures += 1
+                patch = _working_tree_patch(destination, env)
+                append_line(predictions, json.dumps(prediction_record(instance["instance_id"], patch, condition), ensure_ascii=False) + "\n")
+                write_json(attempts / f"{instance['instance_id']}.json", {
+                    "instance_id": instance["instance_id"],
+                    "exit_code": exit_code,
+                    "timed_out": timed_out,
+                    "stdout": redact(stdout, key)[:_SIDECAR_LIMIT],
+                    "stderr": redact(stderr, key)[:_SIDECAR_LIMIT],
+                })
+                if not timed_out and exit_code != 0:
+                    failures += 1
+            finally:
+                if destination.is_dir() and not destination.is_symlink() and destination.parent == work:
+                    shutil.rmtree(destination)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
     return failures
 
 
@@ -467,10 +552,24 @@ def report_index(output: Path, selected: tuple[str, ...]) -> dict[str, str]:
     return index
 
 
-def _materialize(instance: dict[str, str], destination: Path, env: Mapping[str, str], key: str) -> bool:
-    tool_env = child_env(env, home=destination.parent, hf_home=destination.parent, api_key=None)
+def _materialize(instance: dict[str, str], destination: Path, runtime, *, seed: int, key: str) -> bool:
+    """Fetch the instance without the API key, through the install-phase proxy."""
+    home = destination.parent / "install-home"
+    config = destination.parent / "install-config"
+    home.mkdir(exist_ok=True)
+    config.mkdir(exist_ok=True)
     for command in git_materialize_commands(instance["repo"], instance["base_commit"], destination):
-        completed = run_command(command, cwd=destination.parent, env=tool_env, timeout=600)
+        completed = runtime.run(
+            command,
+            phase="install",
+            key=None,
+            workspace=destination.parent,
+            home=home,
+            config=config,
+            skill_root=None,
+            timeout=600,
+            seed=seed,
+        )
         if completed.returncode != 0:
             print(
                 f"Could not check out {instance['instance_id']}. No prediction was recorded for it.",

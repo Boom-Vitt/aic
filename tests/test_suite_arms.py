@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from benchmarks.budget import agent_env_script, claude_shell, dollar_stop, install_environment
+from benchmarks.terminal_bench.phases import dispatch_task_command
 from benchmarks.suite_arms import (
     OFFICIAL_IDS,
     apply_harness_marker,
@@ -73,10 +74,15 @@ class SharedStopTests(unittest.TestCase):
         self.assertNotIn("--seed", command)
         with self.assertRaises(ValueError):
             agent_env_script("   ")
-        source = (ROOT / "benchmarks" / "terminal_bench" / "claude_agent.py").read_text(encoding="utf-8")
-        self.assertIn("install_environment", source)
-        self.assertIn("_AGENT_PREFIX", source)
-        self.assertNotIn("export ANTHROPIC_API_KEY=", source)
+        refused = []
+
+        def execute(argv):
+            refused.append(argv)
+            return 0, "", ""
+
+        response = dispatch_task_command(json.dumps(["-lc", f"echo {KEY}"]).encode(), KEY, execute)
+        self.assertEqual(response, b"refused\n")
+        self.assertEqual(refused, [])
 
 
 class SuiteStubTests(unittest.TestCase):
@@ -211,6 +217,7 @@ class SuiteRunnerTests(unittest.TestCase):
                 revision_reader=kwargs.get("revision_reader"),
                 arm_preparer=kwargs.get("arm_preparer"),
                 compare_runner=kwargs.get("compare_runner"),
+                suite_runtime_factory=kwargs.get("suite_runtime_factory"),
             )
         return code, stdout.getvalue(), stderr.getvalue()
 
@@ -266,10 +273,34 @@ class SuiteRunnerTests(unittest.TestCase):
         commands = []
 
         def harness(argv, cwd, env, timeout):
-            commands.append(list(argv))
+            commands.append((list(argv), dict(env)))
+            self.assertNotIn("ANTHROPIC_API_KEY", env)
+            self.assertFalse(any(KEY in value for value in env.values()))
             self.assertNotIn(KEY, argv)
-            self.assertNotIn(KEY, env.get("PYTHONPATH", ""))
             return subprocess.CompletedProcess(argv, 0, "ok", "")
+
+        sock_root = self.results
+
+        class Runtime:
+            def __init__(self):
+                self.calls = []
+
+            def child_env(self):
+                return {
+                    "AIC_SUITE_AGENT_SOCK": str(sock_root / "agent.sock"),
+                    "AIC_SUITE_BWRAP": "/usr/bin/bwrap",
+                    "AIC_SUITE_INSTALL_SOCK": str(sock_root / "install.sock"),
+                    "AIC_SUITE_KEY_FILE": str(sock_root / "secret"),
+                }
+
+            def run(self, argv, **kwargs):
+                self.calls.append((list(argv), dict(kwargs)))
+                return subprocess.CompletedProcess(argv, 0, "", "")
+
+            def close(self):
+                return
+
+        runtime = Runtime()
 
         def both(path):
             text = str(path)
@@ -297,6 +328,7 @@ class SuiteRunnerTests(unittest.TestCase):
             harness_runner=harness,
             revision_reader=both,
             arm_preparer=lambda _env: prepare_stand_in_arms(),
+            suite_runtime_factory=lambda _parent, _root, connect=None: runtime,
         )
         self.assertEqual(code, 0, err + output)
         estimate = json.loads(output)
@@ -326,7 +358,9 @@ class SuiteRunnerTests(unittest.TestCase):
             ["aic"],
         )
         self.assertEqual(len(commands), len(OFFICIAL_IDS) + 1)
-        terminal_commands = [item for item in commands if "terminal_bench.cli.tb.main" in item]
+        terminal_commands = [argv for argv, _env in commands if "terminal_bench.cli.tb.main" in argv]
+        terminal_envs = [env for argv, env in commands if "terminal_bench.cli.tb.main" in argv]
+        eval_envs = [env for argv, env in commands if "swebench.harness.run_evaluation" in argv]
         self.assertEqual(len(terminal_commands), len(OFFICIAL_IDS))
         for argv in terminal_commands:
             self.assertIn("benchmarks.terminal_bench.claude_agent:RegistryClaudeAgent", argv)
@@ -341,11 +375,50 @@ class SuiteRunnerTests(unittest.TestCase):
         plain_command = next(item for item in terminal_commands if "arm_id=plain-claude-code" in item)
         self.assertTrue(any(item.startswith("plugin_dir=") for item in aic_command))
         self.assertFalse(any(item.startswith("plugin_dir=") for item in plain_command))
-        self.assertNotIn("arm_id=superpowers", " ".join(" ".join(item) for item in commands))
+        self.assertNotIn("arm_id=superpowers", " ".join(" ".join(argv) for argv, _env in commands))
         blob = terminal_receipt_text = (bundle / "receipts" / "terminal-bench.json").read_text(encoding="utf-8")
         self.assertNotIn(KEY, blob)
         self.assertNotIn(KEY, (bundle / "receipts" / "swe-bench-lite.json").read_text(encoding="utf-8"))
         self.assertIsNotNone(terminal_receipt_text)
+        self.assertEqual(terminal_receipt["network"]["agent"]["allow"], ["api.anthropic.com:443"])
+        self.assertFalse(terminal_receipt["network"]["install"]["secrets"])
+        self.assertEqual(swe_receipt["network"]["agent"]["allow"], ["api.anthropic.com:443"])
+        self.assertEqual(swe_receipt["sandbox"], "container")
+        self.assertEqual(len(runtime.calls), len(OFFICIAL_IDS))
+        self.assertEqual(swe_receipt["agent_exit_codes"], [0] * len(OFFICIAL_IDS))
+        for argv, kwargs in runtime.calls:
+            self.assertEqual(kwargs["phase"], "agent")
+            self.assertEqual(kwargs["key"], KEY)
+            self.assertNotIn(KEY, argv)
+            self.assertEqual(argv[argv.index("--max-budget-usd") + 1], "0.35")
+            self.assertEqual(argv[argv.index("--max-turns") + 1], "30")
+        self.assertEqual(len(terminal_envs), len(OFFICIAL_IDS))
+        for env in terminal_envs:
+            self.assertIn("AIC_SUITE_AGENT_SOCK", env)
+            self.assertNotIn("api.anthropic.com", env["AIC_SUITE_AGENT_SOCK"])
+        self.assertEqual(len(eval_envs), 1)
+        self.assertNotIn("AIC_SUITE_KEY_FILE", eval_envs[0])
+
+    def test_the_default_opener_refuses_before_the_harness(self):
+        checkout = self.results / "tb-refuse"
+        checkout.mkdir()
+
+        def opener(parent, root, connect=None):
+            raise AdapterError("official suite results refuse to run without the egress proxy.", 1)
+
+        original = self.runner.open_suite_runtime
+        self.runner.open_suite_runtime = opener
+        try:
+            code, _out, err = self._run(
+                ["--terminal-bench", "--terminal-bench-checkout", str(checkout)],
+                revision_reader=lambda _path: TERMINAL_REVISION,
+                harness_runner=lambda *_args: (_ for _ in ()).throw(AssertionError("harness started")),
+                arm_preparer=lambda _env: (_ for _ in ()).throw(AssertionError("prepare started")),
+            )
+        finally:
+            self.runner.open_suite_runtime = original
+        self.assertEqual(code, 1, err)
+        self.assertIn("egress proxy", err)
 
 
 if __name__ == "__main__":
