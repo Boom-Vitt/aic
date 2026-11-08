@@ -887,7 +887,7 @@ def _run_in_container(
 ) -> subprocess.CompletedProcess:
     if proxies is None or phase not in {"install", "agent"}:
         raise AdapterError(_PROXY_REFUSAL, 1)
-    if not argv or any("\x00" in item or "\n" in item for item in argv):
+    if not argv or any("\x00" in item for item in argv):
         raise AdapterError("refusing an unsafe sandbox command.", 2)
     try:
         python = system_python()
@@ -1144,6 +1144,7 @@ def execute_arms(
                         stub=not invokes_model,
                         key=key,
                         config=config,
+                        phase="agent" if invokes_model else None,
                     )
                     if sandbox == "container":
                         completed = _run_in_container(

@@ -25,6 +25,7 @@ from benchmarks.baselines.adapter import (
     agent_argv,
     assert_license,
     assert_outside_repo,
+    execute_arms,
     fetch_and_verify,
     git_fetch_commands,
     load_registry,
@@ -756,6 +757,124 @@ class EgressProxyTests(unittest.TestCase):
                 proxies=None,
             )
         self.assertIn("egress proxy", str(caught.exception))
+
+    @unittest.skipUnless(shutil.which("bwrap") and Path("/usr/bin/python3").exists(), "bubblewrap or system python is not installed")
+    def test_execute_arms_runs_install_then_agent_through_the_proxy(self):
+        import benchmarks.baselines.adapter as adapter
+        import benchmarks.baselines.proxy as proxy
+        from benchmarks.aicbench.grading import outside_repository_temp
+
+        registry = load_registry()
+        phases = []
+        agent_commands = []
+
+        def fake_dial(host, port):
+            left, right = socket.socketpair()
+            right.close()
+            return left
+
+        def simulate_install(argv):
+            if "rev-parse" in argv:
+                dest = Path(argv[argv.index("-C") + 1])
+                commit = next(
+                    item["commit"] for item in registry["arms"] if item.get("commit") and item["id"] in dest.parts
+                )
+                return subprocess.CompletedProcess(argv, 0, commit + "\n", "")
+            if "init" in argv:
+                dest = Path(argv[-1])
+                dest.mkdir(parents=True, exist_ok=True)
+                if dest.name == "gstack":
+                    setup = dest / "setup"
+                    setup.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                    setup.chmod(0o755)
+            return subprocess.CompletedProcess(argv, 0, "", "")
+
+        real_run = adapter._run_in_container
+
+        def wrapped(argv, **kwargs):
+            phase = kwargs["phase"]
+            arm_id = kwargs["workspace"].parent.name
+            phases.append((arm_id, phase))
+            self.assertIsNotNone(kwargs["proxies"])
+            if phase == "install":
+                install_env = adapter._child_env(
+                    {"PATH": "/usr/bin", "ANTHROPIC_API_KEY": KEY},
+                    task=task, seed=0, home=kwargs["home"], stub=False, key=KEY, phase="install",
+                )
+                self.assertNotIn("ANTHROPIC_API_KEY", install_env)
+                self.assertNotIn(KEY, "\n".join(install_env.values()))
+                return simulate_install(argv)
+            completed = real_run(argv, **kwargs)
+            agent_commands.append(completed.args)
+            return completed
+
+        with tempfile.TemporaryDirectory(prefix="aic-claude-", dir=outside_repository_temp()) as temporary:
+            claude = Path(temporary) / "claude"
+            claude.write_text(
+                "#!/bin/sh\n"
+                "printf '%s\\n' \"$HTTPS_PROXY\"\n"
+                "if test -n \"$ANTHROPIC_API_KEY\"; then echo key-yes; else echo key-no; fi\n"
+                "printf '%s\\n' '{\"total_cost_usd\":0}'\n",
+                encoding="utf-8",
+            )
+            claude.chmod(0o755)
+            task = adapter._task(adapter.PLUMBING_TASK)
+            original_license = adapter.assert_license
+            original_dial = proxy._dial
+            adapter.assert_license = lambda entry, dest: None
+            adapter._run_in_container = wrapped
+            proxy._dial = fake_dial
+            try:
+                report = execute_arms(
+                    registry,
+                    task,
+                    binary=str(claude),
+                    parent_env={"PATH": os.environ.get("PATH", ""), "ANTHROPIC_API_KEY": KEY},
+                    materialize=stand_in_mount,
+                    kind="baseline-live",
+                    invokes_model=True,
+                    key=KEY,
+                    sandbox="container",
+                )
+            finally:
+                adapter.assert_license = original_license
+                adapter._run_in_container = real_run
+                proxy._dial = original_dial
+
+        official = [item["id"] for item in registry["arms"] if item["official_comparison"]]
+        self.assertEqual([item["arm"] for item in report["receipts"]], [item["id"] for item in registry["arms"]])
+        for arm_id in official:
+            arm_phases = [phase for seen_arm, phase in phases if seen_arm == arm_id]
+            self.assertEqual(arm_phases[-1], "agent", arm_phases)
+            if any(item["id"] == arm_id and item["kind"] == "git" for item in registry["arms"]):
+                self.assertEqual(arm_phases[0], "install", arm_phases)
+                self.assertLess(arm_phases.index("install"), arm_phases.index("agent"))
+            else:
+                self.assertEqual(arm_phases, ["agent"])
+        self.assertNotIn("superpowers", [arm for arm, _phase in phases])
+        self.assertGreaterEqual(len(agent_commands), len(official))
+        for command in agent_commands:
+            flat = [str(item) for item in command]
+            self.assertIn("--unshare-net", flat)
+            self.assertTrue(any(item.endswith("proxy.sock") for item in flat))
+            self.assertNotIn(KEY, flat)
+        self.assertEqual(report["sandbox"], "container")
+        self.assertEqual(report["network"]["agent"]["allow"], ["api.anthropic.com:443"])
+        self.assertFalse(report["network"]["install"]["secrets"])
+        self.assertIn("registry.npmjs.org:443", report["network"]["install"]["allow"])
+        self.assertNotIn("github.com:443", report["network"]["agent"]["allow"])
+        for receipt in report["receipts"]:
+            self.assertEqual(receipt["sandbox"], "container")
+            self.assertEqual(receipt["network"]["agent"]["allow"], ["api.anthropic.com:443"])
+            self.assertFalse(receipt["network"]["install"]["secrets"])
+            self.assertIsNone(receipt["public_benchmark_scores"])
+            if receipt["excluded"]:
+                self.assertEqual(receipt["arm"], "superpowers")
+                continue
+            self.assertIsNotNone(receipt["exit_code"])
+            self.assertTrue(receipt["sandboxed"])
+            self.assertFalse(receipt["invalid"])
+            self.assertNotIn("egress proxy", receipt["harness_error"] or "")
 
 
 class ModeBitTests(unittest.TestCase):
