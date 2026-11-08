@@ -2,10 +2,11 @@
 
 The API key stays in the host agent phase, behind the egress proxy. The task
 container receives neither the key nor a copy of an installed third-party arm.
-Before any command is forwarded, the container is disconnected from every
-network that is not ``none`` or Docker-internal. Official runs refuse when
-that closed state cannot be read back from the container. A contiguous-key
-check remains only as defense in depth.
+Before any command is forwarded, every attached network is disconnected,
+including Docker-internal networks. A forwarded command is accepted only when
+the live ``Networks`` map is empty or contains only the ``none`` network.
+Anything else refuses the official run. A contiguous-key check remains only
+as defense in depth.
 """
 from __future__ import annotations
 
@@ -210,48 +211,20 @@ def read_container_attrs(container) -> dict:
     return attrs
 
 
-def _attachment_is_closed(container, name: str, info: object) -> bool:
-    """True for the none network and for a Docker-internal network with no external route."""
-    if name == "none":
-        return True
-    if isinstance(info, dict) and info.get("Internal") is True:
-        return True
-    checker = getattr(container, "network_is_internal", None)
-    if callable(checker):
-        try:
-            if checker(name) is True:
-                return True
-        except Exception:
-            return False
-    client = getattr(container, "client", None)
-    networks = getattr(client, "networks", None) if client is not None else None
-    getter = getattr(networks, "get", None) if networks is not None else None
-    if getter is None:
-        return False
-    try:
-        network = getter(name)
-        if hasattr(network, "reload"):
-            network.reload()
-        network_attrs = getattr(network, "attrs", None)
-    except Exception:
-        return False
-    return isinstance(network_attrs, dict) and network_attrs.get("Internal") is True
-
-
 def task_container_is_isolated(container) -> bool:
-    """True when host networking is off and every live attachment is none or internal.
+    """True only for an empty ``Networks`` map or the ``none`` network.
 
-    ``HostConfig.NetworkMode`` stays at the value from container create, so an
-    empty ``NetworkSettings.Networks`` map is the live proof that a bridge is gone.
+    Docker-internal networks stay attached to the host at their gateway, and
+    the embedded DNS resolver can forward lookups, so they are not closed.
+    ``HostConfig.NetworkMode`` can keep its create-time value after a
+    disconnect. The live attachment map is the check. Host networking and
+    ``container:`` mode are refused even when that map is empty.
     """
     attrs = read_container_attrs(container)
     mode = _network_mode(attrs)
     if mode == "host" or mode.startswith("container:"):
         return False
-    for name, info in _attachments(attrs).items():
-        if not _attachment_is_closed(container, name, info):
-            return False
-    return True
+    return all(name == "none" for name in _attachments(attrs))
 
 
 def _disconnect(container, name: str, info: object) -> None:
@@ -278,16 +251,17 @@ def _disconnect(container, name: str, info: object) -> None:
 
 
 def isolate_task_container(container) -> None:
-    """Drop external networks, then refuse unless the live settings are closed.
+    """Disconnect every network, then refuse unless only ``none`` or nothing remains.
 
-    A task that still has a route out does not run in official mode.
+    A task that still has a route out, including a Docker-internal network,
+    does not run in official mode.
     """
     attrs = read_container_attrs(container)
     mode = _network_mode(attrs)
     if mode == "host" or mode.startswith("container:"):
         raise AdapterError(NETWORK_REFUSAL, 1)
     for name, info in list(_attachments(attrs).items()):
-        if _attachment_is_closed(container, name, info):
+        if name == "none":
             continue
         _disconnect(container, name, info)
     if not task_container_is_isolated(container):

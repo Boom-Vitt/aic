@@ -427,7 +427,12 @@ class TaskNetworkTests(unittest.TestCase):
         for container in (
             TaskContainer(mode="host", networks={}),
             TaskContainer(mode="container:other", networks={}),
-            TaskContainer(mode="lab", networks={"lab": {"NetworkID": "lab"}}, disconnects=False),
+            TaskContainer(
+                mode="lab",
+                networks={"lab": {"NetworkID": "lab", "Internal": True}},
+                internal=("lab",),
+                disconnects=False,
+            ),
             TaskContainer(disconnects=False),
         ):
             launched = []
@@ -466,10 +471,33 @@ class TaskNetworkTests(unittest.TestCase):
         self.assertEqual(container.trace[-1], "exec")
         stale = TaskContainer(mode="bridge", networks={})
         self.assertTrue(task_container_is_isolated(stale))
-        internal = TaskContainer(mode="lab", networks={"lab": {"NetworkID": "lab"}}, internal=("lab",))
+        none_only = TaskContainer(mode="none", networks={"none": {"NetworkID": "none"}})
+        self.assertTrue(task_container_is_isolated(none_only))
+        isolate_task_container(none_only)
+        self.assertNotIn("disconnect", none_only.trace)
+        internal = TaskContainer(
+            mode="lab",
+            networks={"lab": {"NetworkID": "lab", "Internal": True}},
+            internal=("lab",),
+        )
+        self.assertFalse(task_container_is_isolated(internal))
         isolate_task_container(internal)
-        self.assertNotIn("disconnect", internal.trace)
-        self.assertEqual(set(internal.networks), {"lab"})
+        self.assertIn("disconnect", internal.trace)
+        self.assertEqual(internal.networks, {})
+        self.assertTrue(task_container_is_isolated(internal))
+        stuck_internal = TaskContainer(
+            mode="lab",
+            networks={"lab": {"NetworkID": "lab", "Internal": True}},
+            internal=("lab",),
+            disconnects=False,
+        )
+        with self.assertRaises(AdapterError) as caught:
+            isolate_task_container(stuck_internal)
+        self.assertEqual(str(caught.exception), NETWORK_REFUSAL)
+        self.assertFalse(task_container_is_isolated(stuck_internal))
+        with self.assertRaises(AdapterError):
+            container_execute(_NetSession(stuck_internal), ["-lc", "pwd"])
+        self.assertEqual(stuck_internal.execs, [])
 
     def test_split_and_encoded_keys_do_not_reach_a_networked_container(self):
         container = TaskContainer(disconnects=False)
