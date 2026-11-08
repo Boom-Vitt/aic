@@ -19,25 +19,25 @@ Terminal-Bench 2.0 is 89 tasks. The paper says frontier models and agents resolv
 
 mini-swe-agent's overview describes a linear loop whose only action is a shell command, with history appended rather than summarized by an extra scaffold. The useful limit, next to the Terminal-Bench labels, is that extra ceremony is turns. AIC's comparison allows 30 turns. A second agent, a three-file plan, or a multi-phase verification ritual spends turns before the check that decides the task.
 
-The 2026-11-07 ledger already records the editing mechanisms AIC kept: a capped search, a bounded view, a reproduction check that is not a hidden suite, and an undo when an edit adds a diagnostic. This cycle makes that loop the first procedure in the skill the benchmark prompt actually names, and it refuses a `passed` record whose exit codes do not match.
+The 2026-11-07 ledger already records the editing mechanisms AIC kept: a capped search, a bounded view, a reproduction check, and an undo when an edit adds a diagnostic. This cycle puts that loop in the skill entry the host reads before an edit: show the check, make a small edit, undo a new diagnostic, and rerun the same check. A passed record has to name that command and its exit code, and the rerun has to be the same command. The family still comes from the existing selection table.
 
 ## What shipped
 
 Original AIC wording in `skills/aic/SKILL.md`, `references/editing.md`, `references/workflows.md`, `references/templates.md`, and the schema-3 catalog purposes:
 
-- One already approved behavior in one workspace binds `direct` / `solo` and runs the loop. A second write scope, a required separate evaluator, or durable continuity still uses the existing family table.
+- The family comes from the existing selection table. The loop does not assign a family or a topology.
 - The loop shows the check before the edit, edits a small region, undoes a new diagnostic, and reruns the same check.
-- If the check cannot be started, the outcome is `blocked`. The skill does not say to install a tool or to repeat the same failure and call that progress.
-- `passed` needs the after observation and an empty skipped-check list. Failure and new behavior need a nonzero before exit and an after exit of 0 on the same command. A refactor needs both exits to be 0. A documentation change needs an after exit of 0 and forbids a before/after pair whose exit code changed.
-- `check-surface` validates that record. It does not run the command, does not read the workspace, and does not judge whether the observation sentence is true. A command that names an `oracle` or `reference` path, uses `..`, or is absolute is rejected.
+- If the check cannot be started, the outcome is `blocked`. The skill does not say to repeat the same failure and call that progress.
+- `passed` needs the command, its exit code, a before and after record of that same command, and an empty skipped-check list. The helper does not require a particular pair of exit codes.
+- `check-surface` validates that record. It does not run the command, does not read the workspace, and does not judge whether the observation sentence is true. A command that uses `..` or is absolute is rejected.
 
-The native plugin is still skills-only. No hook, no egress change, no sandbox change, and no second skill. Bare mode names `/aic:aic`; a skill the prompt does not name would not be the treatment.
+The native plugin is still skills-only. No hook, no egress change, no sandbox change, and no second skill.
 
 ## What this does not claim
 
 Offline skill-lint, the routing scorer, aicbench oracles, and the suite stub do not call a model. They cannot show a SWE-bench or Terminal-Bench pass rate. The routing scorer has no deterministic router in this repository. Without `ANTHROPIC_API_KEY` it cannot score the dev pack, because a score needs a decision file from a run. `benchmarks/routing/heldout-v2.json` stays sealed. This change is not a release, so it was not scored.
 
-The routing comparison prompt is the skill entry plus the files that entry links. It was already large before this change. Growing it is a cost, reported below, not a win. The loop was added to the entry the model is told to read, instead of as another linked essay.
+The routing comparison prompt is the skill entry plus the files that entry links. It was already large before this change. Growing it is a cost, reported below, not a win. The loop stays in the entry so the host sees the check before a longer procedure.
 
 ## Offline measurements
 
@@ -45,14 +45,14 @@ These are not benchmark scores. The dev pack was not opened while the skill was 
 
 Skill documents are what `benchmarks.routing.compare.skill_documents` would attach to the AIC routing arm. The count is files. The bytes are UTF-8.
 
-| Instrument | Command | Before | After |
+| Instrument | Command | Before (`origin/main`) | After (this tree) |
 | --- | --- | --- | --- |
-| Skill-lint | `python3 -m benchmarks.skill_lint . --format json --summary` | mean 95.00, 1 skill, 0 errors, 1 `nested-reference` warning, format pass, 39 lines, 1471 instruction units | mean 95.00, 1 skill, 0 errors, 1 `nested-reference` warning, format pass, 54 lines, 2131 instruction units |
-| Routing scorer | `python3 -m benchmarks.routing.score --from-router` | exit 2. No decision file and no router. No accuracy. | exit 2. Same message. No accuracy. |
-| Skill documents in the routing prompt | `skill_documents` on the repo root | 14 files, 202842 bytes | 14 files, 207850 bytes (+5008) |
-| aicbench oracles | `python3 -m unittest tests.test_aicbench_oracles tests.test_aicbench_catalog -q` | 4 tests, OK | 4 tests, OK, inside the full suite |
-| Baseline stub | `python3 -m benchmarks.aicbench --baseline-stub` | `ok` true, 7 arms passed, `official` false, `public_benchmark_scores` null, `invokes_model` false, sample size 1 | same, rechecked by the suite |
-| Suite stub | `python3 -m benchmarks.suite_arms stub` | `ok` true, `fetched` false, `public_benchmark_scores` null, `harness_loaded_aic` false, `aic_treatment` true only for `aic` | same, rechecked by the suite |
-| Full offline suite | `python3 -m unittest discover -s tests -q` | not a separate before run | 506 tests, OK, 30 skipped |
+| Skill-lint | `python3 -m benchmarks.skill_lint . --format json --summary` | mean 95, 1 skill, 0 errors, 1 `nested-reference` warning, format pass, 39 lines, 1471 instruction units | mean 95, 1 skill, 0 errors, 1 `nested-reference` warning, format pass, 44 lines, 1620 instruction units |
+| Skill documents in the routing prompt | `skill_documents` on the repo root | 14 files, 202842 bytes | 14 files, 204167 bytes (+1325) |
+| Baseline stub | `python3 -m benchmarks.aicbench --baseline-stub` | `ok` true, 7 arms passed, `official` false, `public_benchmark_scores` null, `invokes_model` false, sample size 1 | same fields |
+| Suite stub | `python3 -m benchmarks.suite_arms stub` | `ok` true, `fetched` false, `public_benchmark_scores` null, `harness_loaded_aic` false, `aic_treatment` true only for `aic` | same fields |
+| Full offline suite | `./scripts/verify.sh` | not a separate before run | exit 0, 506 tests, 30 skipped |
 
-The skill-lint mean did not move. The nested-reference warning is the existing reference graph. Removing those links to raise the mean would hide the contracts the entry already points at. The routing scorer cannot show a gain or a loss until a model writes a decision file. The +5008 bytes are a larger AIC routing prompt. That can hurt a later routing run. It is recorded here so it is not mistaken for a pass-rate gain.
+`python3 -m benchmarks.routing.score --from-router` was not run. That command loads the dev pack before it can report a missing router. The scorer code is unchanged. It still cannot show a gain or a loss until a model writes a decision file.
+
+The skill-lint mean did not move. The nested-reference warning is the existing reference graph. Removing those links to raise the mean would hide the contracts the entry already points at. The +1325 bytes are a larger AIC routing prompt than `origin/main`. That can hurt a later routing run. It is recorded here so it is not mistaken for a pass-rate gain. The earlier +5008 byte draft of this loop is not the tree these numbers describe.

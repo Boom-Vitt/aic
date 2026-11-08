@@ -1,4 +1,4 @@
-"""Changed-surface records: exit-code gates, and no command execution."""
+"""Changed-surface records: same check before and after, and no command execution."""
 import json
 import os
 import subprocess
@@ -19,18 +19,17 @@ def record(**overrides):
     value = {
         "schema_version": 1,
         "kind": "aic-changed-surface",
-        "task": "Signed totals disagree with the ledger.",
-        "change_kind": "failure",
+        "task": "Empty names are still accepted.",
         "outcome": "passed",
         "checks": [
             {
-                "command": "python -m unittest tests.test_totals",
+                "command": "python -m unittest tests.test_form",
                 "phase": "before",
-                "observed": "AssertionError: expected 1",
+                "observed": "AssertionError: empty name was accepted",
                 "exit_code": 1,
             },
             {
-                "command": "python -m unittest tests.test_totals",
+                "command": "python -m unittest tests.test_form",
                 "phase": "after",
                 "observed": "OK",
                 "exit_code": 0,
@@ -43,51 +42,45 @@ def record(**overrides):
 
 
 class SurfaceTests(unittest.TestCase):
-    def test_passed_failure_keeps_the_red_then_green_pair(self):
+    def test_passed_keeps_the_same_command_and_its_exit_codes(self):
         accepted = validate_surface(record())
         self.assertEqual(accepted["outcome"], "passed")
-        self.assertEqual(accepted["checks"][0]["exit_code"], 1)
-        self.assertEqual(accepted["checks"][1]["exit_code"], 0)
+        self.assertEqual(accepted["checks"][0]["command"], accepted["checks"][1]["command"])
+        self.assertEqual([item["exit_code"] for item in accepted["checks"]], [1, 0])
         accepted["outcome"] = "failed"
         self.assertEqual(validate_surface(record())["outcome"], "passed")
 
-    def test_passed_failure_without_the_before_run_is_rejected(self):
+    def test_passed_accepts_any_recorded_exit_pair_for_the_same_command(self):
+        for before, after in ((1, 0), (0, 0), (0, 1), (2, 3)):
+            value = record()
+            value["checks"][0]["exit_code"] = before
+            value["checks"][1]["exit_code"] = after
+            with self.subTest(before=before, after=after):
+                accepted = validate_surface(value)
+                self.assertEqual([item["exit_code"] for item in accepted["checks"]], [before, after])
+
+    def test_passed_without_the_rerun_is_rejected(self):
         value = record()
-        value["checks"] = [value["checks"][1]]
+        value["checks"] = [value["checks"][0]]
         with self.assertRaises(AICError) as caught:
             validate_surface(value)
-        self.assertIn("nonzero before", str(caught.exception))
-
-    def test_passed_behavior_uses_the_same_pair_as_a_failure(self):
-        accepted = validate_surface(record(change_kind="behavior", task="Add slugify."))
-        self.assertEqual(accepted["change_kind"], "behavior")
-        value = record(change_kind="behavior", task="Add slugify.")
-        value["checks"][0]["exit_code"] = 0
+        self.assertIn("same command", str(caught.exception))
+        different = record()
+        different["checks"][1]["command"] = "python -m unittest tests.test_other"
         with self.assertRaises(AICError):
-            validate_surface(value)
+            validate_surface(different)
 
-    def test_passed_refactor_requires_the_same_successful_check(self):
-        checks = [
-            {"command": "python -m unittest tests.test_billing", "phase": "before", "observed": "OK", "exit_code": 0},
-            {"command": "python -m unittest tests.test_billing", "phase": "after", "observed": "OK", "exit_code": 0},
-        ]
-        accepted = validate_surface(record(change_kind="refactor", task="Split billing.", checks=checks))
-        self.assertEqual(accepted["change_kind"], "refactor")
-        checks[1]["exit_code"] = 1
-        with self.assertRaises(AICError):
-            validate_surface(record(change_kind="refactor", task="Split billing.", checks=checks, outcome="passed"))
-
-    def test_passed_docs_rejects_a_check_whose_exit_changed(self):
-        checks = [
-            {"command": "git diff --exit-code -- src", "phase": "before", "observed": "clean", "exit_code": 0},
-            {"command": "git diff --exit-code -- src", "phase": "after", "observed": "src changed", "exit_code": 1},
-        ]
+    def test_passed_rejects_a_shown_check_that_was_not_rerun(self):
+        value = record()
+        value["checks"].append({
+            "command": "python -m unittest tests.test_other",
+            "phase": "before",
+            "observed": "OK",
+            "exit_code": 0,
+        })
         with self.assertRaises(AICError) as caught:
-            validate_surface(record(change_kind="docs", task="Document the limiter.", checks=checks))
-        self.assertIn("exit code changed", str(caught.exception))
-        after_only = [checks[0] | {"phase": "after"}]
-        accepted = validate_surface(record(change_kind="docs", task="Document the limiter.", checks=after_only))
-        self.assertEqual(accepted["checks"][0]["phase"], "after")
+            validate_surface(value)
+        self.assertIn("same command", str(caught.exception))
 
     def test_passed_with_a_skipped_check_is_rejected_and_blocked_is_not(self):
         with self.assertRaises(AICError):
@@ -95,8 +88,14 @@ class SurfaceTests(unittest.TestCase):
         blocked = validate_surface(record(outcome="blocked", checks=[], not_run=["the check could not be started"]))
         self.assertEqual(blocked["outcome"], "blocked")
         self.assertEqual(blocked["checks"], [])
+        partial = validate_surface(record(
+            outcome="partial",
+            checks=[record()["checks"][1]],
+            not_run=["a second route"],
+        ))
+        self.assertEqual(partial["outcome"], "partial")
 
-    def test_hidden_grader_paths_and_escapes_are_rejected_without_running(self):
+    def test_commands_that_leave_the_workspace_are_rejected_without_running(self):
         marker = ROOT / ".work" / "surface-must-not-be-created"
         if marker.exists():
             marker.unlink()
@@ -107,10 +106,8 @@ class SurfaceTests(unittest.TestCase):
         validate_surface(value)
         self.assertFalse(marker.exists())
         for command in (
-            "python -m unittest oracle/test_oracle.py",
-            "cat reference/solution.py",
             "python -m unittest ../outside.py",
-            "/usr/bin/python -m unittest tests.test_totals",
+            "/usr/bin/python -m unittest tests.test_form",
         ):
             value = record()
             value["checks"][0]["command"] = command
@@ -120,6 +117,7 @@ class SurfaceTests(unittest.TestCase):
                     validate_surface(value)
 
     def test_cli_accepts_a_record_and_rejects_a_passed_claim_without_a_rerun(self):
+        (ROOT / ".work").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=ROOT / ".work") as directory:
             base = Path(directory)
             good = base / "good.json"
@@ -135,12 +133,13 @@ class SurfaceTests(unittest.TestCase):
             )
             self.assertEqual(accepted.returncode, 0, accepted.stderr)
             self.assertEqual(json.loads(accepted.stdout)["outcome"], "passed")
+            self.assertNotIn("change_kind", json.loads(accepted.stdout))
             rejected = subprocess.run(
                 [sys.executable, "-B", str(CLI), "check-surface", str(bad)],
                 cwd=base, env=env, capture_output=True, text=True, timeout=30, check=False,
             )
             self.assertEqual(rejected.returncode, 2)
-            self.assertIn("nonzero before", rejected.stderr)
+            self.assertIn("same command", rejected.stderr)
             self.assertNotIn("Traceback", rejected.stderr)
 
 

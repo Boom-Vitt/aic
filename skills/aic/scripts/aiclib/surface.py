@@ -1,8 +1,8 @@
 """Validate a changed-surface record. Never run the recorded command.
 
 The host writes the record after it has already run the checks. This module
-checks shape and exit codes only. It does not execute a shell, read a project,
-or decide that the observation text is true.
+checks shape only. It does not execute a shell, read a project, or decide
+that the observation text is true.
 """
 from __future__ import annotations
 
@@ -13,13 +13,11 @@ from .safety import AICError
 
 
 _RECORD_KEYS = frozenset({
-    "schema_version", "kind", "task", "change_kind", "outcome", "checks", "not_run",
+    "schema_version", "kind", "task", "outcome", "checks", "not_run",
 })
 _CHECK_KEYS = frozenset({"command", "phase", "observed", "exit_code"})
-_CHANGE_KINDS = frozenset({"failure", "behavior", "refactor", "docs"})
 _OUTCOMES = frozenset({"passed", "partial", "blocked", "failed"})
 _PHASES = frozenset({"before", "after"})
-_FORBIDDEN_SEGMENTS = frozenset({"oracle", "reference"})
 _KIND = "aic-changed-surface"
 
 _MAX_BYTES = 16 * 1024
@@ -34,8 +32,9 @@ _MAX_NOT_RUN_ITEM = 160
 def validate_surface(record: dict) -> dict:
     """Return a detached copy of a schema-1 changed-surface record.
 
-    ``passed`` requires an empty ``not_run`` list and exit codes that match
-    ``change_kind``. Any other outcome may omit checks. No command is executed.
+    ``passed`` requires an empty ``not_run`` list and the same command
+    recorded before editing and again after, each with an exit code.
+    Any other outcome may omit checks. No command is executed.
     """
     if type(record) is not dict:
         raise AICError("Changed-surface record must be an object.")
@@ -50,7 +49,6 @@ def validate_surface(record: dict) -> dict:
     if record["kind"] != _KIND:
         raise AICError(f"kind must be {_KIND}.")
     task = _bounded_text(record["task"], "task", _MAX_TASK)
-    change_kind = _choice(record["change_kind"], _CHANGE_KINDS, "change_kind")
     outcome = _choice(record["outcome"], _OUTCOMES, "outcome")
     checks = _checks(record["checks"])
     not_run = _not_run(record["not_run"])
@@ -59,12 +57,11 @@ def validate_surface(record: dict) -> dict:
             raise AICError("A passed record must list no skipped checks. Use partial or blocked when a check was not run.")
         if not checks:
             raise AICError("A passed record needs at least one check.")
-        _require_passed(change_kind, checks)
+        _require_same_check(checks)
     value = {
         "schema_version": 1,
         "kind": _KIND,
         "task": task,
-        "change_kind": change_kind,
         "outcome": outcome,
         "checks": checks,
         "not_run": not_run,
@@ -75,49 +72,16 @@ def validate_surface(record: dict) -> dict:
     return deepcopy(value)
 
 
-def _require_passed(change_kind: str, checks: list[dict]) -> None:
-    grouped: dict[str, dict[str, int]] = {}
+def _require_same_check(checks: list[dict]) -> None:
+    phases: dict[str, set[str]] = {}
     for check in checks:
-        grouped.setdefault(check["command"], {})[check["phase"]] = check["exit_code"]
-    if change_kind == "failure" or change_kind == "behavior":
-        if _has_red_then_green(grouped):
-            return
+        phases.setdefault(check["command"], set()).add(check["phase"])
+    paired = any({"before", "after"} <= seen for seen in phases.values())
+    unfinished = any("before" in seen and "after" not in seen for seen in phases.values())
+    if not paired or unfinished:
         raise AICError(
-            "A passed failure or behavior record needs one command with a nonzero before exit and an after exit of 0."
+            "A passed record needs each check shown before editing recorded again after, on the same command, with an exit code."
         )
-    if change_kind == "refactor":
-        if _has_unchanged_success(grouped):
-            return
-        raise AICError("A passed refactor record needs one command whose before and after exits are both 0.")
-    if change_kind == "docs":
-        _require_docs(grouped)
-        return
-    raise AICError("change_kind is not a supported passed gate.")
-
-
-def _has_red_then_green(grouped: dict[str, dict[str, int]]) -> bool:
-    for phases in grouped.values():
-        if "before" in phases and phases["before"] != 0 and phases.get("after") == 0:
-            return True
-    return False
-
-
-def _has_unchanged_success(grouped: dict[str, dict[str, int]]) -> bool:
-    for phases in grouped.values():
-        if phases.get("before") == 0 and phases.get("after") == 0 and "before" in phases and "after" in phases:
-            return True
-    return False
-
-
-def _require_docs(grouped: dict[str, dict[str, int]]) -> None:
-    saw_after = False
-    for phases in grouped.values():
-        if "before" in phases and "after" in phases and phases["before"] != phases["after"]:
-            raise AICError("A passed docs record cannot show a check whose exit code changed.")
-        if phases.get("after") == 0:
-            saw_after = True
-    if not saw_after:
-        raise AICError("A passed docs record needs an after check with exit code 0.")
 
 
 def _checks(value: object) -> list[dict]:
@@ -163,26 +127,19 @@ def _command(value: object, label: str) -> str:
     command = _bounded_text(value, label, _MAX_COMMAND)
     if any(ord(character) < 32 for character in command):
         raise AICError(f"{label} must be a single line.")
-    if _forbidden_command(command):
-        raise AICError(
-            f"{label} must stay inside the approved workspace and must not name an oracle or reference path."
-        )
+    if _escaped_command(command):
+        raise AICError(f"{label} must stay a relative command inside the approved workspace.")
     return command
 
 
-def _forbidden_command(command: str) -> bool:
-    folded = command.casefold().replace("\\", "/")
-    if "oracle/" in folded or "reference/" in folded:
-        return True
+def _escaped_command(command: str) -> bool:
     for token in command.split():
         if token.startswith(("/", "~")):
             return True
         normalized = token.replace("\\", "/")
         for raw in normalized.split("/"):
             piece = raw.strip("\"'`()[]{}:,")
-            if piece in {"", "."}:
-                continue
-            if piece == ".." or piece.casefold() in _FORBIDDEN_SEGMENTS:
+            if piece == "..":
                 return True
     return False
 

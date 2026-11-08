@@ -127,7 +127,7 @@ The last command prints bounded retained scrollback to the operator terminal and
 chmod 600 "$RUN_DIR/zero.capture.txt"
 ```
 
-A capture is not a full transcript, acceptance oracle or proof that a detached/daemonized descendant has stopped. Reattach with the same explicit attach command after detaching. If the host/server was lost, first reconcile the board, artifacts and any uncertain external actions; do not assume continuation happened or resubmit automatically.
+A capture is not a full transcript, acceptance check or proof that a detached/daemonized descendant has stopped. Reattach with the same explicit attach command after detaching. If the host/server was lost, first reconcile the board, artifacts and any uncertain external actions; do not assume continuation happened or resubmit automatically.
 
 ### 4. Account for every job, then individually scoped cleanup
 

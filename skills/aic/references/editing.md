@@ -32,7 +32,7 @@ For a reported failure, keep the report as ground truth.
 - Before editing, show the failure with a check that runs on the unmodified code inside the approved workspace.
 - Drop a patch that fails that check. If every candidate fails it, say so and fall back to the checks that already passed before the change. Say that the reproduction check rejected the pool.
 - Pre-existing passing tests may guard behavior the owner has said a correct fix must keep. They are not permission to change that behavior silently.
-- Do not open, copy or vote with a hidden acceptance suite, an oracle, a reference solution or a grader outside the approved workspace. Using those as a localization signal or as a voter invalidates the comparison.
+- Do not open or copy an acceptance suite outside the approved workspace. Using one as a localization signal or as a voter invalidates the comparison.
 - A generated check can prefer a wrong patch. Treat it as a filter with that limit, not as the user's acceptance suite.
 - One careful edit is the default. Sampling more than one patch is allowed only when the user has already authorized the extra model calls, a baseline and a stop count.
 
@@ -58,28 +58,9 @@ Passed, partial and blocked keep the meanings in [workflow selection](workflows.
 
 ### Machine-checked record
 
-The optional `check-surface` helper accepts one JSON object and does not run the command. A valid record is not approval, and it does not prove the observation text is true. `passed` is accepted only when `not_run` is empty and the exit codes match the change kind:
+The optional `check-surface` helper accepts one JSON object and does not run the command. A valid record is not approval, and it does not prove the observation text is true. `passed` needs an empty `not_run` list and the same command recorded both before the edit and after it, each with an exit code. Any other outcome may omit checks.
 
-- `failure` and `behavior`: one command has a nonzero `before` exit and an `after` exit of 0.
-- `refactor`: one command has `before` and `after` exits that are both 0.
-- `docs`: one `after` exit is 0, and a command recorded in both phases keeps the same exit code.
-
-Fields are exactly `schema_version` (the integer 1), `kind` (`aic-changed-surface`), `task`, `change_kind` (`failure`, `behavior`, `refactor` or `docs`), `outcome` (`passed`, `partial`, `blocked` or `failed`), `checks` and `not_run`. Each check has exactly `command`, `phase` (`before` or `after`), `observed` and `exit_code`. A command that names an `oracle` or `reference` path, uses `..`, or is absolute is rejected. At most 8 checks and 12 not-run strings. `partial`, `blocked` and `failed` may omit checks.
-
-```json
-{
-  "schema_version": 1,
-  "kind": "aic-changed-surface",
-  "task": "Signed totals disagree with the ledger.",
-  "change_kind": "failure",
-  "outcome": "passed",
-  "checks": [
-    {"command": "python -m unittest tests.test_totals", "phase": "before", "observed": "AssertionError: expected 1", "exit_code": 1},
-    {"command": "python -m unittest tests.test_totals", "phase": "after", "observed": "OK", "exit_code": 0}
-  ],
-  "not_run": []
-}
-```
+Fields are exactly `schema_version` (the integer 1), `kind` (`aic-changed-surface`), `task`, `outcome` (`passed`, `partial`, `blocked` or `failed`), `checks` and `not_run`. Each check has exactly `command`, `phase` (`before` or `after`), `observed` and `exit_code`. A command that uses `..` or is absolute is rejected. At most 8 checks and 12 not-run strings.
 
 ## Findings, when evaluation is separate
 
@@ -90,7 +71,7 @@ Each finding names the artifact version, the criterion, a location, the observat
 ## What this procedure does not adopt
 
 - No new code-execution tool. A host that can already run a check may bundle that check and the follow-up. File edits still use the guarded edit above. An unrestricted shell edit is the shape the SWE-agent comparison found weaker than a dedicated edit.
-- No search tree and no extra selector model, unless the user has already authorized measured optimization with a correct baseline, an oracle that is not the hidden acceptance suite, comparable measurements and a call budget. Flexible stage order is not a default. The small gain from unconstrained transitions in the SWE-Search comparison is a reason to keep stage order unless search is there to stop a loop.
+- No search tree and no extra selector model, unless the user has already authorized measured optimization with a correct baseline, a correctness check, comparable measurements and a call budget. Flexible stage order is not a default. The small gain from unconstrained transitions in the SWE-Search comparison is a reason to keep stage order unless search is there to stop a loop.
 - No spectrum ranking on tests taken from a hidden suite. Hints from a failing test are eligible only when that test already exists in the project and was not written from the hidden acceptance suite. The issue text still has to agree before editing. Stop a validation retry when the authorized tests pass or a small bound is hit. The AutoCodeRover comparison bundled hints and a retry and measured them on a suite that included tests written with the fix. That bundle is not evidence for ranking with only the tests that passed before the issue. Do not import that project's runner. Its current repository license is source-available and is not a grant to copy the implementation.
 - No embedding provider and no claim that a repository map, by itself, has a measured resolve-rate gain in the sources named above.
 

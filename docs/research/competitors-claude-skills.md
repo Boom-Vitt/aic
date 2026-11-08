@@ -274,7 +274,7 @@ Implementing the ten items is follow-on work. This file is the research record o
 
 This section reads the same commits as `benchmarks/baselines/registry.json`. Root `LICENSE` files were fetched again that day. Each one is MIT. Copyright lines: Jesse Vincent (2025) for `obra/superpowers`; Affaan Mustafa (2026) for `affaan-m/ECC`; Addy Osmani (2025) for `addyosmani/agent-skills`; Ahmad Adi (2026) for `OthmanAdi/planning-with-files`; Garry Tan (2026) for `garrytan/gstack`. A root MIT grant was not treated as clearance to copy skill text. No skill body, prompt, template, or README paragraph is copied below. Statements are from directory names, YAML `name` / `description` fields, and markdown headings.
 
-The official AIC arm does not discover a second skill on its own. SWE-bench bare mode names `/aic:aic`, and aicbench tells the model to read `skills/aic/SKILL.md`. A sibling skill that the prompt never names would not be the treatment. The notes below were used to change that one skill, not to add a catalog.
+The notes below were used to tighten the one existing skill, not to add a second skill the host would have to discover on its own.
 
 ### obra/superpowers `22f0b463e7a5e579904dd6211a520321035526f7`
 
@@ -290,7 +290,7 @@ Skill directories: `planning-with-files` and `i18n`. Template filenames: `task_p
 
 ### garrytan/gstack `23f9d07ce9e802ac148a8a353228f201655fc5b8`
 
-`verify/`, `qa/`, `review/`, and `ship/` are skill directories. Their descriptions are short and situational: run checks until they pass, test the running surface, review the diff, then ship. In the pinned `verify` file the verification heading is not first. It follows a shared preamble (plan mode, artifacts, telemetry, a status footer). The trigger is the part that fits a tight budget. The preamble is the part that does not: those sections run before the check. AIC's loop is at the top of `SKILL.md` for that reason. No gstack telemetry or ship automation was added.
+`verify/`, `qa/`, `review/`, and `ship/` are skill directories. Their descriptions are short and situational: run checks until they pass, test the running surface, review the diff, then ship. In the pinned `verify` file the verification heading is not first. It follows a shared preamble (plan mode, artifacts, telemetry, a status footer). The trigger is the part that fits a tight budget. The preamble is the part that does not: those sections run before the check. AIC keeps the check-then-rerun loop in the skill entry so the check is not buried under a preamble. No gstack telemetry or ship automation was added.
 
 ### affaan-m/ECC `d2ef2680594f9a17526a6e1a2e18b3d242c5d17b`
 
@@ -298,4 +298,4 @@ The tree contains 314 `skills/<name>/SKILL.md` files. Sampled coding skills (`py
 
 ### What was taken, and what was left
 
-Taken, in original AIC wording: one invoked skill whose description matches a bugfix, a feature, a refactor, and a documentation change; a loop that shows the failure, edits a small region, and reruns the same check; a passed claim that needs that rerun. Left: session hooks, re-injection hooks, telemetry preambles, role rosters, extra skill trees the benchmark prompt does not name, and any upstream sentence.
+Taken, in original AIC wording: a loop that shows the check, edits a small region, and reruns the same check, and a passed claim that names that command and its exit code. The family still comes from the existing selection table. Left: session hooks, re-injection hooks, telemetry preambles, role rosters, extra skill trees, and any upstream sentence.
