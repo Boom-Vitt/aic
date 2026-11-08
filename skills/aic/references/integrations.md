@@ -106,12 +106,12 @@ Recommendation input is resource-bounded as specified in [routing](routing.md), 
 | `aic_inspect_project(max_files=200, max_depth=4)` | Inspect bounded filenames/directory metadata in the bound project, not source contents |
 | `aic_validate_recommendation(plan)` | Validate schema, paths and recommendation boundaries against that project; validity is not quality, approval or completion |
 
-Guidance sections are exactly `start`, `workflows`, `templates`, `project-plans`, `routing`, `memory`, `safety`, `supervision`, `research` and `integrations`. Unknown sections are errors. All four tools are read-only; none executes the recommended task.
+Guidance sections are exactly `start`, `workflows`, `templates`, `editing`, `project-plans`, `routing`, `memory`, `safety`, `supervision`, `research` and `integrations`. Unknown sections are errors. All four tools are read-only; none executes the recommended task.
 
 Resource-capable clients can read concrete packaged resources:
 
 - `aic://skill/SKILL.md`
-- `aic://skill/references/workflows.md`, `aic://skill/references/templates.md`, `aic://skill/references/project-plans.md`
+- `aic://skill/references/workflows.md`, `aic://skill/references/templates.md`, `aic://skill/references/editing.md`, `aic://skill/references/project-plans.md`
 - `aic://skill/references/routing.md`, `aic://skill/references/memory.md`, `aic://skill/references/safety.md`
 - `aic://skill/references/supervision.md`, `aic://skill/references/research.md`, `aic://skill/references/integrations.md`
 - `aic://skill/assets/workflows.json`, `aic://skill/assets/example-plan.json`
@@ -136,4 +136,4 @@ Maintainer verification records live in the repository's `docs/verification.md`;
 
 ## Optional internal helpers
 
-The included Python scripts remain agent/operator and maintainer tooling for managed skill copies, deterministic `inspect`/`check-plan` checks, approved scoped memory and the optional [Orca handoff](handoffs.md). They are not the public first-run interface and are not required to follow AIC with host tools. Helpers need the declared Python runtime and their own approved scope; they do not supply AI reasoning. See [routing](routing.md), [memory](memory.md), [handoffs](handoffs.md) and [supervision](supervision.md) only when those optional operations are relevant. The MCP adapter exposes no mutation or launch equivalent of those helpers.
+The included Python scripts remain agent/operator and maintainer tooling for managed skill copies, deterministic `inspect`/`check-plan`/`check-surface` checks, approved scoped memory and the optional [Orca handoff](handoffs.md). `check-surface` validates a changed-surface record and does not run the recorded command. They are not the public first-run interface and are not required to follow AIC with host tools. Helpers need the declared Python runtime and their own approved scope; they do not supply AI reasoning. See [routing](routing.md), [memory](memory.md), [handoffs](handoffs.md) and [supervision](supervision.md) only when those optional operations are relevant. The MCP adapter exposes no mutation or launch equivalent of those helpers.

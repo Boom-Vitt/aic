@@ -27,6 +27,7 @@ _GUIDANCE = {
     "start": "SKILL.md",
     "workflows": "references/workflows.md",
     "templates": "references/templates.md",
+    "editing": "references/editing.md",
     "project-plans": "references/project-plans.md",
     "routing": "references/routing.md",
     "memory": "references/memory.md",
@@ -222,8 +223,8 @@ def build_server(project: Path) -> MCPServer:
     def aic_get_guidance(section: str = "start") -> dict[str, str]:
         """Fetch a fixed guidance section, not an arbitrary path or URL.
 
-        Sections: start, workflows, templates, project-plans, routing, memory,
-        safety, supervision, research, integrations.
+        Sections: start, workflows, templates, editing, project-plans, routing,
+        memory, safety, supervision, research, integrations.
         """
         if type(section) is not str or len(section) > _SECTION_MAX_LENGTH or section not in _GUIDANCE:
             raise ToolError(_GUIDANCE_REJECTION)

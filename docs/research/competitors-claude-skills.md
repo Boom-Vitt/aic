@@ -269,3 +269,33 @@ Ranking is a judgment of product-quality value for AIC from this review. It is n
 10. **Compatibility claims tied to receipts.** A test fails when `docs/compatibility.md` states an evidence level that does not cite a receipt already present in `docs/verification.md`. Do not add untested per-host plugin manifests to imitate superpowers or ECC. **Effort: medium.** A parser test and receipt links where a claim is currently prose-only.
 
 Implementing the ten items is follow-on work. This file is the research record only.
+
+## Procedure shapes at the pinned commits (2026-11-08)
+
+This section reads the same commits as `benchmarks/baselines/registry.json`. Root `LICENSE` files were fetched again that day. Each one is MIT. Copyright lines: Jesse Vincent (2025) for `obra/superpowers`; Affaan Mustafa (2026) for `affaan-m/ECC`; Addy Osmani (2025) for `addyosmani/agent-skills`; Ahmad Adi (2026) for `OthmanAdi/planning-with-files`; Garry Tan (2026) for `garrytan/gstack`. A root MIT grant was not treated as clearance to copy skill text. No skill body, prompt, template, or README paragraph is copied below. Statements are from directory names, YAML `name` / `description` fields, and markdown headings.
+
+The notes below were used to tighten the one existing skill, not to add a second skill the host would have to discover on its own.
+
+### obra/superpowers `22f0b463e7a5e579904dd6211a520321035526f7`
+
+Fifteen skill directories, same set as the 2026-11-07 note. The ones that match a bugfix or a feature put the trigger in the description and the order in the headings: a failing check before implementation code, a watch-the-failure step, a minimal change, a watch-the-pass step, and a separate "do not claim success until the command output is in hand" skill. Planning is its own skill, scoped to a multi-step spec before any edit. The session-start hook is still present and still out of bounds for AIC's skills-only plugin.
+
+### addyosmani/agent-skills `301b02b12bff98e4688e6984af6556802322bbde`
+
+Twenty-five skill directories. The coding-relevant descriptions are task-shaped rather than meta: test-driven work for a behavior change, debugging that starts by reproducing, planning when the work is a spec, review before merge, and a context skill for rules and session setup. Headings on the test-driven skill are a failing check, the smallest change that passes, then cleanup. The debugging headings start with reproduce, then localize. That split is the useful part. AIC did not add those skill names or their review axes.
+
+### OthmanAdi/planning-with-files `2362ca385ad74f061aa0e7b73f56543a4b7e6df2`
+
+Skill directories: `planning-with-files` and `i18n`. Template filenames: `task_plan.md`, `findings.md`, `progress.md`, `loop.md`, `analytics_task_plan.md`, `analytics_findings.md`. The skill description says lifecycle hooks inject planning context and that recovery reads those project files. Hooks stay out of AIC. Under the shared stop of 30 turns and 0.35 USD, writing three plan files before the edit spends the budget the loop needs. Durable state stays the existing adaptive-controller case, and only when continuity is the bottleneck.
+
+### garrytan/gstack `23f9d07ce9e802ac148a8a353228f201655fc5b8`
+
+`verify/`, `qa/`, `review/`, and `ship/` are skill directories. Their descriptions are short and situational: run checks until they pass, test the running surface, review the diff, then ship. In the pinned `verify` file the verification heading is not first. It follows a shared preamble (plan mode, artifacts, telemetry, a status footer). The trigger is the part that fits a tight budget. The preamble is the part that does not: those sections run before the check. AIC keeps the check-then-rerun loop in the skill entry so the check is not buried under a preamble. No gstack telemetry or ship automation was added.
+
+### affaan-m/ECC `d2ef2680594f9a17526a6e1a2e18b3d242c5d17b`
+
+The tree contains 314 `skills/<name>/SKILL.md` files. Sampled coding skills (`python-testing`, `django-tdd`) head their procedure with a failing check, a minimal change, then cleanup. `django-verification` is a phased loop: environment, lint, tests, security scan, diff. That is a real verification shape, and it is too many phases for a 30-turn stop. `benchmark-methodology` at this commit is a weighted competitor profile (positioning, voice, offer, evidence, and related dimensions). It is not a resolve-rate harness. The 2026-11-07 note listed the name from the tree and did not open this file. The name is not evidence that ECC ships AIC's kind of benchmark runner.
+
+### What was taken, and what was left
+
+Taken, in original AIC wording: a loop that shows the check, edits a small region, and reruns the same check, and a passed claim that names that command and its exit code. The family still comes from the existing selection table. Left: session hooks, re-injection hooks, telemetry preambles, role rosters, extra skill trees, and any upstream sentence.

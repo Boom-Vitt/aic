@@ -3,8 +3,8 @@
   "workflows": [
     {"id": "answer", "purpose": "Answer a bounded question using authoritative evidence."},
     {"id": "research", "purpose": "Investigate unknowns and reconcile source-backed findings."},
-    {"id": "implementation", "purpose": "Implement approved behavior and verify observable acceptance."},
-    {"id": "debug", "purpose": "Reproduce a failure, establish its cause, fix and recheck."},
+    {"id": "implementation", "purpose": "Implement an approved behavior change and verify the named check before a passed claim."},
+    {"id": "debug", "purpose": "Reproduce a reported failure on the unmodified code, fix the cause, and rerun that same check before a passed claim."},
     {"id": "review", "purpose": "Evaluate existing work against explicit acceptance with concrete evidence."},
     {"id": "design", "purpose": "Compare alternatives against constraints before consequential execution."}
   ],
@@ -50,7 +50,7 @@
     {
       "id": "adaptive-controller",
       "topologies": ["solo", "sequential", "parallel", "generator-evaluator"],
-      "select_when": "Durable delivery needs explicit state, artifact dependencies, recovery ownership and evidence-driven stage reselection; or explicitly authorized optimization has a correct baseline/oracle, representative comparable measurements and bounded resources.",
+      "select_when": "Durable delivery needs explicit state, artifact dependencies, recovery ownership and evidence-driven stage reselection; or explicitly authorized optimization has a correct baseline/check, representative comparable measurements and bounded resources.",
       "avoid_when": "A short task needs no continuity layer, or proposed optimization lacks explicit authorization, correctness evidence or reliable measurements. Ordinary delivery continuity does not require a performance benchmark.",
       "reference": "references/templates.md#adaptive-controller",
       "research": ["meta-control-2026", "openai-harness-2026", "containment-2026", "eat-2026", "co-scientist-2026"]

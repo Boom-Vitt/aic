@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills"))
 SDK_AVAILABLE = importlib.util.find_spec("mcp") is not None
 _SECTIONS = (
-    "start", "workflows", "templates", "project-plans", "routing",
+    "start", "workflows", "templates", "editing", "project-plans", "routing",
     "memory", "safety", "supervision", "research", "integrations",
 )
 _INSPECTION_ERROR = (
