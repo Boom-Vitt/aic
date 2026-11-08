@@ -17,6 +17,10 @@ on:
           - dev
           - heldout-v2
         default: dev
+      baselines:
+        description: Fetch pinned workflow baselines and run them with the same model, budget, and seed
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -45,6 +49,7 @@ jobs:
           BENCH_TERMINAL: ${{ inputs.terminal_bench }}
           BENCH_SWE: ${{ inputs.swe_bench_lite }}
           BENCH_PACK: ${{ inputs.routing_pack }}
+          BENCH_BASELINES: ${{ inputs.baselines }}
         run: |
           set -eu
           case "$BENCH_PACK" in
@@ -60,6 +65,9 @@ jobs:
           fi
           if [ "$BENCH_SWE" = "true" ]; then
             set -- "$@" --swe-bench-lite
+          fi
+          if [ "$BENCH_BASELINES" = "true" ]; then
+            set -- "$@" --baselines
           fi
           "$@"
       - name: Upload the results bundle

@@ -24,6 +24,8 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from benchmarks.aicbench.runner import main as aicbench_main
+from benchmarks.baselines.adapter import AdapterError, load_registry
+from benchmarks.baselines.adapter import main as baselines_main
 from benchmarks.routing.baseline import load_catalog
 from benchmarks.routing.compare import _items, aic_system, main as compare_main, message_body, shared_system, skill_documents
 from benchmarks.routing.score import ScoreError, load_pack
@@ -125,7 +127,15 @@ def pack_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def estimate_for(settings: dict, pack, *, terminal: bool, swe: bool) -> dict:
+def _baseline_ids() -> list[str]:
+    try:
+        registry = load_registry()
+    except AdapterError as exc:
+        raise RunError(str(exc), exc.code) from exc
+    return [item["id"] for item in registry["arms"]]
+
+
+def estimate_for(settings: dict, pack, *, terminal: bool, swe: bool, baselines: bool = False) -> dict:
     pricing = settings["pricing"]
     input_rate = pricing["input_usd_per_million"]
     output_rate = pricing["output_usd_per_million"]
@@ -170,6 +180,15 @@ def estimate_for(settings: dict, pack, *, terminal: bool, swe: bool) -> dict:
     if swe:
         unpriced.append("swe-bench-lite")
         components.append({"name": "swe-bench-lite", "priced": False, "token_budget": None})
+    if baselines:
+        unpriced.append("baselines")
+        components.append({
+            "name": "baselines",
+            "priced": False,
+            "token_budget": None,
+            "arms": _baseline_ids(),
+            "note": "A live run fetches each official git arm at its pinned commit inside the container sandbox. A dry run does not fetch. Unverified installs are excluded.",
+        })
     return {
         "model": settings["model"],
         "input_token_ceiling": input_tokens,
@@ -316,6 +335,17 @@ def _swe_argv(settings: dict, predictions: Path, instance_ids: list[str], run_id
     ]
 
 
+def baseline_live_argv(settings: dict, output: Path) -> list[str]:
+    """Arguments for the live baseline CLI. --model must be one of them."""
+    return [
+        "live",
+        "--sandbox", "container",
+        "--model", settings["model"],
+        "--output", str(output),
+        "--task", "bugfix-ledger-signs",
+    ]
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="run-benchmarks")
     parser.add_argument("--routing-pack", choices=("dev", "heldout-v2"), default="dev")
@@ -325,6 +355,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--swe-bench-lite", action="store_true")
     parser.add_argument("--swe-bench-lite-checkout", type=Path)
     parser.add_argument("--swe-bench-lite-predictions", type=Path)
+    parser.add_argument(
+        "--baselines",
+        action="store_true",
+        help="Also run every registered baseline arm under the pinned model, budget, and seed.",
+    )
     return parser
 
 
@@ -347,6 +382,7 @@ def execute(
     revision_reader=None,
     compare_runner=None,
     aicbench_runner=None,
+    baseline_runner=None,
 ) -> int:
     require_key()
     if args.terminal_bench_checkout and not args.terminal_bench:
@@ -357,7 +393,9 @@ def execute(
     pack_path = resolve_pack(root, settings, args.routing_pack)
     digest = pack_sha256(pack_path)
     pack = load_pack(pack_path)
-    estimate = estimate_for(settings, pack, terminal=args.terminal_bench, swe=args.swe_bench_lite)
+    estimate = estimate_for(
+        settings, pack, terminal=args.terminal_bench, swe=args.swe_bench_lite, baselines=args.baselines,
+    )
     estimate["routing_pack"] = args.routing_pack
     estimate["routing_pack_sha256"] = digest
     print(json.dumps(estimate, indent=2, sort_keys=True), flush=True)
@@ -389,6 +427,8 @@ def execute(
         provenance["commands"].append("terminal-bench subset")
     if args.swe_bench_lite:
         provenance["commands"].append("swe-bench-lite subset")
+    if args.baselines:
+        provenance["commands"].append("python3 -m benchmarks.baselines live")
     _write_json(bundle / "provenance.json", provenance)
     _write_json(bundle / "estimate.json", estimate)
     reader = revision_reader or _checkout_sha
@@ -445,6 +485,14 @@ def execute(
     aicbench_code = aicbench_call(aicbench_argv, environ=os.environ)
     if aicbench_code != 0:
         return aicbench_code
+    if args.baselines:
+        baseline_argv = baseline_live_argv(settings, bundle / "receipts" / "baselines.json")
+        if secret and secret in baseline_argv:
+            raise RunError("refusing to put the API key on a command line.", 1)
+        baseline_call = baseline_runner or baselines_main
+        baseline_code = baseline_call(baseline_argv, environ=os.environ)
+        if baseline_code != 0:
+            return baseline_code
     runner = harness_runner or _harness
     run_id = f"aic-{day}-{sha[:12]}"
     if args.terminal_bench:
@@ -512,6 +560,7 @@ def main(
     revision_reader=None,
     compare_runner=None,
     aicbench_runner=None,
+    baseline_runner=None,
 ) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -524,6 +573,7 @@ def main(
             revision_reader=revision_reader,
             compare_runner=compare_runner,
             aicbench_runner=aicbench_runner,
+            baseline_runner=baseline_runner,
         )
     except (RunError, ScoreError) as exc:
         print(str(exc), file=sys.stderr)

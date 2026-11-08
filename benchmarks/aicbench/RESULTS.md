@@ -21,6 +21,8 @@ A run without `--sandbox container` is debugging output. The report is written w
 
 A missing or blank `ANTHROPIC_API_KEY` exits 3 and writes no report. An invalid trial, a failed task, or a client-side `total_cost_usd` estimate is not a pass rate by itself. Do not fill a missing cost or token field with a computed price or a guessed count.
 
+`python3 -m benchmarks.aicbench --baseline-stub` writes one receipt per registered workflow arm. That file is a plumbing proof. `public_benchmark_scores` is null, `measured` is false, and `official` is false. Do not publish it as a model result.
+
 ## Pipeline smoke
 
 `.github/workflows/aicbench-sandbox.yml` installs bubblewrap on `ubuntu-latest` and runs `python3 -m benchmarks.aicbench --pipeline-smoke --sandbox container` on every pull request. The agent is `stub/agent.py`, a deterministic pipeline smoke test. It is not a model result. It is not a row in a results table. This file does not record a pass rate, token count, cost, or wall time for that stub.

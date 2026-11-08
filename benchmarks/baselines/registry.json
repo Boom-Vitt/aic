@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "checked": "2026-11-08",
+  "model": "claude-sonnet-5-5",
+  "seed": 0,
+  "seed_sent_to_provider": false,
+  "budget": {
+    "max_turns": 30,
+    "timeout_sec": 600,
+    "max_usd": null
+  },
+  "public_benchmark_scores": null,
+  "vendored": false,
+  "note": "Git arms are fetched at the pinned commit when a live run starts. Their trees are not copied into this repository. The license sha256 is the root license file at that commit, read 2026-11-08. A root grant is not a separate review of every nested file. Install commands are the pinned README route. An arm marked unverified-install is excluded from official comparisons.",
+  "arms": [
+    {
+      "id": "plain-claude-code",
+      "role": "plain",
+      "kind": "builtin",
+      "mount": "none",
+      "fetches": false,
+      "license_spdx": null,
+      "install_status": "none",
+      "install_commands": [],
+      "install_note": "Claude Code with no plugin and no install command.",
+      "official_comparison": true,
+      "note": "Claude Code with no AIC skill and no comparable plugin."
+    },
+    {
+      "id": "aic",
+      "role": "aic",
+      "kind": "builtin",
+      "mount": "plugin-dir",
+      "fetches": false,
+      "plugin_manifest": ".claude-plugin/plugin.json",
+      "plugin_name": "aic",
+      "license_spdx": "Apache-2.0",
+      "license_path": "LICENSE",
+      "install_status": "documented",
+      "install_commands": [
+        ["claude", "--plugin-dir", "{checkout}"]
+      ],
+      "install_note": "Mounts a staged directory of the wheel packages skills/aic and src/aic_quickstart plus LICENSE, NOTICE, README.md and the .claude-plugin manifests. The rest of the checkout, including benchmarks, oracles, task references, and heldout packs, is not copied. claude receives --plugin-dir of that directory.",
+      "official_comparison": true,
+      "note": "Shipped plugin and skill files only. The working tree root is not mounted."
+    },
+    {
+      "id": "superpowers",
+      "role": "comparable",
+      "kind": "git",
+      "mount": "installed",
+      "fetches": true,
+      "repository": "obra/superpowers",
+      "url": "https://github.com/obra/superpowers",
+      "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+      "license_spdx": "MIT",
+      "license_path": "LICENSE",
+      "license_sha256": "a37e0e9697144819e1d965176ac4ae5bc3fa02d11e7812036bbcadf6dafe2400",
+      "copyright_notice": "Copyright (c) 2025 Jesse Vincent",
+      "plugin_manifest": ".claude-plugin/plugin.json",
+      "plugin_name": "superpowers",
+      "plugin_version": "7.0.2",
+      "install_status": "unverified-install",
+      "install_commands": [
+        ["/plugin", "marketplace", "add", "obra/superpowers-marketplace"],
+        ["/plugin", "install", "superpowers@superpowers-marketplace"]
+      ],
+      "install_note": "The pinned README Claude Code section documents only those two in-session slash commands. They install the marketplace head, not this commit, and the README does not sanction --plugin-dir. No other install was invented. Excluded from official comparisons.",
+      "official_comparison": false
+    },
+    {
+      "id": "ecc",
+      "role": "comparable",
+      "kind": "git",
+      "mount": "installed",
+      "fetches": true,
+      "repository": "affaan-m/ECC",
+      "url": "https://github.com/affaan-m/ECC",
+      "commit": "d2ef2680594f9a17526a6e1a2e18b3d242c5d17b",
+      "license_spdx": "MIT",
+      "license_path": "LICENSE",
+      "license_sha256": "326146379f01bb137c0a5d3c54770c1aa31076705c8b88a7f6b26a460f6221b2",
+      "copyright_notice": "Copyright (c) 2026 Affaan Mustafa",
+      "plugin_manifest": ".claude-plugin/plugin.json",
+      "plugin_name": "ecc",
+      "plugin_version": "2.2.3",
+      "install_status": "documented",
+      "install_commands": [
+        ["npx", "--yes", "ecc-universal@2.2.3", "setup", "--mode", "claude-plugin", "--scope", "user", "--hooks", "standard", "--yes"]
+      ],
+      "install_note": "Pinned README command is npx ecc-universal@2.2.3 setup. A typical personal setup chooses Global user, Standard hooks, and confirm. Pinned ecc setup --help names those as --mode claude-plugin --scope user --hooks standard --yes. npx --yes skips npm's install prompt. The git tree is license-checked and is not an agent mount.",
+      "official_comparison": true
+    },
+    {
+      "id": "agent-skills",
+      "role": "comparable",
+      "kind": "git",
+      "mount": "plugin-dir",
+      "fetches": true,
+      "repository": "addyosmani/agent-skills",
+      "url": "https://github.com/addyosmani/agent-skills",
+      "commit": "301b02b12bff98e4688e6984af6556802322bbde",
+      "license_spdx": "MIT",
+      "license_path": "LICENSE",
+      "license_sha256": "6f202f8bd568cd730dbb2b0d1f8e243bc74c2fa1f64dbce9b2c7ea08bd5c9fd7",
+      "copyright_notice": "Copyright (c) 2025 Addy Osmani",
+      "plugin_manifest": ".claude-plugin/plugin.json",
+      "plugin_name": "agent-skills",
+      "plugin_version": "0.6.15",
+      "install_status": "documented",
+      "install_commands": [
+        ["claude", "--plugin-dir", "{checkout}"]
+      ],
+      "install_note": "Pinned README local/development section documents claude --plugin-dir on a clone. The harness fetches this commit and passes that directory. npx skills add tracks the default branch, so it is not the pin-accurate route.",
+      "official_comparison": true
+    },
+    {
+      "id": "planning-with-files",
+      "role": "comparable",
+      "kind": "git",
+      "mount": "plugin-dir",
+      "fetches": true,
+      "repository": "OthmanAdi/planning-with-files",
+      "url": "https://github.com/OthmanAdi/planning-with-files",
+      "commit": "2362ca385ad74f061aa0e7b73f56543a4b7e6df2",
+      "license_spdx": "MIT",
+      "license_path": "LICENSE",
+      "license_sha256": "4f2e5ecfaa4e0833621cfe54c0bdc2f60f086c0925540d7bdc713517eafb3c84",
+      "copyright_notice": "Copyright (c) 2026 Ahmad Adi",
+      "plugin_manifest": ".claude-plugin/plugin.json",
+      "plugin_name": "planning-with-files",
+      "plugin_version": "3.28.1",
+      "install_status": "documented",
+      "install_commands": [
+        ["claude", "--plugin-dir", "{checkout}"]
+      ],
+      "install_note": "Pinned docs/installation.md Local Plugin Development documents claude --plugin-dir on a checkout. The harness fetches this commit and passes that directory.",
+      "official_comparison": true
+    },
+    {
+      "id": "gstack",
+      "role": "comparable",
+      "kind": "git",
+      "mount": "installed",
+      "fetches": true,
+      "repository": "garrytan/gstack",
+      "url": "https://github.com/garrytan/gstack",
+      "commit": "23f9d07ce9e802ac148a8a353228f201655fc5b8",
+      "license_spdx": "MIT",
+      "license_path": "LICENSE",
+      "license_sha256": "e56fbb5b3d95756f3fa1cfefa24732ec79f18ece1ad08a4e79e00df57e8b198c",
+      "copyright_notice": "Copyright (c) 2026 Garry Tan",
+      "skill_name": "gstack",
+      "skill_path": "SKILL.md",
+      "install_status": "documented",
+      "install_commands": [
+        ["./setup"]
+      ],
+      "install_note": "Pinned README clones into ~/.claude/skills/gstack and runs ./setup. Bun 1.4.2 or newer must be on PATH. The harness fetches this commit into that directory and runs ./setup with /bin/bash and no extra flags.",
+      "official_comparison": true
+    }
+  ]
+}

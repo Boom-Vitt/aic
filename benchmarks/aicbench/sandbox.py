@@ -40,14 +40,27 @@ def container_command(
     config: Path,
     binary: Path,
     repo: Path,
+    unshare_net: bool = False,
+    extra_binds: tuple[tuple[str, str], ...] = (),
+    extra_ro_binds: tuple[str, ...] = (),
 ) -> list[str]:
-    """Bubblewrap argv that mounts the workspace and skill, not the repository."""
+    """Bubblewrap argv that mounts the workspace and skill, not the repository.
+
+    ``unshare_net`` is off unless the caller supplies an egress proxy. aicbench
+    leaves it off. Baseline runs turn it on and bind the proxy socket.
+    """
     repo_resolved = repo.resolve()
     for label, path in (("binary", binary), ("workspace", workspace), ("home", home), ("config", config)):
         if not _outside_repo(path, repo_resolved):
             raise GradeError(f"Refusing to mount a repository path into the sandbox ({label}).")
     if skill_root is not None and not _outside_repo(skill_root, repo_resolved):
         raise GradeError("Refusing to mount a repository path into the sandbox (skill).")
+    for source, _dest in extra_binds:
+        if not _outside_repo(Path(source), repo_resolved):
+            raise GradeError("Refusing to mount a repository path into the sandbox (proxy).")
+    for source in extra_ro_binds:
+        if not _outside_repo(Path(source), repo_resolved):
+            raise GradeError("Refusing to mount a repository path into the sandbox (tool).")
     command = [
         "bwrap",
         "--die-with-parent",
@@ -56,6 +69,8 @@ def container_command(
         "--unshare-ipc",
         "--unshare-uts",
     ]
+    if unshare_net:
+        command.append("--unshare-net")
     for directory in ("/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc/ssl", "/etc/pki", "/etc/ca-certificates"):
         candidate = Path(directory)
         if candidate.is_dir() and _outside_repo(candidate, repo_resolved):
@@ -70,6 +85,10 @@ def container_command(
     if skill_root is not None:
         text = str(skill_root.resolve())
         command.extend(["--ro-bind", text, text])
+    for source, dest in extra_binds:
+        command.extend(["--bind", source, dest])
+    for source in extra_ro_binds:
+        command.extend(["--ro-bind", source, source])
     binary_text = str(binary.resolve())
     system_prefixes = ("/usr/", "/lib/", "/lib64/", "/bin/", "/sbin/")
     if not binary_text.startswith(system_prefixes):
