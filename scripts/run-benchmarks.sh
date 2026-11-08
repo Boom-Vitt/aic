@@ -2,6 +2,8 @@
 # Run the pinned AIC-versus-baseline comparison.
 # --dry-run prints the token-budget ceiling and does not call a model.
 # --routing-pack dev is the tuning pack. heldout-v2 is the release pack.
+# --baselines fetches each registered workflow repository at its pinned commit.
+# A missing or blank ANTHROPIC_API_KEY still exits 3 before any fetch or model call.
 set -eu
 ROOT=$(unset CDPATH; cd -- "$(dirname -- "$0")/.." && pwd)
 # The repository root must come first so this command uses benchmarks.routing

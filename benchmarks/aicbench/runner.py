@@ -23,6 +23,7 @@ import sys
 import tempfile
 import time
 
+from benchmarks.baselines.adapter import AdapterError, run_stub
 from . import SCHEMA_VERSION, UNOFFICIAL_WARNING
 from .catalog import CatalogError, Task, load_catalog
 from .grading import (
@@ -103,6 +104,14 @@ def _parser() -> argparse.ArgumentParser:
         "--require-official",
         type=Path,
         help="Check a saved report and exit. Does not start a model. Unofficial reports are refused.",
+    )
+    parser.add_argument(
+        "--baseline-stub",
+        action="store_true",
+        help=(
+            "Run every registered baseline through benchmarks/aicbench/stub/agent.py and the oracle. "
+            "No API key, no network fetch, and no public score."
+        ),
     )
     parser.add_argument(
         "--pipeline-smoke",
@@ -536,6 +545,31 @@ def _emit_report(report: dict, output: Path | None) -> None:
         print(text, end="")
 
 
+def _baseline_stub_cli(args: argparse.Namespace, parent: dict[str, str]) -> int:
+    if args.official or args.pipeline_smoke or args.sandbox != "none" or args.tasks:
+        print(
+            "aicbench: the baseline stub proof does not take --official, --pipeline-smoke, "
+            "--sandbox container, or --tasks. It is not a public score.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+    try:
+        report = run_stub(parent)
+    except (AdapterError, CatalogError, GradeError, OSError) as exc:
+        print(f"aicbench: {exc}", file=sys.stderr)
+        return exc.code if isinstance(exc, AdapterError) else EXIT_USAGE
+    if report.get("public_benchmark_scores") is not None or report.get("invokes_model") is not False:
+        print("aicbench: baseline stub report is not a plumbing proof.", file=sys.stderr)
+        return EXIT_USAGE
+    _emit_report(report, args.output)
+    print(
+        "aicbench: baseline stub proof, not a public score; "
+        f"arms={len(report.get('receipts') or [])}; ok={report.get('ok')}",
+        file=sys.stderr,
+    )
+    return 0 if report.get("ok") is True else 1
+
+
 def _pipeline_smoke_cli(args: argparse.Namespace, parent: dict[str, str]) -> int:
     if args.official:
         print(
@@ -573,6 +607,8 @@ def main(argv: list[str] | None = None, environ: dict[str, str] | None = None) -
     if args.require_official is not None:
         return _check_saved_report(args.require_official)
     parent = os.environ if environ is None else environ
+    if args.baseline_stub:
+        return _baseline_stub_cli(args, parent)
     if args.pipeline_smoke:
         return _pipeline_smoke_cli(args, parent)
     try:
