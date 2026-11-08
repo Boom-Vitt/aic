@@ -3,8 +3,8 @@
   "workflows": [
     {"id": "answer", "purpose": "Answer a bounded question using authoritative evidence."},
     {"id": "research", "purpose": "Investigate unknowns and reconcile source-backed findings."},
-    {"id": "implementation", "purpose": "Implement approved behavior and verify observable acceptance."},
-    {"id": "debug", "purpose": "Reproduce a failure, establish its cause, fix and recheck."},
+    {"id": "implementation", "purpose": "Implement an approved behavior change and verify the named check before a passed claim."},
+    {"id": "debug", "purpose": "Reproduce a reported failure on the unmodified code, fix the cause, and rerun that same check before a passed claim."},
     {"id": "review", "purpose": "Evaluate existing work against explicit acceptance with concrete evidence."},
     {"id": "design", "purpose": "Compare alternatives against constraints before consequential execution."}
   ],
@@ -18,7 +18,7 @@
     {
       "id": "direct",
       "topologies": ["solo"],
-      "select_when": "Work is bounded or coupled and delegation would mostly repeat context.",
+      "select_when": "Work is one approved behavior in one workspace, or otherwise bounded or coupled, and delegation would mostly repeat context.",
       "avoid_when": "Independent substantial work or consequential acceptance gaps justify another structure.",
       "reference": "references/templates.md#direct",
       "research": ["google-2026", "concurrency-2026", "anthropic-agents-2024", "swe-agent-2024", "agentless-2024", "autocoderover-2024"]

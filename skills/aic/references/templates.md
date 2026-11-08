@@ -33,7 +33,7 @@ Worker completion returns an artifact, not final acceptance. A caller keeps inte
 
 ### Select and avoid
 
-Select for a bounded answer, one coupled feature, a shared invariant, an initial failure investigation or a design choice that fits coherent owner-held context. Avoid adding workers for trivial lookups or because delegation is available. Choose another template when independent discovery, isolated implementation, continuity or consequential evaluation is a real bottleneck.
+Select for a bounded answer, one coupled feature, a shared invariant, an initial failure investigation or a design choice that fits coherent owner-held context. One already approved behavior in one workspace stays here: run the changed-surface loop before any delegation. Avoid adding workers for trivial lookups or because delegation is available. Choose another template when independent discovery, isolated implementation, continuity or consequential evaluation is a real bottleneck.
 
 ### Inputs, context and ownership
 

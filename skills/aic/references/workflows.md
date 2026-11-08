@@ -40,6 +40,8 @@ Do not delegate all work to another CLI by default. The accountable lead retains
 
 ## Select by task properties
 
+A single reported failure, one feature, one refactor, or one documentation change in one workspace is `direct` / `solo` unless a second substantial write scope, a required separate evaluator, or durable continuity is already visible. Control overhead is not free on a short turn budget: do not design a team, and do not write a plan file, before the changed-surface loop for that unit. Coordination stays mandatory when a row below names an independence, handoff, review, or continuity bottleneck.
+
 | Observed properties | Select | Avoid or simplify when |
 | --- | --- | --- |
 | Bounded question, coherent change, initial bug investigation or coupled design | [direct](templates.md#direct) / `solo` | The work has a demonstrated independent discovery, integration or evaluation bottleneck |

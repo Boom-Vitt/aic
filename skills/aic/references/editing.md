@@ -56,6 +56,31 @@ A screenshot, a worker report or a claim that the code looks right does not fill
 
 Passed, partial and blocked keep the meanings in [workflow selection](workflows.md#outcomes-and-stop-rules). An unrun required check blocks a passed claim.
 
+### Machine-checked record
+
+The optional `check-surface` helper accepts one JSON object and does not run the command. A valid record is not approval, and it does not prove the observation text is true. `passed` is accepted only when `not_run` is empty and the exit codes match the change kind:
+
+- `failure` and `behavior`: one command has a nonzero `before` exit and an `after` exit of 0.
+- `refactor`: one command has `before` and `after` exits that are both 0.
+- `docs`: one `after` exit is 0, and a command recorded in both phases keeps the same exit code.
+
+Fields are exactly `schema_version` (the integer 1), `kind` (`aic-changed-surface`), `task`, `change_kind` (`failure`, `behavior`, `refactor` or `docs`), `outcome` (`passed`, `partial`, `blocked` or `failed`), `checks` and `not_run`. Each check has exactly `command`, `phase` (`before` or `after`), `observed` and `exit_code`. A command that names an `oracle` or `reference` path, uses `..`, or is absolute is rejected. At most 8 checks and 12 not-run strings. `partial`, `blocked` and `failed` may omit checks.
+
+```json
+{
+  "schema_version": 1,
+  "kind": "aic-changed-surface",
+  "task": "Signed totals disagree with the ledger.",
+  "change_kind": "failure",
+  "outcome": "passed",
+  "checks": [
+    {"command": "python -m unittest tests.test_totals", "phase": "before", "observed": "AssertionError: expected 1", "exit_code": 1},
+    {"command": "python -m unittest tests.test_totals", "phase": "after", "observed": "OK", "exit_code": 0}
+  ],
+  "not_run": []
+}
+```
+
 ## Findings, when evaluation is separate
 
 Use this only when the selected family is `independent-review`, or when the user asked for a separate check. The evaluator receives the issue or criteria, the artifact version and the check outcomes. The evaluator does not receive the generator's argument for its own patch.

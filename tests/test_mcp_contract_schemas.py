@@ -34,6 +34,7 @@ GUIDANCE = {
     "start": "SKILL.md",
     "workflows": "references/workflows.md",
     "templates": "references/templates.md",
+    "editing": "references/editing.md",
     "project-plans": "references/project-plans.md",
     "routing": "references/routing.md",
     "memory": "references/memory.md",

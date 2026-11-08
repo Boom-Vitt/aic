@@ -8,6 +8,7 @@ from pathlib import Path
 
 from . import __version__
 from .safety import AICError, checked_root, safe_path
+from .surface import validate_surface
 
 
 def _json_file(value: str) -> dict:
@@ -53,6 +54,8 @@ def parser() -> argparse.ArgumentParser:
     read.add_argument("--project", type=Path, required=True)
     handoff = commands.add_parser("check-handoff", help="Validate continuation data without replaying any action.")
     handoff.add_argument("file")
+    surface = commands.add_parser("check-surface", help="Validate a changed-surface record without running its commands.")
+    surface.add_argument("file")
     plan = commands.add_parser("orca-plan", help="Print a non-mutating Orca/omp launch plan and its approval digest.")
     plan.add_argument("file")
     plan.add_argument("--project", type=Path, required=True)
@@ -92,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "check-handoff":
             from .memory import validate_handoff
             result = validate_handoff(_json_file(args.file))
+        elif args.command == "check-surface":
+            result = validate_surface(_json_file(args.file))
         elif args.command == "orca-plan":
             from .orca import plan_handoff
             result = plan_handoff(checked_root(args.project, must_exist=False), _json_file(args.file), name=args.name, model=args.model)
