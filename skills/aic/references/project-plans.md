@@ -69,7 +69,7 @@ Treat security as part of the milestone that touches it, not a separate project.
 - data deletion;
 - dependencies, lockfiles or container images.
 
-Scale the effort to the exposure. A small owner-held change uses the checklist in place. A consequential or public surface gets an `independent-review` stage with clean, selected input.
+Scale the effort to the exposure. A small owner-held change uses the checklist in place. A consequential or public surface usually warrants an `independent-review` stage with clean, selected input, when an evaluator is available and approved. Otherwise, record that limit.
 
 1. **Map the boundary.** Read code and configuration read-only. Record:
    - who can reach the surface;
@@ -81,7 +81,8 @@ Scale the effort to the exposure. A small owner-held change uses the checklist i
    - a reproduced failing test;
    - an advisory that matches the pinned version actually in use.
 4. **Prioritize by exploitability and exposure.** Rank reachable-from-untrusted-input, known-exploited, data-exposure and money-moving issues first, then the rest.
-5. **Fix test-first at the boundary.**
+5. **Fix test-first at the boundary, within scope.**
+   - Fix only inside the milestone's approved write scope and checks. Otherwise, report the item as confirmed but open.
    - Write a failing test through the real route or entry point, then make the smallest root-cause fix.
    - Rerun that test and the affected suite.
    - Never "fix" by weakening a check, widening an allowlist, disabling a scanner or deleting the test.

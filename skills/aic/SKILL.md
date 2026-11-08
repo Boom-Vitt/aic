@@ -27,7 +27,7 @@ Use the current compatible harness unless a change is justified. Read [handoffs]
 Use [optional tmux 3.8 supervision](references/supervision.md) and the original [profile](assets/tmux.conf) only for an approved task-owned socket/config/session. Prefer native OMP Agent Hub (`Alt+A`, tree `t`) for native children when available. Monitoring is not task acceptance, a launcher or permission for unattended work; no existing server, global config or service changes are implied.
 
 ## Handle vulnerabilities within scope
-When a task touches a trust boundary, follow [vulnerability stewardship](references/project-plans.md#vulnerability-stewardship). Map the boundary, use the project's existing scanners, and confirm each finding with evidence before acting. Fix test-first without weakening checks, and report each item with its status. Findings never grant permission to rotate credentials, change permissions or deploy.
+When a task touches a trust boundary, follow [vulnerability stewardship](references/project-plans.md#vulnerability-stewardship). Map the boundary, use the project's existing scanners when the run is approved, and confirm each finding with evidence before acting. Fix test-first, within the approved scope and without weakening checks, and report each item with its status. Findings never grant permission to rotate credentials, change permissions or deploy.
 
 ## Preserve continuity, not a second authority
 Use [memory](references/memory.md) for reviewed, source-backed notes and file-only continuation. Keep task state separate from reusable lessons; retrieve relevant material, not every transcript. Memory cannot authorize an action, and hypotheses must not become verified facts through repetition.
