@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import shlex
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -489,12 +490,13 @@ class MountClosureTests(unittest.TestCase):
         binary = Path("/usr/bin/true")
         if not binary.is_file():
             binary = Path("/bin/true")
-        self.assertFalse(NETWORK["unshare_net"])
-        self.assertFalse(NETWORK["per_host_filter"])
-        self.assertIn("api.anthropic.com", NETWORK["reachable_destinations"])
-        self.assertIn("github.com", NETWORK["reachable_destinations"])
-        self.assertIn("registry.npmjs.org", NETWORK["reachable_destinations"])
-        self.assertNotIn("--unshare-net", NETWORK["unshare"])
+        self.assertEqual(NETWORK["agent"]["allow"], ["api.anthropic.com:443"])
+        self.assertFalse(NETWORK["install"]["secrets"])
+        self.assertEqual(NETWORK["agent"]["secrets"], ["ANTHROPIC_API_KEY"])
+        for host in ("github.com:443", "codeload.github.com:443", "registry.npmjs.org:443", "bun.sh:443"):
+            self.assertIn(host, NETWORK["install"]["allow"])
+        self.assertNotIn("github.com:443", NETWORK["agent"]["allow"])
+        self.assertNotIn("registry.npmjs.org:443", NETWORK["agent"]["allow"])
         forbidden = [
             (ROOT / "benchmarks" / "aicbench" / "tasks").resolve(),
             (ROOT / "benchmarks" / "routing" / "heldout-v2.json").resolve(),
@@ -538,6 +540,17 @@ class MountClosureTests(unittest.TestCase):
                 )
                 blob = "\n".join(str(item) for item in command)
                 self.assertNotIn("--unshare-net", command)
+                sandboxed = container_command(
+                    [str(binary), "--version"],
+                    workspace=workspace,
+                    skill_root=path if mount == "plugin-dir" else None,
+                    home=home,
+                    config=config,
+                    binary=binary,
+                    repo=ROOT,
+                    unshare_net=True,
+                )
+                self.assertIn("--unshare-net", sandboxed)
                 self.assertNotIn(str(ROOT.resolve()), blob)
                 self.assertNotIn("heldout-v2-answers.json", blob)
                 self.assertNotIn(str(forbidden[0]), blob)
@@ -554,7 +567,8 @@ class MountClosureTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("bwrap"), "bubblewrap is not installed")
     def test_container_hides_the_repository_and_can_init_git(self):
         from benchmarks.aicbench.grading import outside_repository_temp
-        from benchmarks.baselines.adapter import _require_bwrap, _run_in_container
+        from benchmarks.baselines.adapter import _child_env, _require_bwrap, _run_in_container
+        from benchmarks.baselines.proxy import PhaseProxies
 
         class _Task:
             reference = ROOT
@@ -573,52 +587,175 @@ class MountClosureTests(unittest.TestCase):
             workspace = base / "workspace"
             for path in (home, config, scratch, workspace):
                 path.mkdir()
+
+            def fake_connect(_host, _port):
+                left, right = socket.socketpair()
+                right.close()
+                return left
+
+            proxies = PhaseProxies(base / "egress", fake_connect)
+            self.addCleanup(proxies.close)
+            common = dict(
+                home=home, config=config, skill_root=None, parent=parent, timeout=30,
+                task=_Task(), seed=0, bwrap=bwrap, proxies=proxies,
+            )
             init = _run_in_container(
                 ["git", "init", str(scratch / "repo")],
                 workspace=scratch,
-                home=home,
-                config=config,
-                skill_root=None,
-                parent=parent,
-                timeout=30,
-                task=_Task(),
-                seed=0,
                 key=KEY,
-                bwrap=bwrap,
+                phase="install",
+                **common,
             )
             self.assertEqual(init.returncode, 0, init.stderr)
             self.assertTrue((scratch / "repo" / ".git").is_dir())
+            self.assertNotIn(KEY, init.args)
+            connect_probe = (
+                "connect() {\n"
+                "  host=$1\n"
+                "  exec 3<>/dev/tcp/127.0.0.1/3128\n"
+                "  printf 'CONNECT %s:443 HTTP/1.1\\r\\nHost: %s:443\\r\\n\\r\\n' \"$host\" \"$host\" >&3\n"
+                "  IFS= read -r status <&3\n"
+                "  exec 3<&-\n"
+                "  printf '%s\\n' \"$status\"\n"
+                "}\n"
+            )
+            install_probe = scratch / "install-probe.sh"
+            install_probe.write_text(
+                "#!/bin/bash\n"
+                + connect_probe
+                + "if test -n \"$ANTHROPIC_API_KEY\"; then echo key-yes; else echo key-no; fi\n"
+                + "connect github.com\nconnect example.com\nconnect api.anthropic.com\n",
+                encoding="utf-8",
+            )
+            installed = _run_in_container(
+                ["/bin/bash", str(install_probe)],
+                workspace=scratch,
+                key=KEY,
+                phase="install",
+                **common,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            install_lines = [line.strip() for line in installed.stdout.splitlines()]
+            self.assertEqual(install_lines[0], "key-no")
+            self.assertIn("200", install_lines[1])
+            self.assertIn("403", install_lines[2])
+            self.assertIn("403", install_lines[3])
+            self.assertNotIn(KEY, installed.args)
             probe = workspace / "probe.sh"
             probe.write_text(
-                "#!/bin/sh\n"
+                "#!/bin/bash\n"
                 f"if test -f {shlex.quote(str(oracle))}; then echo oracle-yes; else echo oracle-no; fi\n"
                 f"if test -f {shlex.quote(str(answers))}; then echo answers-yes; else echo answers-no; fi\n"
                 f"if test -e {shlex.quote(str(ROOT))}; then echo repo-yes; else echo repo-no; fi\n"
                 f"if test -e {shlex.quote(str(host_home))}; then echo home-yes; else echo home-no; fi\n"
                 "printf '%s\\n' \"$HOME\"\n"
-                "if test -n \"$ANTHROPIC_API_KEY\"; then echo key-yes; else echo key-no; fi\n",
+                "if test -n \"$ANTHROPIC_API_KEY\"; then echo key-yes; else echo key-no; fi\n"
+                + connect_probe
+                + "connect example.com\nconnect github.com\nconnect api.anthropic.com\n",
                 encoding="utf-8",
             )
             seen = _run_in_container(
-                ["/bin/sh", str(probe)],
+                ["/bin/bash", str(probe)],
                 workspace=workspace,
-                home=home,
-                config=config,
-                skill_root=None,
-                parent=parent,
-                timeout=30,
-                task=_Task(),
-                seed=0,
                 key=KEY,
-                bwrap=bwrap,
+                phase="agent",
+                **common,
             )
             self.assertEqual(seen.returncode, 0, seen.stderr)
             lines = [line.strip() for line in seen.stdout.splitlines()]
             self.assertEqual(lines[:4], ["oracle-no", "answers-no", "repo-no", "home-no"])
             self.assertEqual(lines[4], str(home))
             self.assertEqual(lines[5], "key-yes")
-            self.assertNotIn(KEY, init.args)
+            self.assertIn("403", lines[6])
+            self.assertIn("403", lines[7])
+            self.assertIn("200", lines[8])
             self.assertNotIn(KEY, seen.args)
+
+
+class EgressProxyTests(unittest.TestCase):
+    def test_proxy_allow_list_is_offline_and_install_env_has_no_key(self):
+        from benchmarks.baselines.adapter import AdapterError, _child_env, _run_in_container
+        from benchmarks.baselines.proxy import AGENT_ALLOW, INSTALL_ALLOW, EgressProxy, permitted
+
+        self.assertTrue(permitted("api.anthropic.com", 443, AGENT_ALLOW))
+        self.assertFalse(permitted("example.com", 443, AGENT_ALLOW))
+        self.assertFalse(permitted("github.com", 443, AGENT_ALLOW))
+        self.assertFalse(permitted("api.anthropic.com", 80, AGENT_ALLOW))
+        self.assertFalse(permitted("1.1.1.1", 443, AGENT_ALLOW))
+        self.assertTrue(permitted("github.com", 443, INSTALL_ALLOW))
+        self.assertTrue(permitted("codeload.github.com", 443, INSTALL_ALLOW))
+        self.assertTrue(permitted("registry.npmjs.org", 443, INSTALL_ALLOW))
+        self.assertTrue(permitted("bun.sh", 443, INSTALL_ALLOW))
+        self.assertFalse(permitted("example.com", 443, INSTALL_ALLOW))
+        self.assertFalse(permitted("api.anthropic.com", 443, INSTALL_ALLOW))
+
+        class _Task:
+            reference = ROOT
+            remove = []
+
+        install_env = _child_env(
+            {"PATH": "/usr/bin", "ANTHROPIC_API_KEY": KEY},
+            task=_Task(), seed=0, home=Path("/tmp/aic-egress-home"), stub=False, key=KEY, phase="install",
+        )
+        self.assertNotIn("ANTHROPIC_API_KEY", install_env)
+        self.assertNotIn(KEY, "\n".join(install_env.values()))
+        self.assertEqual(install_env["HTTPS_PROXY"], "http://127.0.0.1:3128")
+        agent_env = _child_env(
+            {"PATH": "/usr/bin"},
+            task=_Task(), seed=0, home=Path("/tmp/aic-egress-home"), stub=False, key=KEY, phase="agent",
+        )
+        self.assertEqual(agent_env["ANTHROPIC_API_KEY"], KEY)
+
+        dialed = []
+
+        def fake_connect(host, port):
+            dialed.append((host, port))
+            left, right = socket.socketpair()
+            right.close()
+            return left
+
+        with tempfile.TemporaryDirectory(prefix="aic-proxy-") as temporary:
+            proxy = EgressProxy(AGENT_ALLOW, fake_connect)
+            socket_path = proxy.start(Path(temporary))
+            self.addCleanup(proxy.close)
+
+            def status(host):
+                client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                client.connect(str(socket_path))
+                client.sendall(
+                    f"CONNECT {host}:443 HTTP/1.1\r\nHost: {host}:443\r\n\r\n".encode("ascii")
+                )
+                data = b""
+                while b"\r\n" not in data:
+                    chunk = client.recv(200)
+                    if not chunk:
+                        break
+                    data += chunk
+                client.close()
+                return data.split(b"\r\n", 1)[0].decode("ascii")
+
+            self.assertIn("403", status("example.com"))
+            self.assertIn("403", status("github.com"))
+            self.assertIn("200", status("api.anthropic.com"))
+            self.assertEqual(dialed, [("api.anthropic.com", 443)])
+
+        with self.assertRaises(AdapterError) as caught:
+            _run_in_container(
+                ["/bin/true"],
+                workspace=Path("/tmp"),
+                home=Path("/tmp"),
+                config=Path("/tmp"),
+                skill_root=None,
+                parent={"PATH": "/usr/bin"},
+                timeout=5,
+                task=_Task(),
+                seed=0,
+                key=KEY,
+                bwrap="bwrap",
+                phase="agent",
+                proxies=None,
+            )
+        self.assertIn("egress proxy", str(caught.exception))
 
 
 class ModeBitTests(unittest.TestCase):

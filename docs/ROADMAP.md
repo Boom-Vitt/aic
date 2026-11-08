@@ -32,7 +32,7 @@ Landed on `main` through [#31](https://github.com/Boom-Vitt/aic/pull/31) (`79093
 - SWE-bench Lite and Verified, Terminal-Bench, and Aider polyglot have not been run. Aider's exercises are not licensed for copying into this tree. See `docs/BENCHMARKS.md`.
 - The Terminal-Bench and SWE-bench flags on `./scripts/run-benchmarks.sh` still record `aic_treatment` false. They do not load AIC or the other registered plugins inside those harnesses.
 - Registered comparable repositories are pinned and wired. They have not been fetched or scored in a model run.
-- Official aicbench numbers still require `--sandbox container`. Official baseline results also refuse sandbox `none`. The baseline stub proof uses sandbox `none` on purpose, so the stub can read the reference solution. That report stays unofficial. `superpowers` is an unverified install and is excluded from official comparisons.
+- Official aicbench numbers still require `--sandbox container`. Official baseline results also refuse sandbox `none` and refuse to run without the egress proxy. The baseline stub proof uses sandbox `none` on purpose, so the stub can read the reference solution. That report stays unofficial. `superpowers` is an unverified install and is excluded from official comparisons.
 
 ## Next
 

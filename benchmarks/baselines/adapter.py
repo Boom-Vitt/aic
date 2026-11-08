@@ -35,6 +35,14 @@ from benchmarks.aicbench.grading import (
 )
 from benchmarks.aicbench.metrics import cost_from_payload, cost_text
 from benchmarks.aicbench.sandbox import container_command
+from benchmarks.baselines.proxy import (
+    PROXY_PORT,
+    PROXY_URL,
+    PhaseProxies,
+    network_policy,
+    system_python,
+    write_forwarder,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,47 +90,9 @@ _GIT_FIELDS = frozenset({
     "install_note",
     "official_comparison",
 })
-# What a live container can reach. container_command does not pass --unshare-net.
-NETWORK = {
-    "bubblewrap": "benchmarks/aicbench/sandbox.py container_command",
-    "unshare": ["user", "pid", "ipc", "uts"],
-    "unshare_net": False,
-    "per_host_filter": False,
-    "filesystem_read_only": [
-        "/usr",
-        "/lib",
-        "/lib64",
-        "/bin",
-        "/sbin",
-        "/etc/ssl",
-        "/etc/pki",
-        "/etc/ca-certificates",
-        "/etc/resolv.conf",
-        "the Claude executable file when it is outside those prefixes",
-        "a plugin directory, read-only, when the arm's install is --plugin-dir",
-    ],
-    "filesystem_read_write": [
-        "the per-arm task workspace",
-        "a fresh HOME created for that arm",
-        "a fresh CLAUDE_CONFIG_DIR created for that arm",
-        "a tmpfs at /tmp",
-    ],
-    "filesystem_hidden": [
-        "this repository",
-        "the invoking user's home directory",
-        "benchmarks/aicbench/tasks oracle and reference trees",
-        "benchmarks/routing/heldout-v2.json",
-        "benchmarks/routing/heldout-v2-answers.json",
-    ],
-    "reachable_destinations": (
-        "The container shares the host network namespace. "
-        "bubblewrap is not started with --unshare-net, and this harness does not install a per-host firewall. "
-        "Any destination the host can route is reachable, including the model API at api.anthropic.com:443, "
-        "git fetch at github.com:443, npm at registry.npmjs.org:443, and the hosts Bun uses to download packages. "
-        "The API key is placed only in the sandboxed process environment because Claude Code reads it there. "
-        "It is not a command argument."
-    ),
-}
+# Live receipts copy this. Install has no secrets. The agent may reach only the model API.
+NETWORK = network_policy()
+_PROXY_REFUSAL = "official baseline results refuse to run without the egress proxy."
 
 
 class AdapterError(Exception):
@@ -699,6 +669,7 @@ def _child_env(
     stub: bool,
     key: str | None,
     config: Path | None = None,
+    phase: str | None = None,
 ) -> dict[str, str]:
     env = {
         "AIC_BENCH_SEED": str(seed),
@@ -715,13 +686,29 @@ def _child_env(
         env["AICBENCH_STUB_REFERENCE"] = str(task.reference.resolve())
         env["AICBENCH_STUB_REMOVE"] = json.dumps(list(task.remove))
         return env
-    if not key:
-        raise AdapterError("ANTHROPIC_API_KEY is required.", 3)
-    env["ANTHROPIC_API_KEY"] = key
     env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
     env["GIT_CONFIG_GLOBAL"] = "/dev/null"
     env["GIT_CONFIG_NOSYSTEM"] = "1"
     env["TMPDIR"] = "/tmp"
+    env.update({
+        "HTTP_PROXY": PROXY_URL,
+        "HTTPS_PROXY": PROXY_URL,
+        "ALL_PROXY": PROXY_URL,
+        "http_proxy": PROXY_URL,
+        "https_proxy": PROXY_URL,
+        "all_proxy": PROXY_URL,
+        "NO_PROXY": "",
+        "no_proxy": "",
+    })
+    if phase == "install":
+        if "ANTHROPIC_API_KEY" in env or (key and any(key in value for value in env.values())):
+            raise AdapterError("install phase environment contains a secret.", 1)
+        return env
+    if phase != "agent":
+        raise AdapterError(_PROXY_REFUSAL, 1)
+    if not key:
+        raise AdapterError("ANTHROPIC_API_KEY is required.", 3)
+    env["ANTHROPIC_API_KEY"] = key
     return env
 
 
@@ -810,6 +797,7 @@ def _blank_receipt(
         "prompt_sha256": None,
         "public_benchmark_scores": None,
         "repository": entry.get("repository"),
+        "network": NETWORK if sandbox == "container" else None,
         "sandbox": sandbox,
         "sandboxed": False,
         "seed": registry["seed"],
@@ -852,6 +840,35 @@ def _stub_observed(payload: dict, *, mount: str, mount_path: Path | None, entry:
     return f"unknown mount: {mount}"
 
 
+def _tool_binds(argv: list[str], roots: tuple[Path, ...]) -> tuple[str, ...]:
+    mounted = []
+    for root in roots:
+        try:
+            mounted.append(root.resolve())
+        except OSError:
+            continue
+    binds: list[str] = []
+    repo = ROOT.resolve()
+    for item in argv:
+        if not item.startswith("/"):
+            continue
+        candidate = Path(item)
+        if not candidate.is_file() and not candidate.is_symlink():
+            continue
+        try:
+            resolved = candidate.resolve()
+        except OSError:
+            continue
+        text = str(resolved)
+        if text.startswith(_SYSTEM_PREFIXES) or resolved == repo or repo in resolved.parents:
+            continue
+        if any(resolved == root or root in resolved.parents for root in mounted):
+            continue
+        if text not in binds:
+            binds.append(text)
+    return tuple(binds)
+
+
 def _run_in_container(
     argv: list[str],
     *,
@@ -865,15 +882,27 @@ def _run_in_container(
     seed: int,
     key: str | None,
     bwrap: str,
+    phase: str,
+    proxies: PhaseProxies,
 ) -> subprocess.CompletedProcess:
+    if proxies is None or phase not in {"install", "agent"}:
+        raise AdapterError(_PROXY_REFUSAL, 1)
     if not argv or any("\x00" in item or "\n" in item for item in argv):
         raise AdapterError("refusing an unsafe sandbox command.", 2)
+    try:
+        python = system_python()
+        socket_path = proxies.socket_for(phase)
+    except (OSError, ValueError) as exc:
+        raise AdapterError(_PROXY_REFUSAL, 1) from exc
     binary = _resolve_tool(argv[0], parent)
-    inner = [binary, *argv[1:]]
+    real = [binary, *argv[1:]]
+    forwarder = write_forwarder(workspace)
+    inner = [python, str(forwarder), str(socket_path), str(PROXY_PORT), "--", *real]
     for path in (workspace, home, config):
         assert_mount_closed(path)
     if skill_root is not None:
         assert_mount_closed(skill_root)
+    proxy_dir = str(socket_path.parent.resolve())
     try:
         command = container_command(
             inner,
@@ -881,17 +910,22 @@ def _run_in_container(
             skill_root=skill_root,
             home=home,
             config=config,
-            binary=Path(binary),
+            binary=Path(python),
             repo=ROOT,
+            unshare_net=True,
+            extra_binds=((proxy_dir, proxy_dir),),
+            extra_ro_binds=_tool_binds(real, (workspace, home, config, skill_root) if skill_root else (workspace, home, config)),
         )
     except GradeError as exc:
         raise AdapterError(str(exc), 1) from exc
     command[0] = bwrap
-    if "--unshare-net" in command or str(ROOT.resolve()) in [str(item) for item in command]:
-        raise AdapterError("sandbox command included the network unshare or the repository path.", 1)
+    if "--unshare-net" not in command or str(ROOT.resolve()) in [str(item) for item in command]:
+        raise AdapterError("sandbox command is missing the network unshare or includes the repository.", 1)
     if key and key in command:
         raise AdapterError("refusing to put the API key on a command line.", 1)
-    env = _child_env(parent, task=task, seed=seed, home=home, stub=False, key=key, config=config)
+    env = _child_env(
+        parent, task=task, seed=seed, home=home, stub=False, key=key, config=config, phase=phase,
+    )
     return subprocess.run(
         command,
         cwd=str(workspace),
@@ -923,9 +957,9 @@ def _prepare_live(
     parent: dict[str, str],
     task,
     seed: int,
-    key: str,
     bwrap: str,
     timeout: int,
+    proxies: PhaseProxies,
 ) -> tuple[str, Path | None, bool, list[list[str]], list[list[str]]]:
     if entry["id"] == "plain-claude-code":
         return "none", None, False, [], []
@@ -944,8 +978,10 @@ def _prepare_live(
             timeout=kwargs.get("timeout", 180),
             task=task,
             seed=seed,
-            key=key,
+            key=None,
             bwrap=bwrap,
+            phase="install",
+            proxies=proxies,
         )
 
     fetch_dest = scratch / "repo"
@@ -973,8 +1009,10 @@ def _prepare_live(
                 timeout=timeout,
                 task=task,
                 seed=seed,
-                key=key,
+                key=None,
                 bwrap=bwrap,
+                phase="install",
+                proxies=proxies,
             )
             _check_completed(entry, completed, "setup")
             continue
@@ -989,8 +1027,10 @@ def _prepare_live(
                 timeout=timeout,
                 task=task,
                 seed=seed,
-                key=key,
+                key=None,
                 bwrap=bwrap,
+                phase="install",
+                proxies=proxies,
             )
             _check_completed(entry, completed, "install")
             continue
@@ -1019,197 +1059,212 @@ def execute_arms(
     receipts = []
     with tempfile.TemporaryDirectory(prefix="aic-baselines-", dir=outside_repository_temp()) as temporary:
         root = Path(temporary)
-        bwrap = _require_bwrap(parent_env) if sandbox == "container" else ""
-        for entry in registry["arms"]:
-            started = time.perf_counter()
-            arm_root = root / entry["id"]
-            home = arm_root / "home"
-            config = arm_root / "config"
-            scratch = arm_root / "scratch"
-            checkout = arm_root / "checkout"
-            workspace = arm_root / "workspace"
-            home.mkdir(parents=True)
-            config.mkdir()
-            scratch.mkdir()
-            if invokes_model and entry.get("official_comparison") is not True:
-                receipts.append(
-                    _blank_receipt(
-                        entry,
-                        registry,
-                        invokes_model=False,
-                        seconds=0,
-                        error=str(entry.get("install_note") or "unverified-install"),
-                        sandbox=sandbox,
-                        excluded=True,
-                    )
-                )
-                continue
-            fetched = False
-            install_commands: list[list[str]] = []
-            fetch_commands: list[list[str]] = []
-            sandboxed = False
+        bwrap = ""
+        proxies = None
+        if sandbox == "container":
+            bwrap = _require_bwrap(parent_env)
             try:
-                if invokes_model:
-                    mount, mount_path, fetched, install_commands, fetch_commands = _prepare_live(
-                        entry,
-                        checkout,
-                        home,
-                        config,
-                        scratch,
-                        parent=parent_env,
-                        task=task,
-                        seed=registry["seed"],
-                        key=key or "",
-                        bwrap=bwrap,
-                        timeout=registry["budget"]["timeout_sec"],
+                system_python()
+                proxies = PhaseProxies(root / "egress")
+            except OSError as exc:
+                raise AdapterError(_PROXY_REFUSAL, 1) from exc
+        try:
+            for entry in registry["arms"]:
+                started = time.perf_counter()
+                arm_root = root / entry["id"]
+                home = arm_root / "home"
+                config = arm_root / "config"
+                scratch = arm_root / "scratch"
+                checkout = arm_root / "checkout"
+                workspace = arm_root / "workspace"
+                home.mkdir(parents=True)
+                config.mkdir()
+                scratch.mkdir()
+                if invokes_model and entry.get("official_comparison") is not True:
+                    receipts.append(
+                        _blank_receipt(
+                            entry,
+                            registry,
+                            invokes_model=False,
+                            seconds=0,
+                            error=str(entry.get("install_note") or "unverified-install"),
+                            sandbox=sandbox,
+                            excluded=True,
+                        )
                     )
-                else:
-                    mount, mount_path = materialize(entry, checkout, home)
-                    needs_checkout = any(
-                        token == _CHECKOUT for argv in entry["install_commands"] for token in argv
-                    )
-                    install_commands = concrete_install_commands(entry, checkout if needs_checkout else None)
-                if key and mount_path is not None and key in str(mount_path):
-                    raise AdapterError("refusing to put the API key in a path.", 1)
-                if mount_path is not None:
-                    assert_mount_closed(mount_path)
-                prepare_workspace(task, workspace, solution=False)
-                assert_mount_closed(workspace)
-                argv = agent_argv(
-                    binary,
-                    prompt=prompt,
-                    model=registry["model"],
-                    max_turns=registry["budget"]["max_turns"],
-                    mount=mount,
-                    mount_path=None if mount == "installed" else mount_path,
-                )
-                if key and key in argv:
-                    raise AdapterError("refusing to put the API key on a command line.", 1)
-                if _ALLOWED_TOOLS not in argv:
-                    raise AdapterError("agent command dropped the shared tool list.", 1)
-                env = _child_env(
-                    parent_env,
-                    task=task,
-                    seed=registry["seed"],
-                    home=home,
-                    stub=not invokes_model,
-                    key=key,
-                    config=config,
-                )
-                if sandbox == "container":
-                    completed = _run_in_container(
-                        argv,
-                        workspace=workspace,
-                        home=home,
-                        config=config,
-                        skill_root=mount_path if mount == "plugin-dir" else None,
-                        parent=parent_env,
-                        timeout=registry["budget"]["timeout_sec"],
-                        task=task,
-                        seed=registry["seed"],
-                        key=key,
-                        bwrap=bwrap,
-                    )
-                    sandboxed = True
-                else:
-                    completed = launch(
-                        argv,
-                        cwd=workspace,
-                        env=env,
-                        check=False,
-                        capture_output=True,
-                        text=True,
-                        timeout=registry["budget"]["timeout_sec"],
-                    )
-            except subprocess.TimeoutExpired:
-                receipts.append(
-                    _blank_receipt(
-                        entry,
-                        registry,
-                        invokes_model=invokes_model,
-                        seconds=round(time.perf_counter() - started, 6),
-                        error="agent timeout",
-                        sandbox=sandbox,
-                    )
-                )
-                continue
-            except (AdapterError, GradeError, OSError) as exc:
-                receipts.append(
-                    _blank_receipt(
-                        entry,
-                        registry,
-                        invokes_model=invokes_model,
-                        seconds=round(time.perf_counter() - started, 6),
-                        error=str(exc),
-                        sandbox=sandbox,
-                    )
-                )
-                continue
-            elapsed = round(time.perf_counter() - started, 6)
-            payload = _parse_payload(completed.stdout or "")
-            cost = cost_text(cost_from_payload(payload))
-            harness_error = None
-            invalid = False
-            grade_passed = False
-            if not invokes_model:
-                harness_error = _stub_observed(payload, mount=mount, mount_path=mount_path, entry=entry)
-                if payload.get("model") != registry["model"] or payload.get("seed") != str(registry["seed"]):
-                    harness_error = harness_error or "stub did not observe the shared model and seed."
-                if payload.get("max_turns") != str(registry["budget"]["max_turns"]):
-                    harness_error = harness_error or "stub did not observe the shared turn budget."
-                if payload.get("task_id") != task.id:
-                    harness_error = harness_error or "stub did not observe the task id."
-            try:
-                current = verified_bytes(task, expected)
-            except IntegrityError as exc:
-                invalid = True
-                harness_error = str(exc)
-                current = None
-            if current is not None and harness_error is None:
+                    continue
+                fetched = False
+                install_commands: list[list[str]] = []
+                fetch_commands: list[list[str]] = []
+                sandboxed = False
                 try:
-                    result = grade(task, workspace, oracle_bytes=current[ORACLE_KEY])
-                    grade_passed = result.passed and not result.timed_out
-                    if not grade_passed:
-                        harness_error = result.detail[-300:] or "oracle did not pass."
-                except GradeError as exc:
+                    if invokes_model:
+                        mount, mount_path, fetched, install_commands, fetch_commands = _prepare_live(
+                            entry,
+                            checkout,
+                            home,
+                            config,
+                            scratch,
+                            parent=parent_env,
+                            task=task,
+                            seed=registry["seed"],
+                            bwrap=bwrap,
+                            timeout=registry["budget"]["timeout_sec"],
+                            proxies=proxies,
+                        )
+                    else:
+                        mount, mount_path = materialize(entry, checkout, home)
+                        needs_checkout = any(
+                            token == _CHECKOUT for argv in entry["install_commands"] for token in argv
+                        )
+                        install_commands = concrete_install_commands(entry, checkout if needs_checkout else None)
+                    if key and mount_path is not None and key in str(mount_path):
+                        raise AdapterError("refusing to put the API key in a path.", 1)
+                    if mount_path is not None:
+                        assert_mount_closed(mount_path)
+                    prepare_workspace(task, workspace, solution=False)
+                    assert_mount_closed(workspace)
+                    argv = agent_argv(
+                        binary,
+                        prompt=prompt,
+                        model=registry["model"],
+                        max_turns=registry["budget"]["max_turns"],
+                        mount=mount,
+                        mount_path=None if mount == "installed" else mount_path,
+                    )
+                    if key and key in argv:
+                        raise AdapterError("refusing to put the API key on a command line.", 1)
+                    if _ALLOWED_TOOLS not in argv:
+                        raise AdapterError("agent command dropped the shared tool list.", 1)
+                    env = _child_env(
+                        parent_env,
+                        task=task,
+                        seed=registry["seed"],
+                        home=home,
+                        stub=not invokes_model,
+                        key=key,
+                        config=config,
+                    )
+                    if sandbox == "container":
+                        completed = _run_in_container(
+                            argv,
+                            workspace=workspace,
+                            home=home,
+                            config=config,
+                            skill_root=mount_path if mount == "plugin-dir" else None,
+                            parent=parent_env,
+                            timeout=registry["budget"]["timeout_sec"],
+                            task=task,
+                            seed=registry["seed"],
+                            key=key,
+                            bwrap=bwrap,
+                            phase="agent",
+                            proxies=proxies,
+                        )
+                        sandboxed = True
+                    else:
+                        completed = launch(
+                            argv,
+                            cwd=workspace,
+                            env=env,
+                            check=False,
+                            capture_output=True,
+                            text=True,
+                            timeout=registry["budget"]["timeout_sec"],
+                        )
+                except subprocess.TimeoutExpired:
+                    receipts.append(
+                        _blank_receipt(
+                            entry,
+                            registry,
+                            invokes_model=invokes_model,
+                            seconds=round(time.perf_counter() - started, 6),
+                            error="agent timeout",
+                            sandbox=sandbox,
+                        )
+                    )
+                    continue
+                except (AdapterError, GradeError, OSError) as exc:
+                    receipts.append(
+                        _blank_receipt(
+                            entry,
+                            registry,
+                            invokes_model=invokes_model,
+                            seconds=round(time.perf_counter() - started, 6),
+                            error=str(exc),
+                            sandbox=sandbox,
+                        )
+                    )
+                    continue
+                elapsed = round(time.perf_counter() - started, 6)
+                payload = _parse_payload(completed.stdout or "")
+                cost = cost_text(cost_from_payload(payload))
+                harness_error = None
+                invalid = False
+                grade_passed = False
+                if not invokes_model:
+                    harness_error = _stub_observed(payload, mount=mount, mount_path=mount_path, entry=entry)
+                    if payload.get("model") != registry["model"] or payload.get("seed") != str(registry["seed"]):
+                        harness_error = harness_error or "stub did not observe the shared model and seed."
+                    if payload.get("max_turns") != str(registry["budget"]["max_turns"]):
+                        harness_error = harness_error or "stub did not observe the shared turn budget."
+                    if payload.get("task_id") != task.id:
+                        harness_error = harness_error or "stub did not observe the task id."
+                try:
+                    current = verified_bytes(task, expected)
+                except IntegrityError as exc:
+                    invalid = True
                     harness_error = str(exc)
-            passed = (
-                grade_passed
-                and completed.returncode == 0
-                and harness_error is None
-                and not invalid
-            )
-            receipts.append(
-                {
-                    "arm": entry["id"],
-                    "budget": dict(registry["budget"]),
-                    "commit": entry.get("commit"),
-                    "copyright_notice": entry.get("copyright_notice"),
-                    "cost_usd": cost,
-                    "excluded": False,
-                    "exit_code": completed.returncode,
-                    "fetch_commands": fetch_commands,
-                    "fetched": fetched,
-                    "harness_error": harness_error,
-                    "install_commands": install_commands,
-                    "install_note": entry.get("install_note"),
-                    "install_status": entry.get("install_status"),
-                    "invalid": invalid,
-                    "invokes_model": invokes_model,
-                    "license_spdx": entry.get("license_spdx"),
-                    "model": registry["model"],
-                    "mount": mount,
-                    "official_comparison": entry.get("official_comparison"),
-                    "passed": passed,
-                    "prompt_sha256": prompt_sha,
-                    "public_benchmark_scores": None,
-                    "repository": entry.get("repository"),
-                    "sandbox": sandbox,
-                    "sandboxed": sandboxed,
-                    "seed": registry["seed"],
-                    "wall_time_seconds": elapsed,
-                }
-            )
+                    current = None
+                if current is not None and harness_error is None:
+                    try:
+                        result = grade(task, workspace, oracle_bytes=current[ORACLE_KEY])
+                        grade_passed = result.passed and not result.timed_out
+                        if not grade_passed:
+                            harness_error = result.detail[-300:] or "oracle did not pass."
+                    except GradeError as exc:
+                        harness_error = str(exc)
+                passed = (
+                    grade_passed
+                    and completed.returncode == 0
+                    and harness_error is None
+                    and not invalid
+                )
+                receipts.append(
+                    {
+                        "arm": entry["id"],
+                        "budget": dict(registry["budget"]),
+                        "commit": entry.get("commit"),
+                        "copyright_notice": entry.get("copyright_notice"),
+                        "cost_usd": cost,
+                        "excluded": False,
+                        "exit_code": completed.returncode,
+                        "fetch_commands": fetch_commands,
+                        "fetched": fetched,
+                        "harness_error": harness_error,
+                        "install_commands": install_commands,
+                        "install_note": entry.get("install_note"),
+                        "install_status": entry.get("install_status"),
+                        "invalid": invalid,
+                        "invokes_model": invokes_model,
+                        "license_spdx": entry.get("license_spdx"),
+                        "model": registry["model"],
+                        "mount": mount,
+                        "official_comparison": entry.get("official_comparison"),
+                        "passed": passed,
+                        "prompt_sha256": prompt_sha,
+                        "public_benchmark_scores": None,
+                        "repository": entry.get("repository"),
+                        "sandbox": sandbox,
+                        "sandboxed": sandboxed,
+                        "seed": registry["seed"],
+                        "wall_time_seconds": elapsed,
+                        "network": NETWORK if sandbox == "container" else None,
+                    }
+                )
+        finally:
+            if proxies is not None:
+                proxies.close()
     compared = [item for item in receipts if item.get("excluded") is not True]
     ok = bool(compared) and all(
         item["passed"] is True and item["public_benchmark_scores"] is None for item in compared
@@ -1230,7 +1285,8 @@ def execute_arms(
             "Stub agent and oracle only. A pass here proves the adapter, the mount, and the grader. "
             "It is not a public benchmark score. The sandbox is none, so the stub can read the reference."
             if not invokes_model
-            else "Live arms ran in the bubblewrap container. This report is not a public benchmark score. "
+            else "Live install and agent phases ran in a network-unshared bubblewrap container behind an "
+            "allow-list CONNECT proxy. This report is not a public benchmark score. "
             "Unverified installs are excluded."
         ),
         "official": official,
