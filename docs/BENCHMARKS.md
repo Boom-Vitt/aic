@@ -12,7 +12,7 @@ This harness compares arms only when they share one model id, one budget (`max_t
 | `swe-bench-lite` | [SWE-bench](https://github.com/SWE-bench/SWE-bench) software at `02e7a74ffd0b707aab73d203fe87bdc7c76afc8e` | MIT on that GitHub repository. Dataset rows are separate. | Not run. |
 | `swe-bench-verified` | Filtered subset described by the [SWE-bench project](https://www.swebench.com/) | MIT above is not a grant for the Verified subset. Confirm the subset's own terms before use. | Not run. |
 | `terminal-bench` | [laude-institute/terminal-bench](https://github.com/laude-institute/terminal-bench) at `d28711d0da2675d0bb1d56de45ae5df6082438a3` | Apache-2.0 on that repository. Task notices can be narrower. | Not run. |
-| `aider-polyglot` | [Aider-AI/polyglot-benchmark](https://github.com/Aider-AI/polyglot-benchmark) at `7e0611e77b54e2dea774cdc0aa00cf9f7ed6144f` | No SPDX license on the repo. README attributes the exercises to Exercism. [Aider](https://github.com/Aider-AI/aider) is Apache-2.0 at `5dc9490bb35f9729ef2c95d00a19ccd30c26339c`; that does not license the exercises. | Not run. Do not copy the exercises here. |
+| `aider-polyglot` | Exercism tracks named by [Aider-AI/polyglot-benchmark](https://github.com/Aider-AI/polyglot-benchmark) at `7e0611e77b54e2dea774cdc0aa00cf9f7ed6144f`. That mirror has no root license and is not fetched. | Root MIT on six Exercism tracks, checked 2026-11-09. Nested Catch is BSL-1.0 and the Java Gradle Wrapper is Apache-2.0. See the pin below. | Not run. This is not the official Aider suite. No score is claimed. |
 | `real-task` | Operator-owned repositories | The operator's own rights | Not run. None are included. |
 
 `benchmarks/catalog.json` is the machine-readable copy of this table. Revisions above are the commits whose license metadata was read. A later run must pin the revision it actually checks out. License metadata can change.
@@ -82,7 +82,7 @@ A real run writes `results/<UTC date>-<full git SHA>/`:
 
 The command refuses to overwrite an existing bundle. `public_benchmark_scores` stays null. A routing receipt may count label matches for that bundle. This document does not publish those counts. Raw text is redacted if it contains the API key.
 
-Terminal-Bench and SWE-bench Lite stay out unless you pass a flag.
+Terminal-Bench, SWE-bench Lite, and Aider polyglot stay out unless you pass a flag.
 
 ```sh
 ./scripts/run-benchmarks.sh --dry-run
@@ -90,6 +90,7 @@ Terminal-Bench and SWE-bench Lite stay out unless you pass a flag.
 ./scripts/run-benchmarks.sh --routing-pack heldout-v2
 ./scripts/run-benchmarks.sh --terminal-bench --terminal-bench-checkout /absolute/pinned/terminal-bench
 ./scripts/run-benchmarks.sh --swe-bench-lite --swe-bench-lite-checkout /absolute/pinned/SWE-bench --swe-bench-lite-predictions /absolute/predictions.jsonl
+./scripts/run-benchmarks.sh --aider-polyglot
 ```
 
 `--terminal-bench` runs one task of `terminal-bench-core==0.1.1` through the checkout's `terminal_bench` CLI at revision `d28711d0da2675d0bb1d56de45ae5df6082438a3`, once per official arm. The agent phase runs on the host behind the egress proxy. The task container does not receive the API key, `agent-env.sh`, or a copy of an installed third-party arm. Before that phase forwards a command, the container is disconnected from every network, including Docker-internal networks. The run accepts only an empty Networks map or the `none` network and refuses if any other attachment remains. A task that still needs a route does not run in official mode. `--swe-bench-lite` runs the six official arms (`plain-claude-code`, `aic`, `ecc`, `agent-skills`, `planning-with-files`, and `gstack`) through the same agent-phase proxy under the shared `max_usd` stop, then runs the pinned SWE-bench harness at revision `02e7a74ffd0b707aab73d203fe87bdc7c76afc8e` on a JSONL predictions file of at most 5 rows. `superpowers` stays out. The install phase has no API key and allows only the GitHub, npm, and Bun hosts. The agent phase allows only `api.anthropic.com:443`. Official runs refuse to start when bubblewrap or the proxy is missing. Both CLIs still have no token budget, so the estimate lists them as unpriced instead of inventing a suite cost. The shared `max_usd` stop is sent anyway. It is not a price for those suites. `public_benchmark_scores` stays null. `aic_treatment` is true only for the `aic` arm when a process read that shipped plugin. It stays false for `plain-claude-code` and for every other plugin. `harness_loaded_aic` stays false until the Terminal-Bench run writes `arm-load.json`. The SWE-bench evaluation command scores predictions and does not load a plugin, so `evaluation_aic_treatment` stays false. A missing checkout, the wrong revision, a missing predictions file, or a missing key exits 3 before any routing call.
@@ -149,4 +150,36 @@ python3 -m benchmarks.suite_arms stub
 ```
 
 It stages the shipped AIC plugin and local stand-ins for the other official arms, then runs the same stub agent. `aic_treatment` is true only for `aic`, because that process read plugin name `aic`. It stays false for `plain-claude-code`, `ecc`, `agent-skills`, `planning-with-files`, and `gstack`. `superpowers` is excluded. `harness_loaded_aic` is false: Terminal-Bench and SWE-bench are not started. `public_benchmark_scores` is null. Nothing is fetched. The shared budget on that report is `max_turns` 30, `timeout_sec` 600, and `max_usd` 0.35.
+
+## Aider polyglot
+
+Checked 2026-11-09 from each root license file and from the files in the 225 pinned practice exercises. The machine-readable pin is `benchmarks/polyglot/pins.json`. A root MIT grant is not clearance for every nested file. Exercise bytes, Catch sources, and the Gradle Wrapper are not stored in this repository.
+
+Aider's benchmark README at `5dc9490bb35f9729ef2c95d00a19ccd30c26339c` says to clone `Aider-AI/polyglot-benchmark`. That commit of the mirror, `7e0611e77b54e2dea774cdc0aa00cf9f7ed6144f` (2024-12-22), has no root license file. No root license file was added later; the default branch still points at that commit. The GitHub license API returns null. The README attributes the exercises to Exercism and does not itself grant a license. The adapter does not fetch that tree. Aider's own `LICENSE.txt` is Apache-2.0, sha256 `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`. That grant covers the harness, not the exercises. `benchmark/clone-exercism.sh` in that same commit clones the six Exercism tracks named below.
+
+The exercise index is the 225 practice-directory names listed in the unlicensed mirror. Those names are not the exercise text. The default live subset is one exercise, `cpp` / `all-your-base`, the first name in that index. It is not the full 225-case run and it is not the official Aider suite. `public_benchmark_scores` stays null until a real model run is linked from `docs/ROADMAP.md`.
+
+| Track | Commit | Commit date | Root license | SHA-256 |
+| --- | --- | --- | --- | --- |
+| [exercism/cpp](https://github.com/exercism/cpp) | `9d47dff5f64f9244699b82cfcdf68ed72edd289f` | 2026-11-08 | MIT. Copyright (c) 2021 Exercism | `e52f804e74f0fbd34e8927962319df346166b8194094309a0aee318693df44df` |
+| [exercism/go](https://github.com/exercism/go) | `54da18da1bf36b9c03cdad48d592fb28101ac08f` | 2026-11-08 | MIT. Copyright (c) 2021 Exercism | `e52f804e74f0fbd34e8927962319df346166b8194094309a0aee318693df44df` |
+| [exercism/java](https://github.com/exercism/java) | `be2d006c30c50e0154231dd987d5a3b5526c0427` | 2026-11-08 | MIT. Copyright (c) 2021 Exercism | `e52f804e74f0fbd34e8927962319df346166b8194094309a0aee318693df44df` |
+| [exercism/javascript](https://github.com/exercism/javascript) | `43dd0939ec1e1bdb3a69852b0512928b9c4ef996` | 2026-11-08 | MIT. Copyright (c) 2021 Exercism | `e52f804e74f0fbd34e8927962319df346166b8194094309a0aee318693df44df` |
+| [exercism/python](https://github.com/exercism/python) | `479f11b44b02337b0413e805b948491c2179615a` | 2026-11-07 | MIT. Copyright (c) 2021 Exercism. The track README says this repository uses the MIT License. Its PSF paragraph is about Python itself. | `e52f804e74f0fbd34e8927962319df346166b8194094309a0aee318693df44df` |
+| [exercism/rust](https://github.com/exercism/rust) | `523fff27328e9b85085cd7eb7bd6ac36af730433` | 2026-11-08 | MIT. Copyright (c) 2021 Exercism. The track README says this repository uses the MIT License. | `e52f804e74f0fbd34e8927962319df346166b8194094309a0aee318693df44df` |
+
+No reviewed track was excluded. MIT permits a runtime copy when the copyright and permission notice stay with that copy. The fetched checkout keeps the root `LICENSE`, and the agent workspace receives that same file so the notice stays with the copy. Root MIT does not cover two nested works that the tests need.
+
+On the pinned cpp exercises, 25 of 26 copy `test/catch.hpp`, Catch v2.13.6, Copyright (c) 2021 Two Blue Cubes Ltd, BSL-1.0, sha256 `e11ac6b2994c046909c4a7c730a6a536e8f9563172563026878b7baadecdf553`. The header points at an accompanying `LICENSE_1_0.txt` that is not in the Exercism tree. BSL-1.0 requires that entire statement in each copy. The workspace writes the recorded statement, `benchmarks/polyglot/notices/BSL-1.0.txt`, sha256 `c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566`, beside the header. `complex-numbers` instead uses Catch v3.4.0 amalgamated sources, Copyright Catch2 Authors, BSL-1.0. Those digests are in the pin, and the same statement is written as `test/LICENSE.txt`. The default exercise keeps `test/catch.hpp` because the C++ tests include it.
+
+Every pinned java exercise copies the Gradle Wrapper. `gradlew` and `gradlew.bat` are Apache-2.0. The POSIX script says Copyright © 2015 the original authors. The Windows script says Copyright 2015 the original author or authors. `gradle-wrapper.jar` carries the Apache-2.0 text at `META-INF/LICENSE`, sha256 `0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594`. The `gradlew.bat` digest in the pin is the CRLF checkout produced by `exercism/java` `.gitattributes` (`*.bat text eol=crlf`), not the LF git blob. The wrapper stays in the workspace because `./gradlew test` needs it. Go, JavaScript, Python, and Rust pinned practice files outside the excluded trees had no separate non-MIT notice. JavaScript exercises also include a copy of the root MIT `LICENSE`. A file with an unpinned non-MIT notice is not copied.
+
+The agent workspace omits `.meta`, `.approaches`, and `.articles`, and it omits files named `snippet.txt` or `snippet.md`. Those trees hold exemplar solutions and approach or article snippets. The default cpp exercise's `.approaches/in-sequence/snippet.txt` and `.approaches/in-parallel/snippet.txt` are working solutions and do not reach the workspace. `.docs` stays, including published hints. The live command fetches only the selected exercise directory plus that license file, inside the install-phase egress proxy. That phase has no API key. A missing key exits 3 before any fetch. The agent phase is the only phase that receives the key, and its allow-list is `api.anthropic.com:443`. The score command runs in bubblewrap with `--unshare-net` and without the key. Official runs refuse to start when bubblewrap or the proxy is missing. The same six arms, model, seed, and budget apply: `max_turns` 30, `timeout_sec` 600, `max_usd` 0.35. `superpowers` stays out. A missing compiler or test runner is a failed case, not a pass.
+
+```sh
+python3 -m benchmarks.polyglot stub
+python3 -m benchmarks.polyglot live
+```
+
+The stub builds an original local git fixture, fetches it through the same sparse checkout, and scores it with unittest. `upstream_fetched` is false. `sandbox` is `none`, `official` is false, and `invokes_model` is false. The same process builds the install, agent, and score bubblewrap commands. It does not start bubblewrap and it does not call a model. The fixture is deleted when the process exits.
 

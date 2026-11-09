@@ -21,6 +21,10 @@ on:
         description: Fetch pinned workflow baselines and run them with the same model, budget, and seed
         type: boolean
         default: false
+      aider_polyglot:
+        description: Fetch the pinned Exercism exercise and run the official arms. Does not fetch the unlicensed polyglot mirror.
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -50,6 +54,7 @@ jobs:
           BENCH_SWE: ${{ inputs.swe_bench_lite }}
           BENCH_PACK: ${{ inputs.routing_pack }}
           BENCH_BASELINES: ${{ inputs.baselines }}
+          BENCH_POLYGLOT: ${{ inputs.aider_polyglot }}
         run: |
           set -eu
           case "$BENCH_PACK" in
@@ -68,6 +73,9 @@ jobs:
           fi
           if [ "$BENCH_BASELINES" = "true" ]; then
             set -- "$@" --baselines
+          fi
+          if [ "$BENCH_POLYGLOT" = "true" ]; then
+            set -- "$@" --aider-polyglot
           fi
           "$@"
       - name: Upload the results bundle
