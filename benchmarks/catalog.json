@@ -46,8 +46,9 @@
       "public_benchmark": true,
       "url": "https://github.com/Aider-AI/polyglot-benchmark",
       "revision_observed": "7e0611e77b54e2dea774cdc0aa00cf9f7ed6144f",
-      "license_observed": "GitHub reports no SPDX license on Aider-AI/polyglot-benchmark. The README says the exercises are copyright Exercism. Aider's own repository is Apache-2.0 at 5dc9490bb35f9729ef2c95d00a19ccd30c26339c and that grant does not license these exercises.",
-      "blocked": "Not run. Do not copy exercises into this repository until each track's Exercism terms are reviewed. The harness may point at a local checkout the operator already has rights to use."
+      "license_checked": "2026-11-09",
+      "license_observed": "Aider-AI/polyglot-benchmark has no root license file at 7e0611e77b54e2dea774cdc0aa00cf9f7ed6144f (2024-12-22). Aider-AI/aider LICENSE.txt is Apache-2.0 at 5dc9490bb35f9729ef2c95d00a19ccd30c26339c (2026-05-22) and does not license the exercises. exercism/cpp, exercism/go, exercism/java, exercism/javascript, exercism/python, and exercism/rust each have a root LICENSE that is MIT, Copyright (c) 2021 Exercism, sha256 e52f804e74f0fbd34e8927962319df346166b8194094309a0aee318693df44df. Pins are in benchmarks/polyglot/pins.json.",
+      "blocked": "Not run. The old recorder does not score this suite. The adapter can fetch the six MIT Exercism tracks at the pinned commits and does not fetch the unlicensed polyglot-benchmark tree. No model run is in the score history."
     },
     {
       "id": "real-task",

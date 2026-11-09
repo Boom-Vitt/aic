@@ -3,6 +3,8 @@
 # --dry-run prints the token-budget ceiling and does not call a model.
 # --routing-pack dev is the tuning pack. heldout-v2 is the release pack.
 # --baselines runs each official arm inside the bubblewrap container sandbox.
+# --aider-polyglot fetches one pinned Exercism exercise. It does not fetch
+# Aider-AI/polyglot-benchmark, which has no root license file.
 # Fetch, install, and the agent share that sandbox. A missing or blank
 # ANTHROPIC_API_KEY still exits 3 before any fetch or model call.
 # An unverified install is excluded. sandbox none is refused.

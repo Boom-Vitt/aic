@@ -29,6 +29,7 @@ from benchmarks.aicbench.runner import main as aicbench_main
 from benchmarks.baselines.adapter import AdapterError, load_registry
 from benchmarks.baselines.adapter import main as baselines_main
 from benchmarks.budget import shared_stop
+from benchmarks.polyglot.adapter import main as polyglot_main
 from benchmarks.suite_arms import (
     apply_harness_marker,
     observe_arms,
@@ -150,7 +151,7 @@ def _baseline_ids() -> list[str]:
     return [item["id"] for item in _registry()["arms"]]
 
 
-def estimate_for(settings: dict, pack, *, terminal: bool, swe: bool, baselines: bool = False) -> dict:
+def estimate_for(settings: dict, pack, *, terminal: bool, swe: bool, baselines: bool = False, polyglot: bool = False) -> dict:
     pricing = settings["pricing"]
     input_rate = pricing["input_usd_per_million"]
     output_rate = pricing["output_usd_per_million"]
@@ -223,6 +224,21 @@ def estimate_for(settings: dict, pack, *, terminal: bool, swe: bool, baselines: 
             "token_budget": None,
             "arms": _baseline_ids(),
             "note": "A live run fetches each official git arm at its pinned commit inside the container sandbox. A dry run does not fetch. Unverified installs are excluded.",
+        })
+    if polyglot:
+        unpriced.append("aider-polyglot")
+        components.append({
+            "name": "aider-polyglot",
+            "priced": False,
+            "token_budget": None,
+            "budget": dict(registry["budget"]),
+            "max_usd": stop["max_usd"],
+            "arms": official_ids,
+            "note": (
+                "A live run fetches the selected Exercism exercise at its pinned commit. "
+                "max_usd is the shared stop rule, not a token price for this suite. "
+                "The unlicensed polyglot-benchmark tree is not fetched."
+            ),
         })
     return {
         "model": settings["model"],
@@ -390,6 +406,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also run every registered baseline arm under the pinned model, budget, and seed.",
     )
+    parser.add_argument(
+        "--aider-polyglot",
+        action="store_true",
+        help="Fetch the pinned Exercism exercise and run every official arm under the shared budget and seed.",
+    )
     return parser
 
 
@@ -415,6 +436,7 @@ def execute(
     baseline_runner=None,
     arm_preparer=None,
     suite_runtime_factory=None,
+    polyglot_runner=None,
 ) -> int:
     require_key()
     if args.terminal_bench_checkout and not args.terminal_bench:
@@ -427,6 +449,7 @@ def execute(
     pack = load_pack(pack_path)
     estimate = estimate_for(
         settings, pack, terminal=args.terminal_bench, swe=args.swe_bench_lite, baselines=args.baselines,
+        polyglot=args.aider_polyglot,
     )
     estimate["routing_pack"] = args.routing_pack
     estimate["routing_pack_sha256"] = digest
@@ -461,6 +484,8 @@ def execute(
         provenance["commands"].append("swe-bench-lite subset")
     if args.baselines:
         provenance["commands"].append("python3 -m benchmarks.baselines live")
+    if args.aider_polyglot:
+        provenance["commands"].append("python3 -m benchmarks.polyglot live")
     _write_json(bundle / "provenance.json", provenance)
     _write_json(bundle / "estimate.json", estimate)
     reader = revision_reader or _checkout_sha
@@ -554,6 +579,14 @@ def execute(
             baseline_code = baseline_call(baseline_argv, environ=os.environ)
             if baseline_code != 0:
                 return baseline_code
+        if args.aider_polyglot:
+            polyglot_argv = ["live", "--output", str(bundle / "receipts" / "aider-polyglot.json")]
+            if secret and secret in polyglot_argv:
+                raise RunError("refusing to put the API key on a command line.", 1)
+            polyglot_call = polyglot_runner or polyglot_main
+            polyglot_code = polyglot_call(polyglot_argv, environ=os.environ)
+            if polyglot_code != 0:
+                return polyglot_code
         runner = harness_runner or _harness
         run_id = f"aic-{day}-{sha[:12]}"
         registry = _registry()
@@ -711,6 +744,7 @@ def main(
     baseline_runner=None,
     arm_preparer=None,
     suite_runtime_factory=None,
+    polyglot_runner=None,
 ) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -726,6 +760,7 @@ def main(
             baseline_runner=baseline_runner,
             arm_preparer=arm_preparer,
             suite_runtime_factory=suite_runtime_factory,
+            polyglot_runner=polyglot_runner,
         )
     except (RunError, ScoreError) as exc:
         print(str(exc), file=sys.stderr)
