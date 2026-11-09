@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import decimal
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -20,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import zipfile
 
 from benchmarks.aicbench.grading import GradeError, outside_repository_temp
 from benchmarks.aicbench.metrics import cost_from_payload, cost_text
@@ -50,6 +52,34 @@ TRACK_IDS = ("cpp", "go", "java", "javascript", "python", "rust")
 SOURCE_IDS = ("polyglot-benchmark", "aider")
 LICENSE_SHA = "e52f804e74f0fbd34e8927962319df346166b8194094309a0aee318693df44df"
 COPYRIGHT = "Copyright (c) 2021 Exercism"
+BSL_NOTICE_SHA = "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+CATCH_V2_SHA = "e11ac6b2994c046909c4a7c730a6a536e8f9563172563026878b7baadecdf553"
+CATCH_V3_HPP_SHA = "bc734753c5697ab8cbea01b414f953dc27a6a68a24c6cbbddd09e4b128415e74"
+CATCH_V3_CPP_SHA = "1b4fb8c6cded4dae4e5fca5f47f098a89705d233b8ecd0da345b433e978da629"
+GRADLEW_SHA = "ab5c0cad16305af2e619c159c1f58dd68d07fab9c11e36701e109c0277407f7a"
+GRADLEW_BAT_SHA = "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52"
+GRADLE_JAR_SHA = "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7"
+GRADLE_JAR_LICENSE_SHA = "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+_NESTED_SPDX = frozenset({"Apache-2.0", "BSL-1.0"})
+_NON_MIT_MARKERS = (
+    "Boost Software License",
+    "Apache License",
+    "GNU General Public License",
+    "Mozilla Public License",
+)
+_SPDX = re.compile(r"SPDX-License-Identifier:\s*([A-Za-z0-9.\-+]+)")
+_NESTED_PATHS = {
+    "cpp": {
+        "test/catch.hpp": CATCH_V2_SHA,
+        "test/catch_amalgamated.hpp": CATCH_V3_HPP_SHA,
+        "test/catch_amalgamated.cpp": CATCH_V3_CPP_SHA,
+    },
+    "java": {
+        "gradlew": GRADLEW_SHA,
+        "gradlew.bat": GRADLEW_BAT_SHA,
+        "gradle/wrapper/gradle-wrapper.jar": GRADLE_JAR_SHA,
+    },
+}
 MISSING_KEY = (
     "ANTHROPIC_API_KEY is required. No Exercism exercise was fetched and no polyglot score was recorded."
 )
@@ -57,10 +87,13 @@ _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 _SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 _LICENSE_NAME = re.compile(r"LICENSE(?:\.txt)?\Z")
-_SKIP = frozenset({".git", ".meta", "__pycache__"})
+_SOLUTION_TREES = frozenset({".meta", ".approaches", ".articles"})
+_SOLUTION_FILES = frozenset({"snippet.txt", "snippet.md"})
+_SKIP = frozenset({".git", "__pycache__"}) | _SOLUTION_TREES
 FIXTURE_SLUG = "sum-digits"
 FIXTURE_COPYRIGHT = "Copyright (c) 2026 AIC polyglot fixture"
 DECOY_MARKER = "polyglot-fixture-decoy-not-exercism"
+FIXTURE_SOLUTION_MARKER = "polyglot-fixture-solution-snippet"
 _GIT = ("git", "-c", "core.hooksPath=/dev/null")
 
 
@@ -101,6 +134,10 @@ def validate_pins(data: dict) -> None:
     for source in sources:
         _validate_source(source)
     total = 0
+    notices = data.get("nested_notices")
+    if not isinstance(notices, list) or [item.get("id") for item in notices if isinstance(item, dict)] != ["bsl-1.0"]:
+        raise AdapterError("polyglot pins must record the Boost Software License notice.", 2)
+    _validate_notice(notices[0])
     for track in tracks:
         _validate_track(track)
         total += len(track["exercises"])
@@ -155,6 +192,53 @@ def _validate_track(track: dict) -> None:
         raise AdapterError(f"{track.get('id')} has no test command.", 2)
     for argv in commands:
         _validate_argv(argv, track["id"])
+    _validate_nested_components(track)
+
+
+def _validate_notice(notice: dict) -> None:
+    if notice.get("spdx") != "BSL-1.0" or notice.get("path") != "notices/BSL-1.0.txt":
+        raise AdapterError("the Boost notice pin is not notices/BSL-1.0.txt.", 2)
+    if notice.get("sha256") != BSL_NOTICE_SHA:
+        raise AdapterError("the Boost notice pin does not match the recorded statement.", 2)
+    _read_notice(notice)
+
+
+def _validate_nested_components(track: dict) -> None:
+    components = track.get("nested_components")
+    if not isinstance(components, list):
+        raise AdapterError(f"{track.get('id')} must list nested components.", 2)
+    expected = _NESTED_PATHS.get(track["id"], {})
+    if [item.get("path") for item in components if isinstance(item, dict)] != list(expected):
+        raise AdapterError(f"{track['id']} nested components are not the reviewed set.", 2)
+    for component in components:
+        if component.get("sha256") != expected[component["path"]] or component.get("spdx") not in _NESTED_SPDX:
+            raise AdapterError(f"{track['id']} nested digest is not the reviewed file.", 2)
+        if not isinstance(component.get("copyright_notice"), str) or not component["copyright_notice"]:
+            raise AdapterError(f"{track['id']} nested copyright is missing.", 2)
+        if not isinstance(component.get("name"), str) or not component["name"]:
+            raise AdapterError(f"{track['id']} nested component name is missing.", 2)
+        notices = component.get("required_notices")
+        entries = component.get("zip_entries")
+        if entries is None:
+            if not isinstance(notices, list) or component["copyright_notice"] not in notices:
+                raise AdapterError(f"{track['id']} nested file is missing its copyright notice.", 2)
+        else:
+            if not isinstance(entries, list) or not entries:
+                raise AdapterError(f"{track['id']} archive notice is missing.", 2)
+            for entry in entries:
+                if entry.get("path") != "META-INF/LICENSE" or entry.get("sha256") != GRADLE_JAR_LICENSE_SHA:
+                    raise AdapterError(f"{track['id']} archive notice is not the reviewed Apache text.", 2)
+                required = entry.get("required_notices")
+                if not isinstance(required, list) or "Apache License" not in required:
+                    raise AdapterError(f"{track['id']} archive notice text is missing.", 2)
+        accompanying = component.get("accompanying_notice")
+        if component.get("spdx") == "BSL-1.0" and accompanying != "bsl-1.0":
+            raise AdapterError(f"{track['id']} BSL component is missing its accompanying statement.", 2)
+        if accompanying is not None:
+            if accompanying != "bsl-1.0" or not isinstance(component.get("accompanying_path"), str):
+                raise AdapterError(f"{track['id']} accompanying notice is not the Boost statement.", 2)
+            _component_parts(component["accompanying_path"])
+        _component_parts(component["path"])
 
 
 def _validate_argv(argv: object, label: str) -> None:
@@ -226,6 +310,8 @@ def fetch_commands(repository: str, commit: str, dest: Path, url: str, license_p
     exercise = f"exercises/practice/{slug}"
     return [
         [*_GIT, "init", "-b", "main", str(dest)],
+        [*_GIT, "-C", str(dest), "config", "core.autocrlf", "false"],
+        [*_GIT, "-C", str(dest), "config", "core.eol", "lf"],
         [*_GIT, "-C", str(dest), "remote", "add", "origin", remote],
         [*_GIT, "-C", str(dest), "sparse-checkout", "set", "--no-cone", license_path, exercise],
         [*_GIT, "-C", str(dest), "fetch", "--depth", "1", "origin", commit],
@@ -288,7 +374,163 @@ def _assert_license(track: dict, dest: Path) -> None:
         raise AdapterError(f"{track['id']} license file is missing its copyright notice.", 3)
 
 
-def prepare_workspace(checkout: Path, slug: str, dest: Path) -> None:
+def _solution_leaked(dest: Path) -> bool:
+    for path in dest.rglob("*"):
+        if any(part in _SOLUTION_TREES or part in _SOLUTION_FILES for part in path.relative_to(dest).parts):
+            return True
+    return False
+
+
+def _copy_root_license(checkout: Path, dest: Path, track: dict | None) -> None:
+    name = "LICENSE" if track is None else str(track.get("license_path") or "")
+    if _LICENSE_NAME.fullmatch(name) is None:
+        raise AdapterError("refusing an unsafe license path.", 2)
+    source = checkout / name
+    if source.is_symlink() or not source.is_file():
+        raise AdapterError("exercise workspace is missing the root license notice.", 3)
+    data = source.read_bytes()
+    if track is not None:
+        if hashlib.sha256(data).hexdigest() != track.get("license_sha256"):
+            raise AdapterError("root license copied into the workspace does not match the pin.", 3)
+        text = data.decode("utf-8", "replace")
+        if str(track.get("copyright_notice") or "") not in text.splitlines():
+            raise AdapterError("root license copied into the workspace is missing its copyright notice.", 3)
+    target = dest / name
+    if target.exists() or target.is_symlink():
+        if target.is_symlink() or not target.is_file() or target.read_bytes() != data:
+            raise AdapterError("exercise license does not match the root license notice.", 3)
+        return
+    target.write_bytes(data)
+
+
+def _component_parts(value: str) -> tuple[str, ...]:
+    if not isinstance(value, str) or not value or value.startswith(("/", "\\")) or "\\" in value:
+        raise AdapterError("refusing an unsafe nested path.", 2)
+    parts = tuple(value.split("/"))
+    if any(part in {"", ".", ".."} or part in _SOLUTION_TREES or part in _SOLUTION_FILES for part in parts):
+        raise AdapterError("refusing an unsafe nested path.", 2)
+    return parts
+
+
+def _contained(dest: Path, parts: tuple[str, ...]) -> Path:
+    target = dest.joinpath(*parts)
+    resolved = target.resolve()
+    root = dest.resolve()
+    if resolved != root and root not in resolved.parents:
+        raise AdapterError("nested path escapes the workspace.", 3)
+    return target
+
+
+def _read_notice(notice: dict) -> bytes:
+    rel = notice.get("path")
+    if not isinstance(rel, str):
+        raise AdapterError("refusing an unsafe notice path.", 2)
+    parts = _component_parts(rel)
+    root = Path(__file__).resolve().parent
+    path = root.joinpath(*parts)
+    resolved = path.resolve()
+    if root not in resolved.parents or path.is_symlink() or not path.is_file():
+        raise AdapterError("refusing an unsafe notice path.", 2)
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != notice.get("sha256"):
+        raise AdapterError("pinned notice file does not match its sha256.", 3)
+    return data
+
+
+def _notice_bytes(track: dict, notice_id: str) -> bytes:
+    notices = track.get("nested_notices")
+    if not isinstance(notices, list):
+        notices = load_pins().get("nested_notices")
+    if not isinstance(notices, list):
+        raise AdapterError(f"nested notice {notice_id} is not pinned.", 2)
+    match = next((item for item in notices if isinstance(item, dict) and item.get("id") == notice_id), None)
+    if not isinstance(match, dict):
+        raise AdapterError(f"nested notice {notice_id} is not pinned.", 2)
+    return _read_notice(match)
+
+
+def _verify_zip_entry(data: bytes, label: str, entry: dict) -> None:
+    name = entry.get("path")
+    if not isinstance(name, str):
+        raise AdapterError(f"{label} archive notice path is unsafe.", 2)
+    _component_parts(name)
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            info = archive.getinfo(name)
+            if info.file_size > 1_000_000 or info.file_size < 0:
+                raise AdapterError(f"{label} archive notice is an unexpected size.", 3)
+            blob = archive.read(name)
+    except KeyError as exc:
+        raise AdapterError(f"{label} is missing its license entry.", 3) from exc
+    except zipfile.BadZipFile as exc:
+        raise AdapterError(f"{label} is not a readable archive.", 3) from exc
+    if hashlib.sha256(blob).hexdigest() != entry.get("sha256"):
+        raise AdapterError(f"{label} license entry does not match the pinned sha256.", 3)
+    text = blob.decode("utf-8", "replace")
+    for required in entry.get("required_notices") or []:
+        if required not in text:
+            raise AdapterError(f"{label} license entry is missing a required notice.", 3)
+
+
+def _apply_nested_notices(dest: Path, track: dict | None) -> None:
+    components = [] if track is None else track.get("nested_components") or []
+    if not isinstance(components, list):
+        raise AdapterError("nested components must be a list.", 2)
+    allowed: set[tuple[str, ...]] = set()
+    for component in components:
+        if not isinstance(component, dict):
+            raise AdapterError("nested component is not an object.", 2)
+        parts = _component_parts(str(component.get("path") or ""))
+        allowed.add(parts)
+        target = _contained(dest, parts)
+        if not target.exists():
+            continue
+        if target.is_symlink() or not target.is_file():
+            raise AdapterError(f"refusing a nested component that is not a file: {component.get('path')}.", 3)
+        data = target.read_bytes()
+        if hashlib.sha256(data).hexdigest() != component.get("sha256"):
+            raise AdapterError(f"{component.get('path')} does not match the pinned sha256.", 3)
+        if component.get("required_notices"):
+            text = data.decode("utf-8", "replace")
+            for required in component["required_notices"]:
+                if required not in text:
+                    raise AdapterError(f"{component.get('path')} is missing a required notice.", 3)
+        for entry in component.get("zip_entries") or []:
+            if not isinstance(entry, dict):
+                raise AdapterError(f"{component.get('path')} archive notice is not an object.", 2)
+            _verify_zip_entry(data, str(component.get("path")), entry)
+        notice_id = component.get("accompanying_notice")
+        if notice_id:
+            notice = _notice_bytes(track or {}, str(notice_id))
+            acc_parts = _component_parts(str(component.get("accompanying_path") or ""))
+            allowed.add(acc_parts)
+            accompanying = _contained(dest, acc_parts)
+            if accompanying.exists() or accompanying.is_symlink():
+                if accompanying.is_symlink() or not accompanying.is_file() or accompanying.read_bytes() != notice:
+                    raise AdapterError("accompanying notice does not match the pinned statement.", 3)
+            else:
+                accompanying.parent.mkdir(parents=True, exist_ok=True)
+                accompanying.write_bytes(notice)
+    _reject_unpinned_licenses(dest, track, allowed)
+
+
+def _reject_unpinned_licenses(dest: Path, track: dict | None, allowed: set[tuple[str, ...]]) -> None:
+    license_name = "LICENSE" if track is None else str(track.get("license_path") or "LICENSE")
+    for path in dest.rglob("*"):
+        if path.is_symlink() or not path.is_file():
+            continue
+        parts = path.relative_to(dest).parts
+        if parts in allowed or (len(parts) == 1 and parts[0] == license_name):
+            continue
+        text = path.read_bytes().decode("utf-8", "replace")
+        if any(marker in text for marker in _NON_MIT_MARKERS):
+            raise AdapterError(f"unpinned non-MIT notice in {path.relative_to(dest)}.", 3)
+        for match in _SPDX.finditer(text):
+            if match.group(1) != "MIT":
+                raise AdapterError(f"unpinned SPDX license in {path.relative_to(dest)}.", 3)
+
+
+def prepare_workspace(checkout: Path, slug: str, dest: Path, track: dict | None = None) -> None:
     if _SLUG.fullmatch(slug) is None:
         raise AdapterError("refusing an unsafe exercise name.", 2)
     source = checkout / "exercises" / "practice" / slug
@@ -298,24 +540,30 @@ def prepare_workspace(checkout: Path, slug: str, dest: Path) -> None:
         raise AdapterError("refusing to reuse an exercise workspace.", 3)
     assert_outside_repo(dest.parent)
     dest.mkdir(parents=True)
-    for path in sorted(source.rglob("*")):
-        relative = path.relative_to(source)
-        if any(part in _SKIP or part == ".." for part in relative.parts):
-            continue
-        if path.is_symlink():
-            raise AdapterError(f"refusing a symlinked exercise file: {relative}.", 3)
-        target = dest.joinpath(*relative.parts)
-        if target != dest and dest.resolve() not in target.resolve().parents and target.resolve() != dest.resolve():
-            raise AdapterError("exercise copy escapes the workspace.", 3)
-        if path.is_dir():
-            target.mkdir(parents=True, exist_ok=True)
-        elif path.is_file():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(path.read_bytes())
-        else:
-            raise AdapterError(f"refusing an unsupported exercise file: {relative}.", 3)
-    if any(part == ".meta" for path in dest.rglob("*") for part in path.relative_to(dest).parts):
-        raise AdapterError("exercise workspace still contains exemplar metadata.", 3)
+    try:
+        for path in sorted(source.rglob("*")):
+            relative = path.relative_to(source)
+            if any(part in _SKIP or part in _SOLUTION_FILES or part == ".." for part in relative.parts):
+                continue
+            if path.is_symlink():
+                raise AdapterError(f"refusing a symlinked exercise file: {relative}.", 3)
+            target = dest.joinpath(*relative.parts)
+            if target != dest and dest.resolve() not in target.resolve().parents and target.resolve() != dest.resolve():
+                raise AdapterError("exercise copy escapes the workspace.", 3)
+            if path.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+            elif path.is_file():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(path.read_bytes())
+            else:
+                raise AdapterError(f"refusing an unsupported exercise file: {relative}.", 3)
+        _copy_root_license(checkout, dest, track)
+        if _solution_leaked(dest):
+            raise AdapterError("exercise workspace still contains a solution tree.", 3)
+        _apply_nested_notices(dest, track)
+    except Exception:
+        shutil.rmtree(dest, ignore_errors=True)
+        raise
 
 
 def score_exercise(
@@ -438,7 +686,29 @@ def write_fixture(source: Path) -> dict:
         encoding="utf-8",
     )
     (practice / ".meta" / "example.py").write_text(
-        "def add(left, right):\n    return left + right\n",
+        f"def add(left, right):\n    return left + right  # {FIXTURE_SOLUTION_MARKER}\n",
+        encoding="utf-8",
+    )
+    sequence = practice / ".approaches" / "in-sequence"
+    sequence.mkdir(parents=True)
+    (sequence / "snippet.txt").write_text(
+        f"for item in values:\n    total += item  # {FIXTURE_SOLUTION_MARKER}\n",
+        encoding="utf-8",
+    )
+    parallel = practice / ".approaches" / "in-parallel"
+    parallel.mkdir(parents=True)
+    (parallel / "snippet.txt").write_text(
+        f"while total:\n    total -= 1  # {FIXTURE_SOLUTION_MARKER}\n",
+        encoding="utf-8",
+    )
+    article = practice / ".articles" / "performance"
+    article.mkdir(parents=True)
+    (article / "snippet.md").write_text(
+        f"def add(left, right):\n    return left + right  # {FIXTURE_SOLUTION_MARKER}\n",
+        encoding="utf-8",
+    )
+    (practice / "snippet.txt").write_text(
+        f"loose {FIXTURE_SOLUTION_MARKER}\n",
         encoding="utf-8",
     )
     decoy = source / "exercises" / "practice" / "decoy"
@@ -777,9 +1047,9 @@ def run_stub(registry: dict | None = None) -> dict:
         arms = []
         for arm in prepared.arms:
             workspace = root / "work" / arm["id"]
-            prepare_workspace(checkout, FIXTURE_SLUG, workspace)
-            if (workspace / ".meta").exists():
-                raise AdapterError("the agent workspace contains exemplar metadata.", 1)
+            prepare_workspace(checkout, FIXTURE_SLUG, workspace, track)
+            if any((workspace / name).exists() for name in _SOLUTION_TREES):
+                raise AdapterError("the agent workspace contains a solution tree.", 1)
             arms.append(_run_stub_arm(loaded, arm, workspace, reference, commands))
         aic = next(item for item in prepared.arms if item["id"] == "aic")
         wiring = _wiring(loaded, aic, root / "work" / "aic", root, dict(os.environ))
@@ -956,7 +1226,7 @@ def run_live(parent: dict[str, str], registry: dict | None = None) -> dict:
             costs = []
             for track, slug in selected:
                 workspace = root / "work" / arm["id"] / slug
-                prepare_workspace(checkouts[(track["id"], slug)], slug, workspace)
+                prepare_workspace(checkouts[(track["id"], slug)], slug, workspace, track)
                 prompt = (
                     f"Task id: polyglot-{track['id']}-{slug}\n"
                     "Edit the solution files so the exercise tests pass. "

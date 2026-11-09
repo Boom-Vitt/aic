@@ -1,5 +1,7 @@
 """Aider polyglot fetches pinned Exercism tracks and does not vendor them."""
+import hashlib
 import importlib.util
+import io
 import json
 import os
 from contextlib import redirect_stderr, redirect_stdout
@@ -10,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,7 +23,9 @@ from benchmarks.baselines.adapter import AdapterError
 from benchmarks.polyglot.adapter import (
     COPYRIGHT,
     DECOY_MARKER,
+    FIXTURE_COPYRIGHT,
     FIXTURE_SLUG,
+    FIXTURE_SOLUTION_MARKER,
     LICENSE_SHA,
     MISSING_KEY,
     fetch_track,
@@ -87,6 +92,28 @@ class PolyglotPinTests(unittest.TestCase):
         self.assertEqual(len(set(names)), 225)
         selected = planned_exercises(pins)
         self.assertEqual([(track["id"], slug) for track, slug in selected], [("cpp", "all-your-base")])
+        notice = pins["nested_notices"][0]
+        self.assertEqual(notice["id"], "bsl-1.0")
+        self.assertEqual(notice["sha256"], hashlib.sha256((ROOT / "benchmarks" / "polyglot" / "notices" / "BSL-1.0.txt").read_bytes()).hexdigest())
+        expected_nested = {
+            "cpp": ["test/catch.hpp", "test/catch_amalgamated.hpp", "test/catch_amalgamated.cpp"],
+            "go": [],
+            "java": ["gradlew", "gradlew.bat", "gradle/wrapper/gradle-wrapper.jar"],
+            "javascript": [],
+            "python": [],
+            "rust": [],
+        }
+        for track in pins["tracks"]:
+            self.assertEqual([item["path"] for item in track["nested_components"]], expected_nested[track["id"]])
+        catch = pins["tracks"][0]["nested_components"][0]
+        self.assertEqual(catch["spdx"], "BSL-1.0")
+        self.assertEqual(catch["sha256"], "e11ac6b2994c046909c4a7c730a6a536e8f9563172563026878b7baadecdf553")
+        self.assertEqual(catch["copyright_notice"], "Copyright (c) 2021 Two Blue Cubes Ltd. All rights reserved.")
+        self.assertEqual(catch["accompanying_path"], "test/LICENSE_1_0.txt")
+        bat = pins["tracks"][2]["nested_components"][1]
+        self.assertEqual(bat["sha256"], "475c4f08cd57cf2faa819e7f36d72aa93f0ad646ea23a8f7fa3ef54dee1cbc52")
+        jar = pins["tracks"][2]["nested_components"][2]
+        self.assertEqual(jar["zip_entries"][0]["sha256"], "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594")
 
     def test_docs_record_the_same_commits_and_do_not_claim_a_score(self):
         benchmarks = (ROOT / "docs" / "BENCHMARKS.md").read_text(encoding="utf-8")
@@ -99,6 +126,12 @@ class PolyglotPinTests(unittest.TestCase):
             self.assertIn(commit, benchmarks)
             self.assertIn(f"exercism/{track}", benchmarks)
         self.assertIn("2026-11-09", benchmarks)
+        self.assertIn("BSL-1.0", benchmarks)
+        self.assertIn("Two Blue Cubes", benchmarks)
+        self.assertIn("e11ac6b2994c046909c4a7c730a6a536e8f9563172563026878b7baadecdf553", benchmarks)
+        self.assertIn(".approaches", benchmarks)
+        self.assertIn("not the official Aider suite", benchmarks)
+        self.assertIn("max_usd` 0.35", benchmarks)
         self.assertNotIn("Leave Aider polyglot unwired until", roadmap)
         self.assertIn("heldout-v2", roadmap)
         self.assertIn("| Date | Suite |", roadmap)
@@ -126,8 +159,15 @@ class PolyglotFetchTests(unittest.TestCase):
         workspace = self.root / "work"
         prepare_workspace(dest, FIXTURE_SLUG, workspace)
         self.assertTrue((workspace / "sum_digits_test.py").is_file())
+        self.assertTrue((workspace / ".docs" / "instructions.md").is_file())
         self.assertFalse((workspace / ".meta").exists())
-        self.assertNotIn(DECOY_MARKER, "\n".join(path.read_text(encoding="utf-8") for path in workspace.rglob("*") if path.is_file()))
+        self.assertFalse((workspace / ".approaches").exists())
+        self.assertFalse((workspace / ".articles").exists())
+        self.assertFalse((workspace / "snippet.txt").exists())
+        copied = "\n".join(path.read_text(encoding="utf-8") for path in workspace.rglob("*") if path.is_file())
+        self.assertNotIn(DECOY_MARKER, copied)
+        self.assertNotIn(FIXTURE_SOLUTION_MARKER, copied)
+        self.assertIn(FIXTURE_COPYRIGHT, (workspace / "LICENSE").read_text(encoding="utf-8"))
         failed = score_exercise(workspace, track["test_commands"])
         self.assertFalse(failed["passed"])
         (workspace / "sum_digits.py").write_text("def add(left, right):\n    return left + right\n", encoding="utf-8")
@@ -152,6 +192,142 @@ class PolyglotFetchTests(unittest.TestCase):
         with self.assertRaises(AdapterError):
             fetch_track(track, dest, FIXTURE_SLUG, url=str(source))
         self.assertFalse(dest.exists())
+
+    def _license_track(self, source: Path, components: list[dict], notices: list[dict] | None = None) -> dict:
+        track = write_fixture(source)
+        track["nested_components"] = components
+        track["nested_notices"] = notices or []
+        return track
+
+    def test_workspace_attaches_a_missing_boost_notice_and_keeps_the_header(self):
+        source = self.root / "source"
+        notice = (ROOT / "benchmarks" / "polyglot" / "notices" / "BSL-1.0.txt").read_bytes()
+        header = (
+            "/*\n"
+            " *  Catch v2.13.6\n"
+            " *  Copyright (c) 2021 Two Blue Cubes Ltd. All rights reserved.\n"
+            " *  Distributed under the Boost Software License, Version 1.0. (See accompanying\n"
+            " *  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)\n"
+            " */\n"
+            "int tests() { return 1; }\n"
+        ).encode()
+        component = {
+            "path": "test/catch.hpp",
+            "sha256": hashlib.sha256(header).hexdigest(),
+            "spdx": "BSL-1.0",
+            "name": "Catch v2.13.6",
+            "copyright_notice": "Copyright (c) 2021 Two Blue Cubes Ltd. All rights reserved.",
+            "required_notices": [
+                "Copyright (c) 2021 Two Blue Cubes Ltd. All rights reserved.",
+                "Distributed under the Boost Software License, Version 1.0.",
+                "file LICENSE_1_0.txt",
+            ],
+            "accompanying_notice": "bsl-1.0",
+            "accompanying_path": "test/LICENSE_1_0.txt",
+        }
+        notices = [{
+            "id": "bsl-1.0",
+            "spdx": "BSL-1.0",
+            "path": "notices/BSL-1.0.txt",
+            "sha256": hashlib.sha256(notice).hexdigest(),
+        }]
+        track = self._license_track(source, [component], notices)
+        checkout = self.root / "checkout"
+        fetch_track(track, checkout, FIXTURE_SLUG, url=str(source))
+        practice = checkout / "exercises" / "practice" / FIXTURE_SLUG
+        catch = practice / "test" / "catch.hpp"
+        catch.parent.mkdir()
+        catch.write_bytes(header)
+        workspace = self.root / "work"
+        prepare_workspace(checkout, FIXTURE_SLUG, workspace, track)
+        self.assertEqual((workspace / "test" / "catch.hpp").read_bytes(), header)
+        self.assertEqual((workspace / "test" / "LICENSE_1_0.txt").read_bytes(), notice)
+        self.assertNotIn(FIXTURE_SOLUTION_MARKER, "\n".join(
+            path.read_text(encoding="utf-8") for path in workspace.rglob("*") if path.is_file()
+        ))
+        self.assertTrue((workspace / "sum_digits_test.py").is_file())
+
+    def test_a_mismatched_nested_digest_is_not_left_in_the_workspace(self):
+        source = self.root / "source"
+        notice = (ROOT / "benchmarks" / "polyglot" / "notices" / "BSL-1.0.txt").read_bytes()
+        header = b"Copyright (c) 2021 Two Blue Cubes Ltd. All rights reserved.\nDistributed under the Boost Software License, Version 1.0.\nfile LICENSE_1_0.txt\n"
+        component = {
+            "path": "test/catch.hpp",
+            "sha256": "0" * 64,
+            "spdx": "BSL-1.0",
+            "name": "Catch v2.13.6",
+            "copyright_notice": "Copyright (c) 2021 Two Blue Cubes Ltd. All rights reserved.",
+            "required_notices": [
+                "Copyright (c) 2021 Two Blue Cubes Ltd. All rights reserved.",
+                "Boost Software License, Version 1.0",
+            ],
+            "accompanying_notice": "bsl-1.0",
+            "accompanying_path": "test/LICENSE_1_0.txt",
+        }
+        track = self._license_track(source, [component], [{
+            "id": "bsl-1.0",
+            "spdx": "BSL-1.0",
+            "path": "notices/BSL-1.0.txt",
+            "sha256": hashlib.sha256(notice).hexdigest(),
+        }])
+        checkout = self.root / "checkout"
+        fetch_track(track, checkout, FIXTURE_SLUG, url=str(source))
+        catch = checkout / "exercises" / "practice" / FIXTURE_SLUG / "test" / "catch.hpp"
+        catch.parent.mkdir()
+        catch.write_bytes(header)
+        workspace = self.root / "work"
+        with self.assertRaises(AdapterError):
+            prepare_workspace(checkout, FIXTURE_SLUG, workspace, track)
+        self.assertFalse(workspace.exists())
+
+    def test_an_unpinned_non_mit_header_is_not_copied(self):
+        source = self.root / "source"
+        track = self._license_track(source, [])
+        checkout = self.root / "checkout"
+        fetch_track(track, checkout, FIXTURE_SLUG, url=str(source))
+        helper = checkout / "exercises" / "practice" / FIXTURE_SLUG / "helper.py"
+        helper.write_text(
+            "# Licensed under the Apache License, Version 2.0 (the \"License\");\n",
+            encoding="utf-8",
+        )
+        workspace = self.root / "work"
+        with self.assertRaises(AdapterError):
+            prepare_workspace(checkout, FIXTURE_SLUG, workspace, track)
+        self.assertFalse(workspace.exists())
+
+    def test_a_zip_entry_notice_must_match_before_the_archive_is_kept(self):
+        source = self.root / "source"
+        license_text = b"Apache License\nVersion 2.0, January 2004\n"
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("META-INF/LICENSE", license_text)
+        blob = buffer.getvalue()
+        component = {
+            "path": "gradle/wrapper/gradle-wrapper.jar",
+            "sha256": hashlib.sha256(blob).hexdigest(),
+            "spdx": "Apache-2.0",
+            "name": "Gradle Wrapper",
+            "copyright_notice": "Copyright 2015 the original author or authors.",
+            "zip_entries": [{
+                "path": "META-INF/LICENSE",
+                "sha256": hashlib.sha256(license_text).hexdigest(),
+                "required_notices": ["Apache License", "Version 2.0, January 2004"],
+            }],
+        }
+        track = self._license_track(source, [component])
+        checkout = self.root / "checkout"
+        fetch_track(track, checkout, FIXTURE_SLUG, url=str(source))
+        jar = checkout / "exercises" / "practice" / FIXTURE_SLUG / "gradle" / "wrapper" / "gradle-wrapper.jar"
+        jar.parent.mkdir(parents=True)
+        jar.write_bytes(blob)
+        workspace = self.root / "work"
+        prepare_workspace(checkout, FIXTURE_SLUG, workspace, track)
+        self.assertEqual((workspace / "gradle" / "wrapper" / "gradle-wrapper.jar").read_bytes(), blob)
+        jar.write_bytes(blob + b"tampered")
+        other = self.root / "tampered"
+        with self.assertRaises(AdapterError):
+            prepare_workspace(checkout, FIXTURE_SLUG, other, track)
+        self.assertFalse(other.exists())
 
 
 class PolyglotStubTests(unittest.TestCase):
